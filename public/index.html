@@ -51,7 +51,8 @@
     background: var(--panel2); color: var(--text); border: 1px solid var(--border2);
     border-radius: 8px; padding: 6px 9px; font-size: 13px; max-width: 40vw;
   }
-  header #session { font-weight: 600; }
+  header #session { font-weight: 600; max-width: 30vw; }
+  header button { padding: 6px 8px; }
   #logs { flex: 1; position: relative; overflow: hidden; }
   .log { position: absolute; inset: 0; overflow-y: auto; padding: 14px; display: none; flex-direction: column; gap: 10px; }
   .log.active { display: flex; }
@@ -111,6 +112,8 @@
     <span class="dot"></span>
     <select id="session" aria-label="Oturum"></select>
     <button id="newSession" title="Yeni oturum">＋</button>
+    <button id="renameSession" title="Yeniden adlandır" aria-label="Yeniden adlandır">✎</button>
+    <button id="delSession" title="Oturumu sil" aria-label="Oturumu sil">🗑</button>
     <span class="spacer"></span>
     <button id="theme" title="Tema" aria-label="Tema">🌗</button>
     <button id="reset">Yeni sohbet</button>
@@ -225,7 +228,7 @@
   let recognizing = false;
 
   const S = new Map();   // sessionId -> { meta, logEl, turn }
-  let activeId = null;
+  let activeId = null, defaultSessionId = null;
   const active = () => S.get(activeId);
   const setStatus = (t) => { statusEl.textContent = t || ""; };
 
@@ -528,6 +531,30 @@
   });
 
   sessionSel.addEventListener("change", () => switchTo(sessionSel.value));
+
+  $("renameSession").addEventListener("click", async () => {
+    const st = active(); if (!st) return;
+    const name = (prompt("Yeni isim:", st.meta.name) || "").trim();
+    if (!name || name === st.meta.name) return;
+    try {
+      const r = await fetch("/api/sessions/" + activeId, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ name }) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Olmadı");
+      st.meta = data.session; rebuildSessionSelect();
+    } catch (e) { alert("⚠️ " + e.message); }
+  });
+  $("delSession").addEventListener("click", async () => {
+    if (activeId === defaultSessionId) { alert("Varsayılan oturum silinemez."); return; }
+    const st = active(); if (!st) return;
+    if (!confirm(`"${st.meta.name}" oturumu silinsin mi?`)) return;
+    try {
+      const r = await fetch("/api/sessions/" + activeId, { method: "DELETE", headers: authHeaders() });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Olmadı"); }
+      st.logEl.remove(); S.delete(activeId);
+      activeId = defaultSessionId && S.has(defaultSessionId) ? defaultSessionId : (S.keys().next().value || null);
+      rebuildSessionSelect(); if (activeId) switchTo(activeId);
+    } catch (e) { alert("⚠️ " + e.message); }
+  });
   modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; prefs.mode = modeSel.value; savePrefs(); });
   langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); });
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
@@ -625,7 +652,8 @@
     let list = { sessions: [], defaultSessionId: null };
     try { list = await (await fetch("/api/sessions", { headers: authHeaders() })).json(); } catch (_) {}
     (list.sessions || []).forEach(addSessionState);
-    activeId = list.defaultSessionId || (list.sessions[0] && list.sessions[0].id);
+    defaultSessionId = list.defaultSessionId || (list.sessions[0] && list.sessions[0].id) || null;
+    activeId = defaultSessionId;
     if (!activeId && S.size) activeId = S.keys().next().value;
     rebuildSessionSelect();
     if (prefs.voice) for (const st of S.values()) st.meta.voice = true;

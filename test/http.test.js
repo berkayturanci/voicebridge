@@ -79,6 +79,16 @@ test("voice mode prepends the TTS preamble to the prompt sent to the agent", asy
   assert.match(text, /do x/);
 });
 
+test("a session can be renamed via POST /api/sessions/:id", async () => {
+  const create = await request(server, "POST", "/api/sessions", { name: "old", agent: "claude", projectDir: process.cwd() });
+  const { session } = JSON.parse(create.data);
+  const upd = await request(server, "POST", "/api/sessions/" + session.id, { name: "new name" });
+  assert.strictEqual(upd.status, 200);
+  assert.strictEqual(JSON.parse(upd.data).session.name, "new name");
+  const miss = await request(server, "POST", "/api/sessions/nope", { name: "x" });
+  assert.strictEqual(miss.status, 404);
+});
+
 test("sessions can be listed and deleted; default is protected", async () => {
   const create = await request(server, "POST", "/api/sessions", { agent: "antigravity", projectDir: process.cwd() });
   const { session } = JSON.parse(create.data);

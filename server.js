@@ -427,6 +427,20 @@ function handleRequest(req, res) {
       return sendJson(res, existed ? 200 : 404, existed ? { ok: true } : { error: "Not found" });
     }
 
+    // Update a session's name / mode / voice.
+    if (req.method === "POST" && urlPath.startsWith("/api/sessions/")) {
+      const id = urlPath.slice("/api/sessions/".length);
+      const s = sessions.get(id);
+      if (!s) return sendJson(res, 404, { error: "Not found" });
+      return readBody(req, 64 * 1024, (e, body) => {
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        if (typeof data.name === "string" && data.name.trim()) s.name = data.name.trim();
+        if (data.mode && AGENTS[s.agent].modes[data.mode]) s.mode = data.mode;
+        if (typeof data.voice === "boolean") s.voice = data.voice;
+        return sendJson(res, 200, { session: publicSession(s) });
+      });
+    }
+
     if (req.method === "POST" && urlPath === "/api/ask") {
       return readBody(req, 64 * 1024, (e, body) => {
         if (e) return sendJson(res, 400, { error: "Bad request" });

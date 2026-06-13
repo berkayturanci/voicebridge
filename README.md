@@ -135,7 +135,8 @@ transcribes). Hands-free loop is browser-mode only.
   Antigravity), a **mode**, a **project folder**, and a name. Save frequent
   projects as **favorites** (★) for one-tap prefill (or seed them with `FAVORITES`).
 - The session **dropdown** switches between conversations; each keeps its own
-  transcript, project directory, agent, and mode.
+  transcript, project directory, agent, and mode. **✎** renames and **🗑** deletes
+  the active session (the default session is protected).
 - **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or
   tap ➤; the 🎤 button does voice. **Yeni sohbet** resets the active session; the
   **🎤 → ⏹** button becomes a Stop control while the agent answers or speaks.
