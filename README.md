@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/hero.svg" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
+  <img src="docs/hero.png" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
 </p>
 
 # voicebridge
