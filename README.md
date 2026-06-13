@@ -1,6 +1,13 @@
+<p align="center">
+  <img src="docs/hero.svg" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
+</p>
+
 # voicebridge
 
 [![CI](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml)
+[![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-3fb950)](package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1f6feb)](LICENSE)
+[![Agents: Claude · Codex · Antigravity · Ollama](https://img.shields.io/badge/agents-Claude%20%C2%B7%20Codex%20%C2%B7%20Antigravity%20%C2%B7%20Ollama-8b949e)](#agents-sessions--modes)
 
 **Hands-free, two-way voice for your coding agent from your phone — free, open-source, no ElevenLabs.**
 
@@ -52,12 +59,13 @@ like a phone call with your agent, with a keyboard when you want one.
 git clone <your-repo-url> voicebridge && cd voicebridge && npm install
 cp .env.example .env                                  # set PROJECT_DIR + ACCESS_TOKEN
 CLAUDE_BIN=$(which claude) npm start                  # prints a QR for your phone
-tailscale serve --bg 8787                             # expose over HTTPS (separate terminal)
+tailscale serve --bg --https=443 localhost:8787       # expose over HTTPS (separate terminal)
 ```
 
 Then open the printed `https://…ts.net` URL in your phone's browser (Safari on
-iOS) and tap 🎤 or just type. New to it? See [Requirements](#requirements) and
-[Troubleshooting](#troubleshooting).
+iOS) and tap 🎤 or just type. New to it? See [Requirements](#requirements),
+[Troubleshooting](#troubleshooting), and the step-by-step
+[mobile voice setup](docs/mobile-voice-setup.md) (why the mic needs HTTPS).
 
 ## Requirements
 
@@ -92,13 +100,19 @@ the UI (and, when `ACCESS_TOKEN`/`PUBLIC_URL` are set, to authorize on open).
 
 ### 2. Expose it to your phone over HTTPS (Tailscale)
 
-Web Speech needs a secure context. Tailscale gives your machine a real HTTPS
-cert automatically:
+Web Speech needs a secure context (HTTPS) — over plain `http://<lan-ip>` a
+phone's browser disables the mic. Tailscale gives your machine a real HTTPS cert
+automatically:
 
 ```bash
-tailscale serve --bg 8787
+tailscale serve --bg --https=443 localhost:8787
 tailscale serve status     # shows the https://<your-machine>.<tailnet>.ts.net URL
 ```
+
+The **first time** you run `tailscale serve`, you may have to enable the feature
+once for your tailnet — it prints a `login.tailscale.com/f/serve?node=…` link;
+open it and toggle Serve on. Full walkthrough (and the *why*) in
+[docs/mobile-voice-setup.md](docs/mobile-voice-setup.md).
 
 ### 3. On your phone
 
@@ -249,6 +263,8 @@ CLAUDE_BIN=/tmp/claude npm start   # open the printed URL, type or speak
 | Symptom | Fix |
 |---------|-----|
 | Mic does nothing / "https şart" | Web Speech needs HTTPS — open the `tailscale serve` URL, not `http://…`. |
+| Mic button is **greyed out / disabled** on mobile | You're on a non-HTTPS origin (e.g. `http://<lan-ip>`). Open the `https://…ts.net` URL instead. See [mobile voice setup](docs/mobile-voice-setup.md). |
+| `Serve is not enabled on your tailnet` | One-time: open the printed `login.tailscale.com/f/serve?node=…` link and enable Serve in the admin console. |
 | iOS mic doesn't work | Use the Safari **tab**, not an installed PWA (iOS blocks the mic in installed PWAs). |
 | "Could not find 'claude'…" | Set `CLAUDE_BIN` to the agent's path (`which claude`) and make sure it's logged in. |
 | 401 / keeps asking for a token | `ACCESS_TOKEN` is set — enter it once on the phone, or scan the QR (it carries the token). |
@@ -266,6 +282,7 @@ Details in [docs/security.md](docs/security.md).
 
 ## Documentation
 
+- [docs/mobile-voice-setup.md](docs/mobile-voice-setup.md) — get the mic working on your phone (HTTPS + Tailscale, step by step).
 - [docs/architecture.md](docs/architecture.md) — components, request flow, and the agent-adapter design.
 - [docs/configuration.md](docs/configuration.md) — full env-var reference, agents, and modes.
 - [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.

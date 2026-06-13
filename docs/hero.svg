@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <radialGradient id="greenGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#238636" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#238636" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blueGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1f6feb" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#1f6feb" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b2027"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#21262d"/>
+    </pattern>
+  </defs>
+
+  <!-- background -->
+  <rect width="1200" height="630" fill="#0d1117"/>
+  <rect width="1200" height="630" fill="url(#dots)" opacity="0.55"/>
+  <ellipse cx="120" cy="80" rx="520" ry="360" fill="url(#greenGlow)"/>
+  <ellipse cx="1080" cy="600" rx="520" ry="360" fill="url(#blueGlow)"/>
+  <rect x="16" y="16" width="1168" height="598" rx="26" fill="none" stroke="#21262d"/>
+
+  <!-- ===== Left: brand + copy ===== -->
+  <!-- logo badge (the app icon mark) -->
+  <rect x="72" y="60" width="96" height="96" rx="22" fill="#161b22" stroke="#30363d"/>
+  <g transform="translate(53.4,43.5) scale(0.26)">
+    <g fill="none" stroke="#3fb950" stroke-width="20" stroke-linecap="round">
+      <path d="M196 250 a60 60 0 0 0 120 0"/>
+      <path d="M150 230 a106 106 0 0 0 212 0" opacity="0.5"/>
+    </g>
+    <rect x="226" y="120" width="60" height="150" rx="30" fill="#238636"/>
+    <rect x="248" y="318" width="16" height="46" rx="8" fill="#3fb950"/>
+    <rect x="214" y="360" width="84" height="16" rx="8" fill="#3fb950"/>
+  </g>
+
+  <text x="190" y="118" fill="#e6edf3" font-size="62" font-weight="800" letter-spacing="-1.5">voicebridge</text>
+  <text x="192" y="150" fill="#3fb950" font-size="17" font-weight="600" letter-spacing="3">HANDS-FREE VOICE FOR YOUR CODING AGENT</text>
+
+  <!-- tagline -->
+  <text x="72" y="222" fill="#c9d1d9" font-size="29" font-weight="600">Talk to Claude Code from your phone.</text>
+  <text x="72" y="260" fill="#8b949e" font-size="22">You speak or type; the agent does the work and replies</text>
+  <text x="72" y="289" fill="#8b949e" font-size="22">in chat <tspan fill="#c9d1d9">and aloud</tspan> — free, open-source, no ElevenLabs.</text>
+
+  <!-- feature pills -->
+  <g font-size="17">
+    <rect x="72" y="320" width="430" height="34" rx="17" fill="#161b22" stroke="#30363d"/>
+    <circle cx="92" cy="337" r="4" fill="#3fb950"/>
+    <text x="106" y="343" fill="#adbac7">Claude · Codex · Antigravity · Ollama</text>
+
+    <rect x="72" y="364" width="236" height="34" rx="17" fill="#161b22" stroke="#30363d"/>
+    <circle cx="92" cy="381" r="4" fill="#1f6feb"/>
+    <text x="106" y="387" fill="#adbac7">Web Speech STT + TTS</text>
+
+    <rect x="318" y="364" width="184" height="34" rx="17" fill="#161b22" stroke="#30363d"/>
+    <circle cx="338" cy="381" r="4" fill="#d29922"/>
+    <text x="352" y="387" fill="#adbac7">Tailscale HTTPS</text>
+  </g>
+
+  <!-- tiny-setup command card -->
+  <rect x="72" y="430" width="486" height="96" rx="12" fill="#161b22" stroke="#21262d"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">
+    <text x="90" y="462"><tspan fill="#3fb950">$</tspan> <tspan fill="#e6edf3">npm start</tspan> <tspan fill="#6e7681"># prints a QR for your phone</tspan></text>
+    <text x="90" y="490"><tspan fill="#3fb950">$</tspan> <tspan fill="#e6edf3">tailscale serve --bg --https=443 localhost:8787</tspan></text>
+    <text x="90" y="513" font-size="14" fill="#6e7681">scan the QR  ·  open in Safari  ·  tap 🎤 and speak</text>
+  </g>
+
+  <!-- footer line -->
+  <text x="72" y="566" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6e7681">github.com/berkayturanci/speak-with-claude-code</text>
+  <text x="520" y="566" font-size="16" fill="#484f58">·  MIT</text>
+
+  <!-- ===== Right: phone mockup ===== -->
+  <ellipse cx="935" cy="320" rx="220" ry="280" fill="url(#greenGlow)" opacity="0.7"/>
+
+  <!-- device -->
+  <rect x="812" y="64" width="262" height="502" rx="34" fill="url(#frame)" stroke="#30363d" stroke-width="1.5"/>
+  <rect x="824" y="76" width="238" height="478" rx="24" fill="#0d1117" stroke="#21262d"/>
+
+  <!-- header -->
+  <circle cx="848" cy="106" r="5" fill="#3fb950"/>
+  <rect x="862" y="95" width="120" height="24" rx="8" fill="#21262d" stroke="#30363d"/>
+  <text x="874" y="111" fill="#e6edf3" font-size="13" font-weight="600">Claude  ▾</text>
+  <rect x="990" y="95" width="60" height="24" rx="8" fill="#21262d" stroke="#30363d"/>
+  <text x="1000" y="111" fill="#8b949e" font-size="11">＋  🌗</text>
+  <line x1="824" y1="132" x2="1062" y2="132" stroke="#21262d"/>
+
+  <!-- chat: user bubble -->
+  <rect x="892" y="150" width="160" height="32" rx="15" fill="#1f6feb"/>
+  <text x="908" y="171" fill="#fff" font-size="13">login’e doğrulama ekle</text>
+
+  <!-- chat: agent bubble -->
+  <rect x="836" y="196" width="210" height="112" rx="15" fill="#161b22" stroke="#21262d"/>
+  <text x="852" y="219" fill="#e6edf3" font-size="13">Email + şifre kontrolü ekledim:</text>
+  <rect x="852" y="230" width="178" height="40" rx="8" fill="#0d1117" stroke="#30363d"/>
+  <text x="862" y="246" font-family="ui-monospace, monospace" font-size="11" fill="#7ee787">if (!email) throw</text>
+  <text x="862" y="262" font-family="ui-monospace, monospace" font-size="11" fill="#7ee787">  Error("email gerekli")</text>
+  <text x="852" y="296" fill="#e6edf3" font-size="13">18 test geçti, push edildi. ✅</text>
+
+  <!-- secured-connection badge straddling the phone edge -->
+  <g>
+    <rect x="760" y="330" width="150" height="34" rx="17" fill="#161b22" stroke="#30363d"/>
+    <text x="778" y="352" font-size="14" fill="#d29922">🔒</text>
+    <text x="800" y="352" font-size="14" fill="#c9d1d9">Tailscale · HTTPS</text>
+  </g>
+
+  <!-- composer -->
+  <line x1="824" y1="486" x2="1062" y2="486" stroke="#21262d"/>
+  <rect x="836" y="500" width="150" height="40" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <text x="850" y="525" fill="#8b949e" font-size="13">Yaz ya da konuş…</text>
+  <circle cx="1004" cy="520" r="17" fill="#1f6feb"/>
+  <text x="1004" y="525" fill="#fff" font-size="15" text-anchor="middle">➤</text>
+  <!-- mic (listening) with sound waves -->
+  <circle cx="1044" cy="520" r="19" fill="#da3633"/>
+  <text x="1044" y="526" fill="#fff" font-size="16" text-anchor="middle">🎤</text>
+  <g fill="none" stroke="#da3633" stroke-linecap="round" stroke-width="2.5">
+    <path d="M1068 506 a22 22 0 0 1 0 28" opacity="0.8"/>
+    <path d="M1076 498 a34 34 0 0 1 0 44" opacity="0.45"/>
+    <path d="M1084 490 a46 46 0 0 1 0 60" opacity="0.22"/>
+  </g>
+
+  <!-- mini voice waveform -->
+  <g fill="#3fb950">
+    <rect x="858" y="468" width="3" height="10" rx="1.5"/>
+    <rect x="865" y="463" width="3" height="20" rx="1.5"/>
+    <rect x="872" y="458" width="3" height="30" rx="1.5"/>
+    <rect x="879" y="465" width="3" height="16" rx="1.5"/>
+    <rect x="886" y="460" width="3" height="26" rx="1.5"/>
+    <rect x="893" y="467" width="3" height="12" rx="1.5"/>
+    <rect x="900" y="463" width="3" height="20" rx="1.5"/>
+  </g>
+</svg>
