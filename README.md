@@ -132,7 +132,8 @@ transcribes). Hands-free loop is browser-mode only.
 ## Agents, sessions & modes
 
 - Tap **＋** in the header to create a session: pick an **agent** (Claude / Codex /
-  Antigravity), a **mode**, a **project folder**, and a name.
+  Antigravity), a **mode**, a **project folder**, and a name. Save frequent
+  projects as **favorites** (★) for one-tap prefill (or seed them with `FAVORITES`).
 - The session **dropdown** switches between conversations; each keeps its own
   transcript, project directory, agent, and mode.
 - **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or

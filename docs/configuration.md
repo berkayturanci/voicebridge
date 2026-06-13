@@ -18,6 +18,7 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `ACCESS_TOKEN` | _(none)_ | If set, every `/api/*` route (except `/api/config`) requires `Authorization: Bearer <token>`. |
 | `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
 | `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
+| `FAVORITES` | _(none)_ | JSON array of favorite projects to prefill the new-session dialog, e.g. `[{"name":"App","projectDir":"/Users/me/app","agent":"claude","mode":"full"}]`. Users can also save their own favorites locally. |
 
 ## Agents
 

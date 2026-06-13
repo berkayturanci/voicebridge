@@ -48,6 +48,22 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 let PKG_VERSION = "0.0.0";
 try { PKG_VERSION = require("./package.json").version || PKG_VERSION; } catch (_) {}
 
+// Optional server-provided favorite projects, from FAVORITES (a JSON array of
+// { name?, projectDir, agent?, mode? }). Used to prefill the new-session dialog.
+function parseFavorites(str) {
+  if (!str) return [];
+  try {
+    const a = JSON.parse(str);
+    if (!Array.isArray(a)) return [];
+    return a
+      .filter((f) => f && typeof f.projectDir === "string" && f.projectDir)
+      .map((f) => ({ name: f.name || f.projectDir, projectDir: f.projectDir, agent: f.agent, mode: f.mode }));
+  } catch (_) {
+    return [];
+  }
+}
+const FAVORITES = parseFavorites(process.env.FAVORITES);
+
 // ---------------------------------------------------------------------------
 // Agent backends
 //
@@ -378,6 +394,7 @@ function handleRequest(req, res) {
       })),
       defaultProjectDir: DEFAULT_PROJECT_DIR,
       defaultSessionId,
+      favorites: FAVORITES,
     });
   }
 
@@ -501,6 +518,7 @@ module.exports = {
   parseClaudeLine,
   resolveMode,
   buildPrompt,
+  parseFavorites,
   phoneUrl,
   sessions,
   createSession,
