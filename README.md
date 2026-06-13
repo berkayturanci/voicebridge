@@ -38,8 +38,9 @@ like a phone call with your agent, with a keyboard when you want one.
 > **Codex** (`codex exec`) and **Antigravity** (`agy --print`) backends use the
 > same invocations as [ai-jury](https://github.com/berkayturanci/ai-jury) and
 > stream their plain-text stdout; verify them on your own machine. Conversation
-> continuity (`--continue`) is currently Claude-only — other agents treat each
-> turn as fresh.
+> continuity is built-in for Claude (`--continue`) and opt-in for Codex /
+> Antigravity via `CODEX_CONTINUE_ARGS` / `AGY_CONTINUE_ARGS` (see
+> [docs/configuration.md](docs/configuration.md)).
 
 ---
 
