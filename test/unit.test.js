@@ -23,6 +23,20 @@ test("codex/antigravity adapters still pipe the prompt on stdin", () => {
   assert.strictEqual(srv.AGENTS.antigravity.command("go").stdin, "go");
 });
 
+test("codex resume is opt-in via CODEX_CONTINUE_ARGS", () => {
+  const prev = process.env.CODEX_CONTINUE_ARGS;
+  delete process.env.CODEX_CONTINUE_ARGS;
+  assert.strictEqual(srv.AGENTS.codex.supportsContinue, false);
+  assert.deepStrictEqual(srv.AGENTS.codex.command("p", { cont: true }).argv, ["exec"]);
+  process.env.CODEX_CONTINUE_ARGS = "resume --last";
+  assert.strictEqual(srv.AGENTS.codex.supportsContinue, true);
+  assert.deepStrictEqual(
+    srv.AGENTS.codex.command("p", { cont: true, modeArgs: ["--full-auto"] }).argv,
+    ["exec", "resume", "--last", "--full-auto"]
+  );
+  if (prev === undefined) delete process.env.CODEX_CONTINUE_ARGS; else process.env.CODEX_CONTINUE_ARGS = prev;
+});
+
 test("codex adapter: `exec` with prompt on stdin", () => {
   const { argv, stdin } = srv.AGENTS.codex.command("do it");
   assert.deepStrictEqual(argv, ["exec"]);

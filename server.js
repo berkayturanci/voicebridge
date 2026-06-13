@@ -74,6 +74,11 @@ const FAVORITES = parseFavorites(process.env.FAVORITES);
 //   - Antigravity : agy --print           (prompt on stdin, plain-text stdout)
 // ---------------------------------------------------------------------------
 
+// Split a space-separated argument string from the environment into argv parts.
+function splitArgs(str) {
+  return (str || "").trim().split(/\s+/).filter(Boolean);
+}
+
 // Pull text out of one Claude `stream-json` NDJSON line, or null if it has none.
 function parseClaudeLine(line) {
   let obj;
@@ -138,7 +143,9 @@ const AGENTS = {
   codex: {
     label: "Codex",
     bin: () => process.env.CODEX_BIN || "codex",
-    supportsContinue: false,
+    // Resume is opt-in: set CODEX_CONTINUE_ARGS (e.g. "resume --last") once you
+    // know your codex build's resume flag. Default off — each turn is fresh.
+    get supportsContinue() { return splitArgs(process.env.CODEX_CONTINUE_ARGS).length > 0; },
     stream: "text",
     defaultMode: "auto",
     modes: {
@@ -147,14 +154,16 @@ const AGENTS = {
       full: { label: "Tam otonom", args: ["--dangerously-bypass-approvals-and-sandbox"] },
     },
     // `codex exec` reads the prompt from stdin in non-interactive runs.
-    command(prompt, { modeArgs } = {}) {
-      return { argv: ["exec", ...(modeArgs || [])], stdin: prompt };
+    command(prompt, { cont, modeArgs } = {}) {
+      const resume = cont ? splitArgs(process.env.CODEX_CONTINUE_ARGS) : [];
+      return { argv: ["exec", ...resume, ...(modeArgs || [])], stdin: prompt };
     },
   },
   antigravity: {
     label: "Antigravity",
     bin: () => process.env.AGY_BIN || "agy",
-    supportsContinue: false,
+    // Resume is opt-in via AGY_CONTINUE_ARGS. Default off.
+    get supportsContinue() { return splitArgs(process.env.AGY_CONTINUE_ARGS).length > 0; },
     stream: "text",
     defaultMode: "safe",
     modes: {
@@ -162,8 +171,9 @@ const AGENTS = {
       full: { label: "Tam otonom", args: ["--yolo"] },
     },
     // `agy --print` reads the prompt from stdin when none is given positionally.
-    command(prompt, { modeArgs } = {}) {
-      return { argv: ["--print", ...(modeArgs || [])], stdin: prompt };
+    command(prompt, { cont, modeArgs } = {}) {
+      const resume = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
+      return { argv: ["--print", ...resume, ...(modeArgs || [])], stdin: prompt };
     },
   },
 };

@@ -15,6 +15,8 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `CLAUDE_BIN` | `claude` | Path to the Claude Code executable. |
 | `CODEX_BIN` | `codex` | Path to the Codex executable. |
 | `AGY_BIN` | `agy` | Path to the Antigravity executable. |
+| `CODEX_CONTINUE_ARGS` | _(none)_ | Opt-in Codex resume: argv added on continued turns (e.g. `resume --last`). When set, Codex sessions keep context. Best-effort — verify your build's resume flag. |
+| `AGY_CONTINUE_ARGS` | _(none)_ | Opt-in Antigravity resume: argv added on continued turns. Best-effort. |
 | `ACCESS_TOKEN` | _(none)_ | If set, every `/api/*` route (except `/api/config`) requires `Authorization: Bearer <token>`. |
 | `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
 | `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
@@ -43,8 +45,8 @@ runner is configured). A ready-to-run reference runner lives in
 | Agent | CLI invocation | Prompt delivery | Output | Continuity |
 |-------|----------------|-----------------|--------|------------|
 | `claude` | `claude -p --output-format stream-json --verbose` | positional arg | NDJSON (parsed) | `--continue` (yes) |
-| `codex` | `codex exec` | stdin | plain text | per-turn (no) |
-| `antigravity` | `agy --print` | stdin | plain text | per-turn (no) |
+| `codex` | `codex exec` | stdin | plain text | opt-in (`CODEX_CONTINUE_ARGS`) |
+| `antigravity` | `agy --print` | stdin | plain text | opt-in (`AGY_CONTINUE_ARGS`) |
 
 The Claude backend is fully implemented and tested. The Codex and Antigravity
 backends mirror the invocations used by
