@@ -58,8 +58,11 @@
   .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .claude { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-  .claude pre { margin: 8px 0 2px; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; overflow-x: auto; }
+  .codewrap { position: relative; margin: 8px 0 2px; }
+  .claude pre { margin: 0; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; overflow-x: auto; }
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  .copybtn { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); opacity: .85; }
   .sys { align-self: center; color: var(--muted); font-size: 13px; text-align: center; }
 
   footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); flex: none; display: flex; flex-direction: column; gap: 9px; }
@@ -192,17 +195,41 @@
   }
 
   // ---------- Render: markdown-ish text → bubble with code blocks ----------
+  // Inline `code` and **bold**, built from DOM nodes (never innerHTML).
+  function appendInline(el, text) {
+    const re = /`([^`]+)`|\*\*([^*]+)\*\*/g;
+    let last = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+      if (m[1] != null) { const c = document.createElement("code"); c.textContent = m[1]; el.appendChild(c); }
+      else { const b = document.createElement("strong"); b.textContent = m[2]; el.appendChild(b); }
+      last = re.lastIndex;
+    }
+    if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+  }
   function renderInto(el, text) {
     el.textContent = "";
     const parts = text.split(/```/);
     parts.forEach((part, i) => {
       if (i % 2 === 1) {
+        const code = part.replace(/^\w*\n/, "");
+        const wrap = document.createElement("div");
+        wrap.className = "codewrap";
+        const btn = document.createElement("button");
+        btn.className = "copybtn"; btn.type = "button"; btn.textContent = "Kopyala";
+        btn.addEventListener("click", () => {
+          const done = (txt) => { btn.textContent = txt; setTimeout(() => (btn.textContent = "Kopyala"), 1200); };
+          (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject())
+            .then(() => done("Kopyalandı")).catch(() => done("Hata"));
+        });
         const pre = document.createElement("pre");
-        const code = document.createElement("code");
-        code.textContent = part.replace(/^\w*\n/, "");
-        pre.appendChild(code); el.appendChild(pre);
+        const codeEl = document.createElement("code");
+        codeEl.textContent = code;
+        pre.appendChild(codeEl);
+        wrap.appendChild(btn); wrap.appendChild(pre);
+        el.appendChild(wrap);
       } else if (part) {
-        el.appendChild(document.createTextNode(part));
+        appendInline(el, part);
       }
     });
   }
