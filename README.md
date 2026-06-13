@@ -160,6 +160,9 @@ transcribes). Hands-free loop is browser-mode only.
 - **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or
   tap ➤; the 🎤 button does voice. **Yeni sohbet** resets the active session; the
   **🎤 → ⏹** button becomes a Stop control while the agent answers or speaks.
+- **Talking mode** (📞): a continuous, hands-free voice conversation — speak, it
+  auto-sends on a pause, the reply is read aloud, then it listens again. A minimal
+  voice screen shows *listening / thinking / speaking*. (Needs HTTPS for the mic.)
 - **Local or cloud runner**: each session runs the agent **locally** (CLI on your
   machine) or, when `CLOUD_RUNNER_URL` is set, on a **cloud** runner — same UI,
   same NDJSON protocol. See [docs/configuration.md](docs/configuration.md#runners-local-vs-cloud).
