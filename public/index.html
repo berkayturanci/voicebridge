@@ -834,6 +834,13 @@
   paletteEl.addEventListener("click", (e) => { if (e.target === paletteEl) paletteEl.classList.remove("open"); });
   paletteSearch.addEventListener("input", () => renderPalette(paletteSearch.value));
 
+  // Escape closes any open overlay (or exits talking mode).
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (talking) { exitTalking(); return; }
+    [modal, settingsEl, paletteEl].forEach((m) => m.classList.remove("open"));
+  });
+
   resetBtn.addEventListener("click", async () => {
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}
     const st = active(); if (st) { st.logEl.innerHTML = ""; st.messages = []; persistHistory(st); }
