@@ -148,6 +148,9 @@ transcribes). Hands-free loop is browser-mode only.
 - **Voice-friendly replies**: a "Kısa ses" toggle asks the agent to answer
   concisely for text-to-speech (no long code dumps, ending with a one-line
   summary) — the full text still shows in chat.
+- **Notifications**: opt-in "Bildirim" raises a Web Notification when a reply
+  finishes in the background or ends with a question — so a hands-free task
+  pulls you back when it needs you.
 
 ### Modes (autonomy)
 
