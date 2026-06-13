@@ -1,6 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert");
+const http = require("node:http");
 const { installStubAgents, request, ndjson } = require("./helpers");
 
 installStubAgents();
@@ -112,4 +113,30 @@ test("creating a session with an unknown agent is rejected", async () => {
 test("empty prompt and unknown session are rejected", async () => {
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "  ", sessionId: boot.id })).status, 400);
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "hi", sessionId: "nope" })).status, 404);
+});
+
+test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {
+  // A stub remote runner that speaks our NDJSON protocol.
+  const remote = http.createServer((rq, rs) => {
+    let body = ""; rq.on("data", (c) => (body += c)); rq.on("end", () => {
+      const payload = JSON.parse(body || "{}");
+      rs.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      rs.write(JSON.stringify({ type: "delta", text: "cloud:" + payload.text }) + "\n");
+      rs.end(JSON.stringify({ type: "done" }) + "\n");
+    });
+  });
+  await new Promise((r) => remote.listen(0, "127.0.0.1", r));
+  process.env.CLOUD_RUNNER_URL = "http://127.0.0.1:" + remote.address().port + "/";
+  try {
+    const create = await request(server, "POST", "/api/sessions", { agent: "claude", runner: "cloud", projectDir: "/remote/only" });
+    assert.strictEqual(create.status, 200);
+    const { session } = JSON.parse(create.data);
+    assert.strictEqual(session.runner, "cloud");
+    const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "delta" && /cloud:hi/.test(e.text)));
+    assert.strictEqual(evs[evs.length - 1].type, "done");
+  } finally {
+    delete process.env.CLOUD_RUNNER_URL;
+    await new Promise((r) => remote.close(r));
+  }
 });

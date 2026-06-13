@@ -152,6 +152,14 @@ function resolveMode(agentId, mode) {
   return agent.defaultMode;
 }
 
+// "local" runs the agent CLI here; "cloud" proxies to CLOUD_RUNNER_URL.
+function resolveRunner(runner) {
+  runner = runner || "local";
+  if (runner !== "local" && runner !== "cloud") throw new Error("unknown runner: " + runner);
+  if (runner === "cloud" && !(process.env.CLOUD_RUNNER_URL || "")) throw new Error("cloud runner not configured");
+  return runner;
+}
+
 // ---------------------------------------------------------------------------
 // Session registry
 // ---------------------------------------------------------------------------
@@ -164,12 +172,14 @@ function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
-function createSession({ name, agent, projectDir, mode, voice } = {}) {
+function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
   if (mode && !AGENTS[agent].modes[mode]) throw new Error("unknown mode: " + mode);
+  const run = resolveRunner(runner);
+  // A cloud session may target a directory that only exists on the remote host.
   const dir = projectDir || DEFAULT_PROJECT_DIR;
-  if (!isDir(dir)) throw new Error("project directory not found: " + dir);
+  if (run === "local" && !isDir(dir)) throw new Error("project directory not found: " + dir);
   const id = "s" + (++sessionSeq);
   const s = {
     id,
@@ -178,6 +188,7 @@ function createSession({ name, agent, projectDir, mode, voice } = {}) {
     projectDir: dir,
     mode: resolveMode(agent, mode),
     voice: !!voice,
+    runner: run,
     started: false,
   };
   sessions.set(id, s);
@@ -186,8 +197,8 @@ function createSession({ name, agent, projectDir, mode, voice } = {}) {
 
 function publicSession(s) {
   return {
-    id: s.id, name: s.name, agent: s.agent,
-    agentLabel: AGENTS[s.agent].label, projectDir: s.projectDir, mode: s.mode, voice: s.voice, started: s.started,
+    id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
+    projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, started: s.started,
   };
 }
 
@@ -265,19 +276,48 @@ function buildPrompt(voice, text) {
   return voice ? VOICE_PREAMBLE + "\n\n" + text : text;
 }
 
-function streamAsk(session, prompt, res) {
-  const agent = AGENTS[session.agent];
-  const cont = session.started && agent.supportsContinue;
-  const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
-  const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, modeArgs });
+function cloudRunnerUrl() { return process.env.CLOUD_RUNNER_URL || ""; }
 
+function streamAsk(session, prompt, res) {
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Accel-Buffering": "no",
   });
-
   const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
+  if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
+  return streamLocal(session, prompt, res, emit);
+}
+
+// Cloud runner: proxy the turn to a remote endpoint that speaks the same NDJSON
+// protocol ({type:"delta"|"done"|"error"}). The model/tooling run remotely.
+function streamCloud(session, prompt, res, emit) {
+  const base = cloudRunnerUrl();
+  let url;
+  try { url = new URL(base); } catch (_) { emit({ type: "error", error: "Cloud runner not configured (CLOUD_RUNNER_URL)." }); return res.end(); }
+  const lib = url.protocol === "https:" ? require("https") : require("http");
+  const payload = JSON.stringify({
+    text: buildPrompt(session.voice, prompt),
+    agent: session.agent, mode: session.mode, projectDir: session.projectDir,
+    sessionId: session.id, continue: session.started,
+  });
+  const headers = { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) };
+  if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
+  const up = lib.request(url, { method: "POST", headers }, (r) => {
+    r.on("data", (d) => { try { res.write(d); } catch (_) {} });
+    r.on("end", () => { session.started = true; res.end(); });
+  });
+  up.on("error", (e) => { emit({ type: "error", error: "cloud runner: " + e.message }); res.end(); });
+  up.write(payload); up.end();
+  res.on("close", () => { try { up.destroy(); } catch (_) {} });
+}
+
+// Local runner: spawn the agent CLI on this machine.
+function streamLocal(session, prompt, res, emit) {
+  const agent = AGENTS[session.agent];
+  const cont = session.started && agent.supportsContinue;
+  const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
+  const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, modeArgs });
 
   let child;
   try {
@@ -395,6 +435,7 @@ function handleRequest(req, res) {
       defaultProjectDir: DEFAULT_PROJECT_DIR,
       defaultSessionId,
       favorites: FAVORITES,
+      runners: ["local"].concat((process.env.CLOUD_RUNNER_URL || "") ? ["cloud"] : []),
     });
   }
 
@@ -531,6 +572,7 @@ module.exports = {
   AGENTS,
   parseClaudeLine,
   resolveMode,
+  resolveRunner,
   buildPrompt,
   parseFavorites,
   phoneUrl,

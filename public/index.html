@@ -153,6 +153,7 @@
       </span></label>
       <label>İsim <input id="ns-name" placeholder="ör. Backend refactor" /></label>
       <label>Agent <select id="ns-agent"></select></label>
+      <label id="ns-runner-row" style="display:none">Çalışma yeri <select id="ns-runner"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
       <label>Proje klasörü <input id="ns-dir" placeholder="/Users/you/project" /></label>
       <div class="row">
@@ -292,7 +293,8 @@
     logs.appendChild(logEl);
     const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false } };
     S.set(meta.id, st);
-    addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}\nYaz ya da konuş.`, "sys");
+    const where = meta.runner === "cloud" ? " · ☁️ Bulut" : "";
+    addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nYaz ya da konuş.`, "sys");
     return st;
   }
   function addMsg(sessionId, text, cls) {
@@ -593,9 +595,14 @@
     $("ns-dir").value = f.projectDir || "";
     fillModeSelect(nsMode, nsAgent.value, f.mode);
   }
+  const RUNNER_LABEL = { local: "💻 Yerel", cloud: "☁️ Bulut" };
   function openModal() {
     nsAgent.innerHTML = "";
     (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label; nsAgent.appendChild(o); });
+    const runners = CONFIG.runners || ["local"];
+    const nsRunner = $("ns-runner"); nsRunner.innerHTML = "";
+    runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
+    $("ns-runner-row").style.display = runners.length > 1 ? "flex" : "none";
     $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
     fillModeSelect(nsMode, nsAgent.value);
     renderFavSelect();
@@ -619,7 +626,7 @@
   newSessionBtn.addEventListener("click", openModal);
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {
-    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice };
+    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();
