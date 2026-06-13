@@ -50,7 +50,7 @@ function request(server, method, p, body, headers) {
       (res) => {
         let data = "";
         res.on("data", (c) => (data += c));
-        res.on("end", () => resolve({ status: res.statusCode, data }));
+        res.on("end", () => resolve({ status: res.statusCode, data, headers: res.headers }));
       }
     );
     req.on("error", reject);

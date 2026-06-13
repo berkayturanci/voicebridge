@@ -13,6 +13,12 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ### Hardened
 - `POST /api/push/subscribe` rejects non-`https` endpoints (SSRF hardening).
+- Security response headers on every response (`Content-Security-Policy`,
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`).
+- A prominent startup warning when bound to a non-loopback address without
+  `ACCESS_TOKEN`.
+- Caps on sessions (`MAX_SESSIONS`, default 200) and stored push subscriptions
+  to bound memory.
 
 ## [0.2.0] - 2026-06-13
 
