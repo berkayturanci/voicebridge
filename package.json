@@ -1,14 +1,15 @@
 {
   "name": "voicebridge",
   "version": "0.1.0",
-  "description": "Hands-free, two-way voice for Claude Code from your phone. Free, open-source, no ElevenLabs. Browser Web Speech (STT/TTS) + a tiny zero-dependency Node bridge that drives the Claude Code CLI on your machine.",
+  "description": "Hands-free, two-way voice for coding agents (Claude Code, Codex, Antigravity) from your phone. Free, open-source, no ElevenLabs. Browser Web Speech (STT/TTS) + a tiny zero-dependency Node bridge that drives the agent CLI on your machine.",
   "license": "MIT",
   "type": "commonjs",
   "bin": {
     "voicebridge": "server.js"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18"

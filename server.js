@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /*
- * voicebridge — talk to Claude Code from a phone browser and hear it talk back.
+ * voicebridge — talk to a coding agent from a phone browser and hear it talk back.
  *
  * Speech recognition + synthesis run in the browser (Web Speech API) by default;
- * this server relays text to the Claude Code CLI and STREAMS the reply back so
- * the phone can speak it sentence-by-sentence as Claude generates it.
+ * this server relays text to a coding-agent CLI and STREAMS the reply back so the
+ * phone can speak it sentence-by-sentence as it is generated.
+ *
+ * Multiple agents and multiple concurrent sessions are supported. Each session is
+ * bound to an agent backend (Claude Code / Codex / Antigravity) and a project
+ * directory, and keeps its own conversation; you switch between them in the UI.
  *
  * Optional: fully-local speech-to-text via your own Whisper command (STT_MODE),
  * and a shared access token (ACCESS_TOKEN) so only you can drive it.
@@ -14,14 +18,14 @@
  * Environment variables:
  *   PORT         TCP port to bind (default 8787)
  *   HOST         bind address (default 127.0.0.1 — expose with `tailscale serve`)
- *   PROJECT_DIR  working directory Claude Code runs in (default: process.cwd())
- *   CLAUDE_BIN   path to the claude executable (default: "claude")
+ *   PROJECT_DIR  default working directory for new sessions (default: process.cwd())
+ *   AGENT        default agent for the boot session (default "claude")
+ *   CLAUDE_BIN   path to the claude executable      (default "claude")
+ *   CODEX_BIN    path to the codex executable       (default "codex")
+ *   AGY_BIN      path to the antigravity executable (default "agy")
  *   ACCESS_TOKEN if set, /api/* requires Authorization: Bearer <token>
  *   STT_MODE     "browser" (default) or "whisper"
- *   STT_CMD      shell command for whisper mode; "{file}" is replaced with the
- *                recorded audio path; it must print the transcript to stdout.
- *                e.g. 'ffmpeg -nostdin -i {file} -ar 16000 -ac 1 -f wav - 2>/dev/null
- *                      | whisper-cli -m ~/models/ggml-base.bin -nt -f - 2>/dev/null'
+ *   STT_CMD      shell command for whisper mode; "{file}" -> recorded audio path
  */
 
 "use strict";
@@ -35,16 +39,121 @@ const { spawn } = require("child_process");
 
 const PORT = parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
-const PROJECT_DIR = process.env.PROJECT_DIR || process.cwd();
-const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
+const DEFAULT_PROJECT_DIR = process.env.PROJECT_DIR || process.cwd();
+const DEFAULT_AGENT = process.env.AGENT || "claude";
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "";
 const STT_MODE = (process.env.STT_MODE || "browser").toLowerCase();
 const STT_CMD = process.env.STT_CMD || "";
 const PUBLIC_DIR = path.join(__dirname, "public");
 
-// One rolling Claude Code conversation; first turn is fresh, later turns use
-// --continue. `reset` starts over.
-let conversationStarted = false;
+// ---------------------------------------------------------------------------
+// Agent backends
+//
+// Each adapter turns a prompt into a subprocess invocation and tells the server
+// how to read its streamed output. Commands mirror the real CLIs (see ai-jury):
+//   - Claude Code : claude -p --output-format stream-json (NDJSON events)
+//   - Codex CLI   : codex exec            (prompt on stdin, plain-text stdout)
+//   - Antigravity : agy --print           (prompt on stdin, plain-text stdout)
+// ---------------------------------------------------------------------------
+
+// Pull text out of one Claude `stream-json` NDJSON line, or null if it has none.
+function parseClaudeLine(line) {
+  let obj;
+  try { obj = JSON.parse(line); } catch (_) { return null; }
+  if (obj.type === "assistant" && obj.message && Array.isArray(obj.message.content)) {
+    const text = obj.message.content
+      .filter((b) => b && b.type === "text" && b.text)
+      .map((b) => b.text)
+      .join("");
+    return text || null;
+  }
+  return null;
+}
+
+const AGENTS = {
+  claude: {
+    label: "Claude Code",
+    bin: () => process.env.CLAUDE_BIN || "claude",
+    supportsContinue: true,
+    stream: "ndjson",
+    // Prompt is passed positionally after -p (claude also accepts it on stdin).
+    command(prompt, cont) {
+      const argv = [];
+      if (cont) argv.push("--continue");
+      argv.push("--output-format", "stream-json", "--verbose", "-p", prompt);
+      return { argv, stdin: null };
+    },
+    parseLine: parseClaudeLine,
+  },
+  codex: {
+    label: "Codex",
+    bin: () => process.env.CODEX_BIN || "codex",
+    supportsContinue: false,
+    stream: "text",
+    // `codex exec` reads the prompt from stdin in non-interactive runs.
+    command(prompt) {
+      return { argv: ["exec"], stdin: prompt };
+    },
+  },
+  antigravity: {
+    label: "Antigravity",
+    bin: () => process.env.AGY_BIN || "agy",
+    supportsContinue: false,
+    stream: "text",
+    // `agy --print` reads the prompt from stdin when none is given positionally.
+    command(prompt) {
+      return { argv: ["--print"], stdin: prompt };
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Session registry
+// ---------------------------------------------------------------------------
+
+const sessions = new Map();
+let sessionSeq = 0;
+let defaultSessionId = null;
+
+function isDir(p) {
+  try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
+}
+
+function createSession({ name, agent, projectDir } = {}) {
+  agent = agent || DEFAULT_AGENT;
+  if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
+  const dir = projectDir || DEFAULT_PROJECT_DIR;
+  if (!isDir(dir)) throw new Error("project directory not found: " + dir);
+  const id = "s" + (++sessionSeq);
+  const s = {
+    id,
+    name: (name && String(name).trim()) || AGENTS[agent].label,
+    agent,
+    projectDir: dir,
+    started: false,
+  };
+  sessions.set(id, s);
+  return s;
+}
+
+function publicSession(s) {
+  return {
+    id: s.id, name: s.name, agent: s.agent,
+    agentLabel: AGENTS[s.agent].label, projectDir: s.projectDir, started: s.started,
+  };
+}
+
+function resolveSession(id) {
+  // A provided-but-unknown id is an error; only fall back to the default when
+  // the caller omitted the id entirely (backward compatibility).
+  if (id) return sessions.get(id) || null;
+  if (defaultSessionId) return sessions.get(defaultSessionId) || null;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helpers
+// ---------------------------------------------------------------------------
 
 function send(res, status, body, headers) {
   res.writeHead(status, Object.assign({ "Cache-Control": "no-store" }, headers || {}));
@@ -54,7 +163,6 @@ function sendJson(res, status, obj) {
   send(res, status, JSON.stringify(obj), { "Content-Type": "application/json" });
 }
 
-// Constant-time token check.
 function authorized(req) {
   if (!ACCESS_TOKEN) return true;
   const h = req.headers["authorization"] || "";
@@ -96,11 +204,14 @@ function readBody(req, limitBytes, cb) {
   req.on("error", cb);
 }
 
-// ---- Streaming Claude Code turn (NDJSON out: {type:"delta"|"done"|"error"}) ----
-function streamAsk(prompt, fresh, res) {
-  const args = ["--output-format", "stream-json", "--verbose", "-p"];
-  if (conversationStarted && !fresh) args.unshift("--continue");
-  args.push(prompt);
+// ---------------------------------------------------------------------------
+// Streaming a turn (NDJSON out: {type:"delta"|"done"|"error"})
+// ---------------------------------------------------------------------------
+
+function streamAsk(session, prompt, res) {
+  const agent = AGENTS[session.agent];
+  const cont = session.started && agent.supportsContinue;
+  const { argv, stdin } = agent.command(prompt, cont);
 
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -108,52 +219,60 @@ function streamAsk(prompt, fresh, res) {
     "X-Accel-Buffering": "no",
   });
 
-  const child = spawn(CLAUDE_BIN, args, { cwd: PROJECT_DIR, env: process.env });
   const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
+
+  let child;
+  try {
+    child = spawn(agent.bin(), argv, { cwd: session.projectDir, env: process.env });
+  } catch (e) {
+    emit({ type: "error", error: e.message });
+    return res.end();
+  }
+
+  if (stdin != null) {
+    try { child.stdin.write(stdin); child.stdin.end(); } catch (_) {}
+  }
 
   const timer = setTimeout(() => child.kill("SIGKILL"), 5 * 60 * 1000);
   let buf = "";
   let stderr = "";
   let gotText = false;
 
-  const handleLine = (line) => {
-    line = line.trim();
-    if (!line) return;
-    let obj;
-    try { obj = JSON.parse(line); } catch (_) { return; }
-    // Each assistant message carries content blocks; speak the text ones.
-    if (obj.type === "assistant" && obj.message && Array.isArray(obj.message.content)) {
-      const text = obj.message.content
-        .filter((b) => b && b.type === "text" && b.text)
-        .map((b) => b.text).join("");
-      if (text) { gotText = true; emit({ type: "delta", text }); }
-    }
-  };
+  const onText = (text) => { if (text) { gotText = true; emit({ type: "delta", text }); } };
 
   child.stdout.on("data", (d) => {
-    buf += d.toString();
-    let idx;
-    while ((idx = buf.indexOf("\n")) >= 0) {
-      handleLine(buf.slice(0, idx));
-      buf = buf.slice(idx + 1);
+    const s = d.toString();
+    if (agent.stream === "ndjson") {
+      buf += s;
+      let idx;
+      while ((idx = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (line) onText(agent.parseLine(line));
+      }
+    } else {
+      onText(s); // plain-text agents: stream stdout straight through
     }
   });
   child.stderr.on("data", (d) => (stderr += d.toString()));
 
   child.on("error", (e) => {
     clearTimeout(timer);
-    emit({ type: "error", error: e.code === "ENOENT"
-      ? `Could not find '${CLAUDE_BIN}'. Install Claude Code and run /login.`
-      : e.message });
+    emit({
+      type: "error",
+      error: e.code === "ENOENT"
+        ? `Could not find '${agent.bin()}'. Install ${agent.label} and authenticate it.`
+        : e.message,
+    });
     res.end();
   });
   child.on("close", (code) => {
     clearTimeout(timer);
-    if (buf.trim()) handleLine(buf);
+    if (agent.stream === "ndjson" && buf.trim()) onText(agent.parseLine(buf));
     if (code !== 0 && !gotText) {
-      emit({ type: "error", error: stderr.trim() || `Claude Code exited with code ${code}.` });
+      emit({ type: "error", error: stderr.trim() || `${agent.label} exited with code ${code}.` });
     } else {
-      conversationStarted = true;
+      session.started = true;
       emit({ type: "done" });
     }
     res.end();
@@ -162,7 +281,10 @@ function streamAsk(prompt, fresh, res) {
   res.on("close", () => { clearTimeout(timer); child.kill("SIGKILL"); });
 }
 
-// ---- Local Whisper transcription ----
+// ---------------------------------------------------------------------------
+// Local Whisper transcription
+// ---------------------------------------------------------------------------
+
 function transcribe(audioBuf, contentType, cb) {
   if (STT_MODE !== "whisper" || !STT_CMD) {
     return cb(new Error("Server is not configured for whisper STT."));
@@ -171,7 +293,6 @@ function transcribe(audioBuf, contentType, cb) {
   const tmp = path.join(os.tmpdir(), "vb-" + crypto.randomBytes(6).toString("hex") + ext);
   fs.writeFile(tmp, audioBuf, (werr) => {
     if (werr) return cb(werr);
-    // STT_CMD is operator-provided and {file} is a server-generated safe path.
     const cmd = STT_CMD.replace(/\{file\}/g, tmp);
     const child = spawn("/bin/sh", ["-c", cmd], { env: process.env });
     let out = "", err = "";
@@ -186,29 +307,70 @@ function transcribe(audioBuf, contentType, cb) {
   });
 }
 
-const server = http.createServer((req, res) => {
+// ---------------------------------------------------------------------------
+// Request routing
+// ---------------------------------------------------------------------------
+
+function handleRequest(req, res) {
+  const urlPath = req.url.split("?")[0];
+
   // Public: client configuration (no secrets).
-  if (req.method === "GET" && req.url.split("?")[0] === "/api/config") {
-    return sendJson(res, 200, { sttMode: STT_MODE, authRequired: !!ACCESS_TOKEN });
+  if (req.method === "GET" && urlPath === "/api/config") {
+    return sendJson(res, 200, {
+      sttMode: STT_MODE,
+      authRequired: !!ACCESS_TOKEN,
+      agents: Object.keys(AGENTS).map((id) => ({
+        id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
+      })),
+      defaultProjectDir: DEFAULT_PROJECT_DIR,
+      defaultSessionId,
+    });
   }
 
-  if (req.url.startsWith("/api/")) {
+  if (urlPath.startsWith("/api/")) {
     if (!authorized(req)) return sendJson(res, 401, { error: "Unauthorized" });
 
-    if (req.method === "POST" && req.url === "/api/ask") {
+    if (req.method === "GET" && urlPath === "/api/sessions") {
+      return sendJson(res, 200, {
+        sessions: Array.from(sessions.values()).map(publicSession),
+        defaultSessionId,
+      });
+    }
+
+    if (req.method === "POST" && urlPath === "/api/sessions") {
+      return readBody(req, 64 * 1024, (e, body) => {
+        if (e) return sendJson(res, 400, { error: "Bad request" });
+        let data; try { data = JSON.parse(body.toString("utf8") || "{}"); }
+        catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
+        let s;
+        try { s = createSession(data); }
+        catch (err) { return sendJson(res, 400, { error: err.message }); }
+        return sendJson(res, 200, { session: publicSession(s) });
+      });
+    }
+
+    if (req.method === "DELETE" && urlPath.startsWith("/api/sessions/")) {
+      const id = urlPath.slice("/api/sessions/".length);
+      if (id === defaultSessionId) return sendJson(res, 400, { error: "Cannot delete the default session" });
+      const existed = sessions.delete(id);
+      return sendJson(res, existed ? 200 : 404, existed ? { ok: true } : { error: "Not found" });
+    }
+
+    if (req.method === "POST" && urlPath === "/api/ask") {
       return readBody(req, 64 * 1024, (e, body) => {
         if (e) return sendJson(res, 400, { error: "Bad request" });
         let data; try { data = JSON.parse(body.toString("utf8") || "{}"); }
         catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
         const text = typeof data.text === "string" ? data.text.trim() : "";
-        const fresh = !!data.reset;
-        if (fresh) conversationStarted = false;
         if (!text) return sendJson(res, 400, { error: "Empty prompt" });
-        streamAsk(text, fresh, res);
+        const session = resolveSession(data.sessionId);
+        if (!session) return sendJson(res, 404, { error: "Unknown session" });
+        if (data.reset) session.started = false;
+        streamAsk(session, text, res);
       });
     }
 
-    if (req.method === "POST" && req.url === "/api/stt") {
+    if (req.method === "POST" && urlPath === "/api/stt") {
       return readBody(req, 12 * 1024 * 1024, (e, body) => {
         if (e || !body || !body.length) return sendJson(res, 400, { error: "No audio" });
         transcribe(body, req.headers["content-type"] || "", (terr, text) => {
@@ -218,9 +380,13 @@ const server = http.createServer((req, res) => {
       });
     }
 
-    if (req.method === "POST" && req.url === "/api/reset") {
-      conversationStarted = false;
-      return sendJson(res, 200, { ok: true });
+    if (req.method === "POST" && urlPath === "/api/reset") {
+      return readBody(req, 64 * 1024, (e, body) => {
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        const session = resolveSession(data.sessionId);
+        if (session) session.started = false;
+        return sendJson(res, 200, { ok: true });
+      });
     }
 
     return sendJson(res, 404, { error: "Not found" });
@@ -228,11 +394,40 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "GET") return serveStatic(req, res);
   send(res, 405, "Method not allowed");
-});
+}
 
-server.listen(PORT, HOST, () => {
-  console.log(`voicebridge listening on http://${HOST}:${PORT}`);
-  console.log(`Claude Code working directory: ${PROJECT_DIR}`);
-  console.log(`STT mode: ${STT_MODE}${ACCESS_TOKEN ? "  (access token required)" : ""}`);
-  console.log(`Expose it to your phone with:  tailscale serve --bg ${PORT}`);
-});
+function buildServer() {
+  return http.createServer(handleRequest);
+}
+
+function start() {
+  const boot = createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR });
+  defaultSessionId = boot.id;
+  const server = buildServer();
+  server.listen(PORT, HOST, () => {
+    console.log(`voicebridge listening on http://${HOST}:${PORT}`);
+    console.log(`default session: ${boot.name} · ${AGENTS[boot.agent].label} · ${boot.projectDir}`);
+    console.log(`agents: ${Object.keys(AGENTS).join(", ")}`);
+    console.log(`STT mode: ${STT_MODE}${ACCESS_TOKEN ? "  (access token required)" : ""}`);
+    console.log(`Expose it to your phone with:  tailscale serve --bg ${PORT}`);
+  });
+  return server;
+}
+
+if (require.main === module) {
+  start();
+}
+
+module.exports = {
+  AGENTS,
+  parseClaudeLine,
+  sessions,
+  createSession,
+  resolveSession,
+  publicSession,
+  buildServer,
+  handleRequest,
+  start,
+  get defaultSessionId() { return defaultSessionId; },
+  set defaultSessionId(v) { defaultSessionId = v; },
+};
