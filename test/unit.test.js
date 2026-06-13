@@ -55,3 +55,15 @@ test("createSession defaults name to the agent label", () => {
   const s = srv.createSession({ agent: "claude", projectDir: process.cwd() });
   assert.strictEqual(s.name, "Claude Code");
 });
+
+test("phoneUrl prefers PUBLIC_URL and falls back to host:port", () => {
+  assert.strictEqual(srv.phoneUrl({ host: "127.0.0.1", port: 8787 }), "http://127.0.0.1:8787");
+  assert.strictEqual(srv.phoneUrl({ publicUrl: "https://box.ts.net/" }), "https://box.ts.net");
+});
+
+test("phoneUrl embeds an access token when present", () => {
+  assert.strictEqual(
+    srv.phoneUrl({ publicUrl: "https://box.ts.net", token: "a b/c" }),
+    "https://box.ts.net?token=a%20b%2Fc"
+  );
+});
