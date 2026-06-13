@@ -267,6 +267,34 @@ function agentAvailable(id) {
   return id === "ollama" ? true : binExists(AGENTS[id].bin());
 }
 
+// Project slash commands under .claude/commands/**.md → "/name" (nested dirs
+// namespace with ":", e.g. .claude/commands/keel/ship.md → /keel:ship).
+function listSlashCommands(baseDir) {
+  const out = [];
+  const walk = (d, prefix) => {
+    if (out.length > 200) return;
+    let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of ents) {
+      if (out.length > 200) break;
+      if (e.isDirectory()) walk(path.join(d, e.name), prefix.concat(e.name));
+      else if (e.isFile() && e.name.endsWith(".md")) {
+        const name = prefix.concat(e.name.slice(0, -3)).join(":");
+        out.push({ label: "/" + name, value: "/" + name + " " });
+      }
+    }
+  };
+  walk(path.join(baseDir, ".claude", "commands"), []);
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// package.json scripts → "npm run <name>".
+function listNpmScripts(baseDir) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(baseDir, "package.json"), "utf8"));
+    return Object.keys(pkg.scripts || {}).map((k) => ({ label: "npm run " + k, value: "npm run " + k }));
+  } catch (_) { return []; }
+}
+
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
 function createSession({ name, agent, projectDir, mode, voice, runner, model } = {}) {
@@ -706,6 +734,20 @@ function handleRequest(req, res) {
     if (!authorized(req)) return sendJson(res, 401, { error: "Unauthorized" });
 
     // Browse local directories (for the project-folder picker).
+    // Commands available in a session's project (slash commands + npm scripts).
+    if (req.method === "GET" && urlPath === "/api/commands") {
+      const sid = new URL(req.url, "http://x").searchParams.get("sessionId");
+      const session = resolveSession(sid);
+      if (!session) return sendJson(res, 404, { error: "unknown session" });
+      if (session.runner === "cloud") return sendJson(res, 200, { groups: [] }); // remote dir; see #89
+      const groups = [];
+      const cmds = listSlashCommands(session.projectDir);
+      if (cmds.length) groups.push({ label: "Komutlar (.claude/commands)", items: cmds });
+      const npm = listNpmScripts(session.projectDir);
+      if (npm.length) groups.push({ label: "npm scripts", items: npm });
+      return sendJson(res, 200, { groups });
+    }
+
     if (req.method === "GET" && urlPath === "/api/browse") {
       let dir;
       try { dir = path.resolve(new URL(req.url, "http://x").searchParams.get("path") || DEFAULT_PROJECT_DIR || os.homedir()); }
@@ -919,6 +961,8 @@ module.exports = {
   resolveRunner,
   binExists,
   agentAvailable,
+  listSlashCommands,
+  listNpmScripts,
   buildPrompt,
   looksLikeQuestion,
   parseFavorites,
