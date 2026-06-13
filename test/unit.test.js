@@ -88,6 +88,14 @@ test("parseDotEnv parses KEY=VALUE, skips comments, strips quotes", () => {
   assert.ok(!("BAD" in env));
 });
 
+test("binExists resolves real executables and rejects fakes", () => {
+  assert.strictEqual(srv.binExists("/bin/sh"), true);
+  assert.strictEqual(srv.binExists("sh"), true); // on PATH
+  assert.strictEqual(srv.binExists("/no/such/bin-xyz"), false);
+  assert.strictEqual(srv.binExists("definitely-not-a-real-bin-xyz"), false);
+  assert.strictEqual(srv.agentAvailable("ollama"), true); // HTTP, always "available"
+});
+
 test("parseClaudeLine extracts assistant text", () => {
   const line = JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Hi" }, { type: "tool_use" }] } });
   assert.strictEqual(srv.parseClaudeLine(line), "Hi");

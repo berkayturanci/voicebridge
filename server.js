@@ -251,6 +251,22 @@ function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
+// Is an executable resolvable (absolute path, or found on PATH)?
+function binExists(bin) {
+  if (!bin) return false;
+  if (bin.includes("/")) { try { fs.accessSync(bin, fs.constants.X_OK); return true; } catch (_) { return false; } }
+  for (const d of (process.env.PATH || "").split(path.delimiter)) {
+    if (!d) continue;
+    try { fs.accessSync(path.join(d, bin), fs.constants.X_OK); return true; } catch (_) {}
+  }
+  return false;
+}
+
+// Whether an agent looks usable. Ollama is HTTP (reachability checked at use).
+function agentAvailable(id) {
+  return id === "ollama" ? true : binExists(AGENTS[id].bin());
+}
+
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
 function createSession({ name, agent, projectDir, mode, voice, runner, model } = {}) {
@@ -676,7 +692,7 @@ function handleRequest(req, res) {
       authRequired: !!ACCESS_TOKEN,
       agents: Object.keys(AGENTS).map((id) => ({
         id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
-        defaultMode: AGENTS[id].defaultMode,
+        defaultMode: AGENTS[id].defaultMode, available: agentAvailable(id),
         modes: Object.keys(AGENTS[id].modes).map((m) => ({ id: m, label: AGENTS[id].modes[m].label })),
       })),
       defaultProjectDir: DEFAULT_PROJECT_DIR,
@@ -880,6 +896,8 @@ module.exports = {
   parseClaudeEvents,
   resolveMode,
   resolveRunner,
+  binExists,
+  agentAvailable,
   buildPrompt,
   looksLikeQuestion,
   parseFavorites,

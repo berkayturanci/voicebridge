@@ -672,7 +672,7 @@
   const RUNNER_LABEL = { local: "💻 Yerel", cloud: "☁️ Bulut" };
   function openModal() {
     nsAgent.innerHTML = "";
-    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label; nsAgent.appendChild(o); });
+    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label + (a.available === false ? " — bulunamadı" : ""); nsAgent.appendChild(o); });
     const runners = CONFIG.runners || ["local"];
     const nsRunner = $("ns-runner"); nsRunner.innerHTML = "";
     runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
