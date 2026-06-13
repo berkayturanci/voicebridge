@@ -142,6 +142,55 @@ test("empty prompt and unknown session are rejected", async () => {
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "hi", sessionId: "nope" })).status, 404);
 });
 
+test("/api/reset clears the rolling-conversation flag", async () => {
+  await request(server, "POST", "/api/ask", { text: "hi", sessionId: boot.id });
+  assert.strictEqual(srv.sessions.get(boot.id).started, true);
+  assert.strictEqual((await request(server, "POST", "/api/reset", { sessionId: boot.id })).status, 200);
+  assert.strictEqual(srv.sessions.get(boot.id).started, false);
+});
+
+test("ask surfaces a friendly error when the agent binary is missing", async () => {
+  const prev = process.env.CLAUDE_BIN;
+  process.env.CLAUDE_BIN = "/no/such/bin-xyz";
+  try {
+    const { session } = JSON.parse((await request(server, "POST", "/api/sessions", { agent: "claude", projectDir: process.cwd() })).data);
+    const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "error" && /Could not find/.test(e.error)));
+  } finally { process.env.CLAUDE_BIN = prev; }
+});
+
+test("ask surfaces stderr when the agent exits non-zero", async () => {
+  const stub = path.join(os.tmpdir(), "vb-fail-" + Date.now() + ".js");
+  fs.writeFileSync(stub, '#!/usr/bin/env node\nprocess.stderr.write("boom");process.exit(2);\n');
+  fs.chmodSync(stub, 0o755);
+  const prev = process.env.CLAUDE_BIN;
+  process.env.CLAUDE_BIN = stub;
+  try {
+    const { session } = JSON.parse((await request(server, "POST", "/api/sessions", { agent: "claude", projectDir: process.cwd() })).data);
+    const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "error" && /boom/.test(e.error)));
+  } finally { process.env.CLAUDE_BIN = prev; fs.unlinkSync(stub); }
+});
+
+test("cloud runner connection failure surfaces an error", async () => {
+  process.env.CLOUD_RUNNER_URL = "http://127.0.0.1:1/";
+  try {
+    const { session } = JSON.parse((await request(server, "POST", "/api/sessions", { agent: "claude", runner: "cloud", projectDir: "/x" })).data);
+    const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "error" && /cloud runner/.test(e.error)));
+  } finally { delete process.env.CLOUD_RUNNER_URL; }
+});
+
+test("/api/stt is rejected when whisper is not configured", async () => {
+  const r = await request(server, "POST", "/api/stt", "x", { "Content-Type": "audio/webm" });
+  assert.strictEqual(r.status, 500);
+});
+
+test("unknown method and endpoint", async () => {
+  assert.strictEqual((await request(server, "POST", "/")).status, 405);
+  assert.strictEqual((await request(server, "GET", "/api/nope")).status, 404);
+});
+
 test("the concurrency cap rejects with 429", async () => {
   const prev = process.env.MAX_INFLIGHT;
   process.env.MAX_INFLIGHT = "0"; // every turn exceeds the cap
