@@ -144,6 +144,9 @@ transcribes). Hands-free loop is browser-mode only.
   *error* — so you can run or cycle without looking at the screen.
 - **Quick commands**: one-tap chips send canned prompts ("Ne değişti?", "Testler",
   "Commit & push", …) to the active session — handy one-handed.
+- **Voice-friendly replies**: a "Kısa ses" toggle asks the agent to answer
+  concisely for text-to-speech (no long code dumps, ending with a one-line
+  summary) — the full text still shows in chat.
 
 ### Modes (autonomy)
 

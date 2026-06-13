@@ -136,6 +136,7 @@
       </label>
       <label>Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
       <label>Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
+      <label>Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
     </div>
   </footer>
 
@@ -160,7 +161,7 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
@@ -314,6 +315,7 @@
     for (const st of S.values()) st.logEl.classList.toggle("active", st.meta.id === id);
     sessionSel.value = id;
     fillModeSelect(modeSel, active().meta.agent, active().meta.mode);
+    voiceChk.checked = !!active().meta.voice;
     refreshMic();
     active().logEl.scrollTop = active().logEl.scrollHeight;
   }
@@ -380,7 +382,7 @@
     try {
       const r = await fetch("/api/ask", {
         method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ text, sessionId, mode: st.meta.mode }), signal: st.turn.abort.signal,
+        body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice }), signal: st.turn.abort.signal,
       });
       if (r.status === 401) { localStorage.removeItem("vb_token"); token = ""; throw new Error("Token geçersiz. Sayfayı yenile."); }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
@@ -513,6 +515,7 @@
   langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); });
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
+  voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
   themeBtn.addEventListener("click", () => {
     const cur = prefs.theme || "system";
     prefs.theme = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
@@ -532,7 +535,7 @@
   newSessionBtn.addEventListener("click", openModal);
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {
-    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim() };
+    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice };
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();
@@ -567,6 +570,7 @@
     activeId = list.defaultSessionId || (list.sessions[0] && list.sessions[0].id);
     if (!activeId && S.size) activeId = S.keys().next().value;
     rebuildSessionSelect();
+    if (prefs.voice) for (const st of S.values()) st.meta.voice = true;
     if (activeId) switchTo(activeId);
   })();
 })();

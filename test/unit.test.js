@@ -84,6 +84,18 @@ test("createSession validates mode and stores it", () => {
   assert.strictEqual(d.mode, "auto"); // agent default
 });
 
+test("buildPrompt prepends the voice preamble only in voice mode", () => {
+  assert.strictEqual(srv.buildPrompt(false, "hello"), "hello");
+  const v = srv.buildPrompt(true, "hello");
+  assert.ok(v.endsWith("hello") && v.length > "hello".length);
+  assert.match(v, /text-to-speech/i);
+});
+
+test("createSession stores the voice flag", () => {
+  assert.strictEqual(srv.createSession({ agent: "claude", projectDir: process.cwd() }).voice, false);
+  assert.strictEqual(srv.createSession({ agent: "claude", projectDir: process.cwd(), voice: true }).voice, true);
+});
+
 test("phoneUrl prefers PUBLIC_URL and falls back to host:port", () => {
   assert.strictEqual(srv.phoneUrl({ host: "127.0.0.1", port: 8787 }), "http://127.0.0.1:8787");
   assert.strictEqual(srv.phoneUrl({ publicUrl: "https://box.ts.net/" }), "https://box.ts.net");
