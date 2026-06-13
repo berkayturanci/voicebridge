@@ -7,9 +7,9 @@ platform: "node"
 consent_mode: "explicit"
 
 knobs:
-  # voicebridge is a zero-dependency Node project with no test/lint scripts;
-  # the build gate is a syntax check of the server entrypoint.
-  build_gate_cmd: "node --check server.js"
+  # voicebridge is a zero-dependency Node project; the build gate syntax-checks
+  # the entrypoint and runs the node:test suite.
+  build_gate_cmd: "node --check server.js && npm test"
   tier3_globs:
     - "server.js"
     - "public/**/*.html"
