@@ -65,6 +65,7 @@
   .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
   .copybtn { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); opacity: .85; }
   .sys { align-self: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .act { align-self: flex-start; color: var(--muted); font-size: 12px; font-style: italic; opacity: .85; padding: 0 4px; }
 
   footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); flex: none; display: flex; flex-direction: column; gap: 9px; }
   #status { text-align: center; min-height: 18px; font-size: 12px; color: var(--muted); }
@@ -439,6 +440,8 @@
               st.logEl.scrollTop = st.logEl.scrollHeight;
               setStatus("Cevap veriyor… (durdurmak için ⏹)"); feedSpeech(ev.text);
             }
+          } else if (ev.type === "activity") {
+            addMsg(sessionId, "⚙︎ " + ev.text, "act");
           } else if (ev.type === "error") { throw new Error(ev.error || "Sunucu hatası"); }
         }
       }

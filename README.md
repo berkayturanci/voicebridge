@@ -159,6 +159,8 @@ transcribes). Hands-free loop is browser-mode only.
   pulls you back when it needs you.
 - **Voice & speed**: pick the TTS voice (per language) and adjust the speaking
   rate; both are remembered.
+- **Activity trail**: when Claude uses tools, the chat shows a subtle running
+  log (e.g. `⚙︎ Edit server.js`, `⚙︎ Bash npm test`) so you can watch what it does.
 
 ### Modes (autonomy)
 

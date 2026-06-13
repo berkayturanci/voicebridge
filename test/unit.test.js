@@ -47,6 +47,19 @@ test("parseClaudeLine ignores non-assistant and invalid lines", () => {
   assert.strictEqual(srv.parseClaudeLine(JSON.stringify({ type: "assistant", message: { content: [] } })), null);
 });
 
+test("parseClaudeEvents emits delta for text and activity for tool_use", () => {
+  const line = JSON.stringify({ type: "assistant", message: { content: [
+    { type: "text", text: "ok" },
+    { type: "tool_use", name: "Edit", input: { file_path: "/repo/server.js" } },
+    { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+  ] } });
+  const evs = srv.parseClaudeEvents(line);
+  assert.deepStrictEqual(evs[0], { type: "delta", text: "ok" });
+  assert.deepStrictEqual(evs[1], { type: "activity", text: "Edit server.js" });
+  assert.deepStrictEqual(evs[2], { type: "activity", text: "Bash npm test" });
+  assert.deepStrictEqual(srv.parseClaudeEvents("nope"), []);
+});
+
 test("createSession validates agent and directory", () => {
   assert.throws(() => srv.createSession({ agent: "nope", projectDir: process.cwd() }), /unknown agent/);
   assert.throws(() => srv.createSession({ agent: "claude", projectDir: "/no/such/dir/xyz" }), /not found/);
