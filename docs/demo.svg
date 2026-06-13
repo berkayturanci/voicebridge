@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640" viewBox="0 0 360 640" font-family="-apple-system, system-ui, sans-serif">
+  <rect width="360" height="640" rx="28" fill="#0d1117"/>
+  <rect x="8" y="8" width="344" height="624" rx="22" fill="#0d1117" stroke="#21262d"/>
+
+  <!-- header -->
+  <g>
+    <circle cx="30" cy="44" r="5" fill="#3fb950"/>
+    <rect x="44" y="33" width="150" height="22" rx="7" fill="#21262d" stroke="#30363d"/>
+    <text x="54" y="48" fill="#e6edf3" font-size="12" font-weight="600">Backend · Claude Code</text>
+    <rect x="200" y="33" width="26" height="22" rx="7" fill="#21262d" stroke="#30363d"/>
+    <text x="208" y="49" fill="#e6edf3" font-size="14">＋</text>
+    <rect x="266" y="33" width="78" height="22" rx="7" fill="#21262d" stroke="#30363d"/>
+    <text x="276" y="48" fill="#e6edf3" font-size="11">Yeni sohbet</text>
+  </g>
+  <line x1="8" y1="68" x2="352" y2="68" stroke="#21262d"/>
+
+  <!-- chat -->
+  <g>
+    <rect x="120" y="86" width="224" height="32" rx="14" fill="#1f6feb"/>
+    <text x="134" y="106" fill="#fff" font-size="13">login formuna doğrulama ekle</text>
+
+    <rect x="16" y="130" width="300" height="96" rx="14" fill="#161b22" stroke="#21262d"/>
+    <text x="30" y="152" fill="#e6edf3" font-size="13">Tamam — email ve şifre kontrolü</text>
+    <text x="30" y="170" fill="#e6edf3" font-size="13">ekliyorum:</text>
+    <rect x="30" y="180" width="272" height="38" rx="8" fill="#0d1117" stroke="#30363d"/>
+    <text x="42" y="196" fill="#7ee787" font-size="11" font-family="ui-monospace, monospace">if (!email) throw new Error(</text>
+    <text x="42" y="210" fill="#7ee787" font-size="11" font-family="ui-monospace, monospace">  "email gerekli");</text>
+
+    <rect x="150" y="238" width="194" height="32" rx="14" fill="#1f6feb"/>
+    <text x="164" y="258" fill="#fff" font-size="13">testleri de çalıştır</text>
+
+    <rect x="16" y="282" width="250" height="34" rx="14" fill="#161b22" stroke="#21262d"/>
+    <text x="30" y="303" fill="#e6edf3" font-size="13">18 test geçti. Push edildi. ✅</text>
+  </g>
+
+  <!-- footer -->
+  <line x1="8" y1="520" x2="352" y2="520" stroke="#21262d"/>
+  <text x="180" y="540" fill="#8b949e" font-size="11" text-anchor="middle">Cevap veriyor… (durdurmak için ⏹)</text>
+  <rect x="16" y="550" width="232" height="44" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <text x="30" y="577" fill="#8b949e" font-size="14">Yaz ya da 🎤 ile konuş…</text>
+  <circle cx="276" cy="572" r="22" fill="#1f6feb"/>
+  <text x="276" y="578" fill="#fff" font-size="18" text-anchor="middle">➤</text>
+  <circle cx="326" cy="572" r="22" fill="#238636"/>
+  <text x="326" y="579" fill="#fff" font-size="17" text-anchor="middle">🎤</text>
+
+  <g fill="#8b949e" font-size="11">
+    <text x="40" y="616">Mod: Tam otonom</text>
+    <text x="170" y="616">Dil: TR</text>
+    <text x="250" y="616">Eller serbest ●</text>
+  </g>
+</svg>

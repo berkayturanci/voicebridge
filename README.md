@@ -2,19 +2,26 @@
 
 **Hands-free, two-way voice for your coding agent from your phone — free, open-source, no ElevenLabs.**
 
-You speak to your phone, a coding agent (running on your Mac/Linux box) does the
-work, and the reply is read back aloud — like a phone call with your agent.
+You speak **or type** on your phone, a coding agent (running on your Mac/Linux
+box) does the work, and the reply streams back as chat **and** spoken audio —
+like a phone call with your agent, with a keyboard when you want one.
+
+<p align="center"><img src="docs/demo.svg" alt="voicebridge phone UI" width="300" /></p>
+
+> The image above is a mockup of the UI; a real screen recording will replace it.
 
 - 🤖 **Multiple agents** — Claude Code, **Codex**, and **Antigravity**, selectable
-  per session.
+  per session, each with autonomy **modes** (ask → full-auto).
 - 🗂️ **Multiple sessions** — run several conversations in parallel (e.g. "Claude on
   repo A", "Codex on repo B") and switch between them in the UI.
+- ⌨️🎙️ **Type or speak** — a Claude-Code-like chat with a text box *and* a mic;
+  replies render with code blocks and are read aloud.
 - 🎙️ **Speech-to-text** and 🔊 **text-to-speech** run in your phone's **browser**
   (Web Speech API) — no per-minute cloud voice cost, no API keys.
 - ⚡ **Streaming** — the reply is spoken **sentence-by-sentence as it's generated**,
   not after the whole turn finishes, with a **Stop** button to cut it off.
-- 🧩 A **tiny zero-dependency Node bridge** relays the recognized text to the agent
-  CLI on your machine and streams its reply back.
+- 🧩 A **tiny Node bridge** (one dependency: `qrcode-terminal`) relays the text to
+  the agent CLI on your machine and streams its reply back.
 - 🔒 Reached over **Tailscale** (your private network) with real HTTPS, with an
   optional **shared access token** — your code never touches a third-party voice
   service.
@@ -123,14 +130,30 @@ npm start
 In whisper mode the mic button is **tap-to-start / tap-to-stop** (record, then it
 transcribes). Hands-free loop is browser-mode only.
 
-## Agents & sessions
+## Agents, sessions & modes
 
 - Tap **＋** in the header to create a session: pick an **agent** (Claude / Codex /
-  Antigravity), a **project folder**, and a name.
+  Antigravity), a **mode**, a **project folder**, and a name.
 - The session **dropdown** switches between conversations; each keeps its own
-  transcript and project directory.
-- **Yeni sohbet** resets the active session's conversation; the **🎤 → ⏹** button
-  turns into a Stop control while the agent is answering or speaking.
+  transcript, project directory, agent, and mode.
+- **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or
+  tap ➤; the 🎤 button does voice. **Yeni sohbet** resets the active session; the
+  **🎤 → ⏹** button becomes a Stop control while the agent answers or speaks.
+
+### Modes (autonomy)
+
+Each agent exposes modes that map to its CLI's approval/sandbox flags — pick a
+fuller-auto mode for true hands-free use (cycling, running), with the obvious
+caveat that the agent then edits/runs without asking.
+
+| Agent | Modes (flag) |
+|-------|--------------|
+| Claude | `ask` (none) · `autoEdit` (`--permission-mode acceptEdits`) · `full` (`--dangerously-skip-permissions`) |
+| Codex | `safe` (`-s read-only`) · `auto` (`--full-auto`) · `full` (`--dangerously-bypass-approvals-and-sandbox`) |
+| Antigravity | `safe` (`--sandbox`) · `full` (`--yolo`) |
+
+> ⚠️ Full-auto modes let the agent change files and run commands without
+> prompting. Use them only on trusted projects over your private tailnet.
 
 ## How it works
 

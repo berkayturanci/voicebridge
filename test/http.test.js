@@ -14,12 +14,24 @@ const server = srv.buildServer();
 test.before(() => new Promise((r) => server.listen(0, "127.0.0.1", r)));
 test.after(() => new Promise((r) => server.close(r)));
 
-test("GET /api/config advertises agents and default session", async () => {
+test("GET /api/config advertises agents, their modes, and the default session", async () => {
   const { status, data } = await request(server, "GET", "/api/config");
   assert.strictEqual(status, 200);
   const cfg = JSON.parse(data);
   assert.deepStrictEqual(cfg.agents.map((a) => a.id).sort(), ["antigravity", "claude", "codex"]);
+  const claude = cfg.agents.find((a) => a.id === "claude");
+  assert.strictEqual(claude.defaultMode, "ask");
+  assert.ok(claude.modes.some((m) => m.id === "full"));
   assert.strictEqual(cfg.defaultSessionId, boot.id);
+});
+
+test("a session can be created with a mode, surfaced in its public shape", async () => {
+  const create = await request(server, "POST", "/api/sessions", { agent: "claude", projectDir: process.cwd(), mode: "full" });
+  assert.strictEqual(create.status, 200);
+  assert.strictEqual(JSON.parse(create.data).session.mode, "full");
+
+  const bad = await request(server, "POST", "/api/sessions", { agent: "claude", projectDir: process.cwd(), mode: "ghost" });
+  assert.strictEqual(bad.status, 400);
 });
 
 test("POST /api/ask streams claude stream-json as delta + done", async () => {
