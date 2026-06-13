@@ -107,6 +107,17 @@
   input:checked + .slider { background: var(--green); }
   input:checked + .slider::before { transform: translateX(16px); }
 
+  #home { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 15; padding: calc(12px + env(safe-area-inset-top)) 14px 14px; }
+  #home.open { display: flex; }
+  #home .home-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  #home .home-head h2 { margin: 0; font-size: 20px; }
+  #home #homeNew { background: var(--green); border: none; color: #fff; border-radius: 9px; padding: 8px 12px; font-size: 14px; }
+  #homeList { display: flex; flex-direction: column; gap: 9px; overflow-y: auto; }
+  .scard { text-align: left; background: var(--panel); border: 1px solid var(--border2); border-radius: 12px; padding: 13px 14px; display: flex; flex-direction: column; gap: 4px; color: var(--text); }
+  .scard .sc-name { font-size: 16px; font-weight: 600; }
+  .scard .sc-meta { font-size: 12px; color: var(--accent); }
+  .scard .sc-prev { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #backBtn { font-size: 20px; }
   #talk { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 20; padding: 24px; }
   #talk.open { display: flex; }
   #talk #talkExit { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 16px; }
@@ -141,6 +152,7 @@
 </head>
 <body>
   <header>
+    <button id="backBtn" title="Sohbetler" aria-label="Sohbetler">←</button>
     <span class="dot"></span>
     <select id="session" aria-label="Oturum"></select>
     <button id="newSession" title="Yeni oturum">＋</button>
@@ -162,6 +174,14 @@
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
     </div>
   </footer>
+
+  <div id="home">
+    <div class="home-head">
+      <h2>Sohbetler</h2>
+      <button id="homeNew" title="Yeni oturum" aria-label="Yeni oturum">＋ Yeni</button>
+    </div>
+    <div id="homeList"></div>
+  </div>
 
   <div id="talk">
     <button id="talkExit" aria-label="Bitir">✕</button>
@@ -449,6 +469,34 @@
     });
     sel.value = current || a.defaultMode;
   }
+  // ---------- Home: session list landing (mobile Claude Code style) ----------
+  const homeEl = $("home"), homeListEl = $("homeList");
+  function sessionPreview(st) {
+    for (let i = st.messages.length - 1; i >= 0; i--) {
+      const m = st.messages[i];
+      if (m.cls === "me" || m.cls === "claude") return (m.cls === "me" ? "Sen: " : "") + (m.text || "").replace(/\s+/g, " ").slice(0, 90);
+    }
+    return "Henüz mesaj yok";
+  }
+  function renderHome() {
+    homeListEl.innerHTML = "";
+    for (const st of S.values()) {
+      const card = document.createElement("button");
+      card.className = "scard"; card.type = "button";
+      card.innerHTML = '<div class="sc-name"></div><div class="sc-meta"></div><div class="sc-prev"></div>';
+      card.querySelector(".sc-name").textContent = st.meta.name;
+      const where = st.meta.runner === "cloud" ? " · ☁️ Bulut" : "";
+      card.querySelector(".sc-meta").textContent = st.meta.agentLabel + " · " + modeLabel(st.meta.agent, st.meta.mode) + where;
+      card.querySelector(".sc-prev").textContent = sessionPreview(st);
+      card.addEventListener("click", () => openChat(st.meta.id));
+      homeListEl.appendChild(card);
+    }
+  }
+  function showHome() { renderHome(); homeEl.classList.add("open"); }
+  function openChat(id) { homeEl.classList.remove("open"); switchTo(id); }
+  $("backBtn").addEventListener("click", showHome);
+  $("homeNew").addEventListener("click", () => { homeEl.classList.remove("open"); openModal(); });
+
   function switchTo(id) {
     if (!S.has(id)) return;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -874,7 +922,7 @@
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Oluşturulamadı");
-      addSessionState(data.session); rebuildSessionSelect(); modal.classList.remove("open"); switchTo(data.session.id);
+      addSessionState(data.session); rebuildSessionSelect(); modal.classList.remove("open"); openChat(data.session.id);
     } catch (e) { alert("⚠️ " + e.message); }
   });
 
@@ -915,6 +963,7 @@
     rebuildSessionSelect();
     if (prefs.voice) for (const st of S.values()) st.meta.voice = true;
     if (activeId) switchTo(activeId);
+    showHome(); // land on the session list
     if (prefs.notify) ensurePush();
   })();
 })();
