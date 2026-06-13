@@ -21,11 +21,18 @@ test.after(() => new Promise((r) => server.close(r)));
 test("push endpoints: key disabled by default, subscribe validates", async () => {
   const key = JSON.parse((await request(server, "GET", "/api/push/key")).data);
   assert.strictEqual(key.enabled, false); // no VAPID env in tests
-  const bad = await request(server, "POST", "/api/push/subscribe", { subscription: {} });
-  assert.strictEqual(bad.status, 400);
+  assert.strictEqual((await request(server, "POST", "/api/push/subscribe", { subscription: {} })).status, 400);
+  // non-https endpoints are rejected (SSRF hardening)
+  assert.strictEqual((await request(server, "POST", "/api/push/subscribe", { subscription: { endpoint: "http://internal/x" } })).status, 400);
   const ok = await request(server, "POST", "/api/push/subscribe", { subscription: { endpoint: "https://example.com/x", keys: { p256dh: "a", auth: "b" } }, sessionId: boot.id });
   assert.strictEqual(ok.status, 200);
   assert.strictEqual(JSON.parse(ok.data).ok, true);
+});
+
+test("a malformed percent-encoded path returns 400, not a crash", async () => {
+  assert.strictEqual((await request(server, "GET", "/%E0%A4%A")).status, 400);
+  // server is still responsive afterwards
+  assert.strictEqual((await request(server, "GET", "/api/health")).status, 200);
 });
 
 test("GET /api/health reports ok, version, and session count", async () => {
