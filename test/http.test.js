@@ -55,7 +55,7 @@ test("GET /api/config advertises agents, their modes, and the default session", 
   const { status, data } = await request(server, "GET", "/api/config");
   assert.strictEqual(status, 200);
   const cfg = JSON.parse(data);
-  assert.deepStrictEqual(cfg.agents.map((a) => a.id).sort(), ["antigravity", "claude", "codex"]);
+  assert.deepStrictEqual(cfg.agents.map((a) => a.id).sort(), ["antigravity", "claude", "codex", "ollama"]);
   const claude = cfg.agents.find((a) => a.id === "claude");
   assert.strictEqual(claude.defaultMode, "ask");
   assert.ok(claude.modes.some((m) => m.id === "full"));
