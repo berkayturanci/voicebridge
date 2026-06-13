@@ -6,9 +6,8 @@ You speak **or type** on your phone, a coding agent (running on your Mac/Linux
 box) does the work, and the reply streams back as chat **and** spoken audio —
 like a phone call with your agent, with a keyboard when you want one.
 
-<p align="center"><img src="docs/demo.svg" alt="voicebridge phone UI" width="300" /></p>
-
-> The image above is a mockup of the UI; a real screen recording will replace it.
+<p align="center"><img src="docs/demo.svg" alt="voicebridge phone UI — a chat with an agent, with a text box and a mic" width="300" /></p>
+<p align="center"><em>Type or speak; the agent replies in chat and aloud.</em></p>
 
 - 🤖 **Multiple agents** — Claude Code, **Codex**, and **Antigravity**, selectable
   per session, each with autonomy **modes** (ask → full-auto).
@@ -187,14 +186,22 @@ npm test       # zero-dependency test suite (node:test): adapters, parser,
   project directory (and create sessions pointing at other directories). Keep
   your tailnet private and set `ACCESS_TOKEN`.
 
-## Ideas / roadmap
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — components, request flow, and the agent-adapter design.
+- [docs/configuration.md](docs/configuration.md) — full env-var reference, agents, and modes.
+- [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, and how to add an agent.
+
+## Roadmap
 
 - Fully-local STT: stream mic audio over WebSocket to a local `whisper.cpp`
   server instead of the browser recognizer.
 - Per-agent conversation continuity for Codex / Antigravity (resume support).
-- QR code for the phone URL on startup; a usage GIF in this README.
-- ✅ Streaming replies, a Stop button, multiple agents, and multiple sessions.
+- A real screen recording to sit beside the UI illustration.
+- ✅ Streaming replies, a Stop button, multiple agents, multiple sessions, a
+  type-or-speak chat UI, per-agent autonomy modes, and a startup QR code.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
