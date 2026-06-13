@@ -50,6 +50,15 @@ test("antigravity adapter: `--print` with prompt on stdin", () => {
   assert.strictEqual(stdin, "go");
 });
 
+test("parseDotEnv parses KEY=VALUE, skips comments, strips quotes", () => {
+  const env = srv.parseDotEnv('# comment\nPORT=9000\nNAME="voice bridge"\nEMPTY=\n  SPACED = x \nBAD LINE');
+  assert.strictEqual(env.PORT, "9000");
+  assert.strictEqual(env.NAME, "voice bridge");
+  assert.strictEqual(env.EMPTY, "");
+  assert.strictEqual(env.SPACED, "x");
+  assert.ok(!("BAD" in env));
+});
+
 test("parseClaudeLine extracts assistant text", () => {
   const line = JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Hi" }, { type: "tool_use" }] } });
   assert.strictEqual(srv.parseClaudeLine(line), "Hi");
