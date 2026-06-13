@@ -3,6 +3,41 @@
 All notable changes to voicebridge are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-13
+
+The "talk to it like a person, on your phone" release.
+
+### Added
+- **Talking mode** (📞) — a continuous, hands-free voice conversation: speak, it
+  auto-sends on a pause, reads the reply aloud, then listens again, with a minimal
+  *listening / thinking / speaking* voice screen.
+- **Session list home** — the app opens to a list of conversations (mobile
+  Claude-Code style) with agent/mode/runner badges and a last-message preview; tap
+  to open, **←** to return.
+- **Conversation history persists** across reloads (per session, client-side).
+- **Command palette** (⌘) — the project's own `.claude/commands` slash commands
+  (e.g. `/keel:ship`) and `package.json` npm scripts, searchable; selecting one
+  prefills the composer (`GET /api/commands`).
+- **Folder browser** — a 📁 tree picker for the project directory
+  (`GET /api/browse`), including **remote** dirs for cloud sessions (the bridge
+  proxies the runner's `GET /browse`).
+- **Settings sheet** (⚙) gathers theme, **chat font size**, language, mode,
+  hands-free, cues, voice-friendly, notifications, TTS voice/rate, and session
+  actions — decluttering the header/footer so the chat area is bigger.
+- **Collapsible output** — long code/output blocks (npm logs, etc.) collapse by
+  default with a show-more toggle.
+- **Ollama via HTTP API** — streams `/api/chat` with per-session **conversation
+  continuity** and a model list (`OLLAMA_URL`, `GET /api/ollama/models`).
+- **Cloud-runner parity** — proxied streams are parsed for the activity trail and
+  push-on-question, matching local sessions.
+- Per-agent **availability** is shown in the picker; empty replies give a
+  contextual hint; the mic explains *why* when voice is unavailable (HTTPS / PWA).
+- `Escape` closes any open overlay (or exits talking mode).
+
+### Changed
+- Antigravity invocation is configurable (`AGY_ARGS`, `AGY_PROMPT_ARG`) for
+  builds whose `agy` differs.
+
 ## [0.2.1] - 2026-06-13
 
 ### Fixed (security)

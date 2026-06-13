@@ -151,23 +151,31 @@ transcribes). Hands-free loop is browser-mode only.
 
 ## Agents, sessions & modes
 
-- Tap **＋** in the header to create a session: pick an **agent** (Claude / Codex /
-  Antigravity), a **mode**, a **project folder**, and a name. Save frequent
-  projects as **favorites** (★) for one-tap prefill (or seed them with `FAVORITES`).
-- The session **dropdown** switches between conversations; each keeps its own
-  transcript, project directory, agent, and mode. **✎** renames and **🗑** deletes
-  the active session (the default session is protected).
+- **Session list home**: the app opens to a list of conversations (mobile
+  Claude-Code style) — each card shows the name, agent · mode · runner badges,
+  and a last-message preview. Tap a card to open it; **←** returns to the list.
+- Create a session with **＋ Yeni**: pick an **agent** (Claude / Codex /
+  Antigravity / **Ollama**), a **mode**, a **project folder**, and a name. The
+  folder field has a **📁 Gözat** tree browser (no typing long paths); save
+  frequent projects as **favorites** (★) (or seed them with `FAVORITES`).
+- **Conversation history persists**: each session keeps its own transcript,
+  restored on reload — come back and the conversation is still there.
 - **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or
-  tap ➤; the 🎤 button does voice. **Yeni sohbet** resets the active session; the
-  **🎤 → ⏹** button becomes a Stop control while the agent answers or speaks.
+  tap ➤; the 🎤 button does voice. The **🎤 → ⏹** button becomes a Stop control
+  while the agent answers or speaks.
 - **Talking mode** (📞): a continuous, hands-free voice conversation — speak, it
   auto-sends on a pause, the reply is read aloud, then it listens again. A minimal
   voice screen shows *listening / thinking / speaking*. (Needs HTTPS for the mic.)
+- **Command palette** (⌘): pick from the project's own commands — `.claude/commands`
+  slash commands (e.g. `/keel:ship`) and `package.json` npm scripts — searchable;
+  selecting one prefills the composer.
+- **Settings sheet** (⚙): theme, **chat font size**, language, mode, hands-free,
+  audio cues, voice-friendly, notifications, TTS voice + rate, and session
+  rename / delete / new-chat — all in one tidy place, so the chat area stays big.
 - **Local or cloud runner**: each session runs the agent **locally** (CLI on your
   machine) or, when `CLOUD_RUNNER_URL` is set, on a **cloud** runner — same UI,
-  same NDJSON protocol. See [docs/configuration.md](docs/configuration.md#runners-local-vs-cloud).
-- **Theme & preferences**: the 🌗 button cycles system → light → dark; the theme,
-  language, hands-free toggle, and mode are remembered across reloads.
+  same NDJSON protocol, and the folder picker browses the runner host. See
+  [docs/configuration.md](docs/configuration.md#runners-local-vs-cloud).
 - **Eyes-free audio cues**: optional earcons signal *listening*, *reply done*, and
   *error* — so you can run or cycle without looking at the screen.
 - **Quick commands**: one-tap chips send canned prompts ("Ne değişti?", "Testler",
@@ -179,10 +187,9 @@ transcribes). Hands-free loop is browser-mode only.
   finishes in the background or ends with a question — so a hands-free task
   pulls you back when it needs you. With VAPID keys configured it uses **real
   Web Push** (works even when the app is closed); otherwise in-page notifications.
-- **Voice & speed**: pick the TTS voice (per language) and adjust the speaking
-  rate; both are remembered.
-- **Activity trail**: when Claude uses tools, the chat shows a subtle running
-  log (e.g. `⚙︎ Edit server.js`, `⚙︎ Bash npm test`) so you can watch what it does.
+- **Activity trail & collapsible output**: tool use shows a subtle running log
+  (e.g. `⚙︎ Edit server.js`), and long output blocks (npm logs, etc.) collapse by
+  default with a show-more toggle so the conversation stays readable.
 - **Installable PWA**: a web manifest, icon, and service worker make it
   installable and cache the app shell; notifications go through the service
   worker. (On iOS, use the Safari **tab** for voice — installed PWAs can't use
