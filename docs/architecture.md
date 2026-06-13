@@ -82,6 +82,7 @@ session is recreated on boot).
 
 | Method & path | Purpose |
 |---------------|---------|
+| `GET /api/health` | Public. `{ ok, version, uptime, sessions }` for liveness/uptime checks. |
 | `GET /api/config` | Public. STT mode, whether auth is required, the agent list (with modes), the default project dir and session id. |
 | `GET /api/sessions` | List sessions. |
 | `POST /api/sessions` | Create a session `{ name, agent, projectDir, mode }`. |
