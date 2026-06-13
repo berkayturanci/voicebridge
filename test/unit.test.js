@@ -23,6 +23,18 @@ test("codex/antigravity adapters still pipe the prompt on stdin", () => {
   assert.strictEqual(srv.AGENTS.antigravity.command("go").stdin, "go");
 });
 
+test("ollama adapter runs a local model with the prompt on stdin", () => {
+  const prev = process.env.OLLAMA_MODEL;
+  delete process.env.OLLAMA_MODEL;
+  let c = srv.AGENTS.ollama.command("hi");
+  assert.deepStrictEqual(c.argv, ["run", "llama3.2"]);
+  assert.strictEqual(c.stdin, "hi");
+  assert.strictEqual(srv.AGENTS.ollama.supportsContinue, false);
+  process.env.OLLAMA_MODEL = "qwen2.5-coder";
+  assert.deepStrictEqual(srv.AGENTS.ollama.command("hi").argv, ["run", "qwen2.5-coder"]);
+  if (prev === undefined) delete process.env.OLLAMA_MODEL; else process.env.OLLAMA_MODEL = prev;
+});
+
 test("codex resume is opt-in via CODEX_CONTINUE_ARGS", () => {
   const prev = process.env.CODEX_CONTINUE_ARGS;
   delete process.env.CODEX_CONTINUE_ARGS;

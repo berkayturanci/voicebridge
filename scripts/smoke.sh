@@ -36,7 +36,7 @@ check "health.ok" "$(curl -fsS "$BASE/api/health" | node -pe 'JSON.parse(require
 
 # Config advertises agents, runners, push state
 cfg="$(curl -fsS "$BASE/api/config")"
-check "config.agents" "$(node -pe 'JSON.parse(process.argv[1]).agents.map(a=>a.id).sort().join(",")' "$cfg")" "antigravity,claude,codex"
+check "config.agents" "$(node -pe 'JSON.parse(process.argv[1]).agents.map(a=>a.id).sort().join(",")' "$cfg")" "antigravity,claude,codex,ollama"
 check "config.runners" "$(node -pe 'JSON.parse(process.argv[1]).runners.join(",")' "$cfg")" "local"
 
 # Push key disabled without VAPID

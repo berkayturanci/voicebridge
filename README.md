@@ -11,8 +11,9 @@ like a phone call with your agent, with a keyboard when you want one.
 <p align="center"><img src="docs/demo.svg" alt="voicebridge phone UI — a chat with an agent, with a text box and a mic" width="300" /></p>
 <p align="center"><em>Type or speak; the agent replies in chat and aloud.</em></p>
 
-- 🤖 **Multiple agents** — Claude Code, **Codex**, and **Antigravity**, selectable
-  per session, each with autonomy **modes** (ask → full-auto).
+- 🤖 **Multiple agents** — Claude Code, **Codex**, **Antigravity**, and **Ollama**
+  (a fully-local open-source model), selectable per session, each with autonomy
+  **modes** (ask → full-auto).
 - 🗂️ **Multiple sessions** — run several conversations in parallel (e.g. "Claude on
   repo A", "Codex on repo B") and switch between them in the UI.
 - ⌨️🎙️ **Type or speak** — a Claude-Code-like chat with a text box *and* a mic;
@@ -29,8 +30,9 @@ like a phone call with your agent, with a keyboard when you want one.
 - 🗣️ Optional **fully-local speech-to-text** via your own Whisper command
   (`STT_MODE=whisper`), so even the transcription stays on your machine.
 
-> Honest scope: the agent **model** still runs in its vendor's cloud (that's how
-> these CLIs work). voicebridge just removes the *voice* middleman (ElevenLabs)
+> Honest scope: for Claude/Codex/Antigravity the **model** runs in its vendor's
+> cloud (that's how those CLIs work); with the **Ollama** backend the model runs
+> fully locally. voicebridge just removes the *voice* middleman (ElevenLabs)
 > and its limits. Speech recognition on iOS uses Apple's free dictation service;
 > text-to-speech is fully on-device.
 >

@@ -197,6 +197,22 @@ const AGENTS = {
       return { argv: ["--print", ...resume, ...(modeArgs || [])], stdin: prompt };
     },
   },
+  ollama: {
+    label: "Ollama (yerel)",
+    bin: () => process.env.OLLAMA_BIN || "ollama",
+    supportsContinue: false, // each `ollama run` is a fresh, stateless generation
+    stream: "text",
+    defaultMode: "default",
+    modes: {
+      default: { label: "Yerel model", args: [] },
+    },
+    // `ollama run <model>` reads the prompt from stdin and streams the reply.
+    // The model itself runs locally — nothing leaves the machine.
+    command(prompt, { modeArgs } = {}) {
+      const model = process.env.OLLAMA_MODEL || "llama3.2";
+      return { argv: ["run", model, ...(modeArgs || [])], stdin: prompt };
+    },
+  },
 };
 
 // The valid mode for a session, falling back to the agent default.
