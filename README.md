@@ -140,6 +140,8 @@ transcribes). Hands-free loop is browser-mode only.
   **🎤 → ⏹** button becomes a Stop control while the agent answers or speaks.
 - **Theme & preferences**: the 🌗 button cycles system → light → dark; the theme,
   language, hands-free toggle, and mode are remembered across reloads.
+- **Eyes-free audio cues**: optional earcons signal *listening*, *reply done*, and
+  *error* — so you can run or cycle without looking at the screen.
 
 ### Modes (autonomy)
 
