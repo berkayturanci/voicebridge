@@ -94,6 +94,7 @@
   #mic.listening { background: #da3633; animation: pulse 1.2s infinite; }
   #mic.thinking { background: #9e6a03; }
   #mic:disabled { opacity: .4; }
+  #mic.na { opacity: .55; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(218,54,51,.6); } 50% { box-shadow: 0 0 0 12px rgba(218,54,51,0); } }
   .opts { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
   .opts select { background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 5px 7px; font-size: 12px; }
@@ -268,6 +269,10 @@
   }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const STANDALONE = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+  const noVoiceMsg = () => STANDALONE
+    ? "Sesli giriş için uygulamayı Safari sekmesinde aç (kurulu uygulamada mikrofon yok). Yine de yazabilirsin."
+    : "Bu tarayıcı sesli girişi desteklemiyor — yazabilirsin (iOS'ta Safari sekmesi).";
   let recognizing = false;
 
   const S = new Map();   // sessionId -> { meta, logEl, turn }
@@ -583,6 +588,7 @@
     ensureAudio();
     const st = active();
     if (st && st.turn.busy) { stopActive(); return; }
+    if (CONFIG.sttMode === "browser" && !SR) { setStatus(noVoiceMsg()); composer.focus(); return; }
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
     ensureToken();
     if (CONFIG.sttMode === "whisper") { if (recognizing) stopWhisper(); else startWhisper(); }
@@ -736,7 +742,7 @@
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
-    if (CONFIG.sttMode === "browser" && !SR) { setStatus("Tarayıcı konuşma tanımayı desteklemiyor — iOS'ta Safari kullan."); micBtn.disabled = true; }
+    if (CONFIG.sttMode === "browser" && !SR) { micBtn.classList.add("na"); setStatus(noVoiceMsg()); }
     if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }
     ensureToken();
     let list = { sessions: [], defaultSessionId: null };
