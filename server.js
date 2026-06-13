@@ -191,10 +191,15 @@ const AGENTS = {
       safe: { label: "Sandbox", args: ["--sandbox"] },
       full: { label: "Tam otonom", args: ["--yolo"] },
     },
-    // `agy --print` reads the prompt from stdin when none is given positionally.
+    // `agy --print` reads the prompt from stdin by default. CLIs vary, so the
+    // base args (AGY_ARGS, default "--print") and prompt delivery (AGY_PROMPT_ARG=1
+    // passes the prompt as a positional argument instead of stdin) are overridable.
     command(prompt, { cont, modeArgs } = {}) {
+      const base = process.env.AGY_ARGS ? splitArgs(process.env.AGY_ARGS) : ["--print"];
       const resume = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
-      return { argv: ["--print", ...resume, ...(modeArgs || [])], stdin: prompt };
+      const argv = [...base, ...resume, ...(modeArgs || [])];
+      if (process.env.AGY_PROMPT_ARG) { argv.push(prompt); return { argv, stdin: null }; }
+      return { argv, stdin: prompt };
     },
   },
   ollama: {
