@@ -138,6 +138,8 @@ transcribes). Hands-free loop is browser-mode only.
 - **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or
   tap ➤; the 🎤 button does voice. **Yeni sohbet** resets the active session; the
   **🎤 → ⏹** button becomes a Stop control while the agent answers or speaks.
+- **Theme & preferences**: the 🌗 button cycles system → light → dark; the theme,
+  language, hands-free toggle, and mode are remembered across reloads.
 
 ### Modes (autonomy)
 

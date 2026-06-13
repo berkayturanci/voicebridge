@@ -5,71 +5,99 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <title>voicebridge</title>
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  (() => {
+    try {
+      const p = JSON.parse(localStorage.getItem("vb_prefs") || "{}");
+      if (p.theme && p.theme !== "system") document.documentElement.dataset.theme = p.theme;
+    } catch (_) {}
+  })();
+</script>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #21262d;
+    --border: #21262d; --border2: #30363d; --field: #0d1117;
+    --text: #e6edf3; --muted: #8b949e; --accent: #1f6feb; --green: #238636;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --panel: #f6f8fa; --panel2: #eef1f4;
+    --border: #d0d7de; --border2: #d0d7de; --field: #ffffff;
+    --text: #1f2328; --muted: #59636e; --accent: #0969da; --green: #1a7f37;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #ffffff; --panel: #f6f8fa; --panel2: #eef1f4;
+      --border: #d0d7de; --border2: #d0d7de; --field: #ffffff;
+      --text: #1f2328; --muted: #59636e; --accent: #0969da; --green: #1a7f37;
+      color-scheme: light;
+    }
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; font-family: -apple-system, system-ui, sans-serif;
-    background: #0d1117; color: #e6edf3;
+    background: var(--bg); color: var(--text);
     display: flex; flex-direction: column; height: 100dvh;
   }
   header {
-    padding: 10px 12px; border-bottom: 1px solid #21262d;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 8px; font-weight: 600; flex: none;
   }
   header .dot { width: 9px; height: 9px; border-radius: 50%; background: #3fb950; flex: none; }
   header .spacer { flex: 1; }
   header select, header button {
-    background: #21262d; color: #e6edf3; border: 1px solid #30363d;
-    border-radius: 8px; padding: 6px 9px; font-size: 13px; max-width: 44vw;
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 6px 9px; font-size: 13px; max-width: 40vw;
   }
   header #session { font-weight: 600; }
   #logs { flex: 1; position: relative; overflow: hidden; }
   .log { position: absolute; inset: 0; overflow-y: auto; padding: 14px; display: none; flex-direction: column; gap: 10px; }
   .log.active { display: flex; }
   .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
-  .me { align-self: flex-end; background: #1f6feb; color: #fff; border-bottom-right-radius: 4px; }
-  .claude { align-self: flex-start; background: #161b22; border: 1px solid #21262d; border-bottom-left-radius: 4px; }
-  .claude pre { margin: 8px 0 2px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 10px; overflow-x: auto; }
+  .me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .claude { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .claude pre { margin: 8px 0 2px; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; overflow-x: auto; }
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-  .sys { align-self: center; color: #8b949e; font-size: 13px; text-align: center; }
+  .sys { align-self: center; color: var(--muted); font-size: 13px; text-align: center; }
 
-  footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #21262d; flex: none; display: flex; flex-direction: column; gap: 9px; }
-  #status { text-align: center; min-height: 18px; font-size: 12px; color: #8b949e; }
+  footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); flex: none; display: flex; flex-direction: column; gap: 9px; }
+  #status { text-align: center; min-height: 18px; font-size: 12px; color: var(--muted); }
   .composer { display: flex; align-items: flex-end; gap: 8px; }
   #composer {
     flex: 1; resize: none; min-height: 44px; max-height: 140px; padding: 11px 12px;
-    background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 12px;
+    background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 12px;
     font: inherit; font-size: 16px; line-height: 1.3;
   }
   .iconbtn { flex: none; width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 21px; color: #fff; }
-  #send { background: #1f6feb; }
+  #send { background: var(--accent); }
   #send:disabled { opacity: .4; }
-  #mic { background: #238636; transition: transform .1s, background .2s; }
+  #mic { background: var(--green); transition: transform .1s, background .2s; }
   #mic:active { transform: scale(.94); }
   #mic.listening { background: #da3633; animation: pulse 1.2s infinite; }
   #mic.thinking { background: #9e6a03; }
   #mic:disabled { opacity: .4; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(218,54,51,.6); } 50% { box-shadow: 0 0 0 12px rgba(218,54,51,0); } }
-  .opts { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #8b949e; }
-  .opts select { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 5px 7px; font-size: 12px; }
+  .opts { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .opts select { background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 5px 7px; font-size: 12px; }
   .opts label { display: inline-flex; align-items: center; gap: 6px; }
   .switch { position: relative; width: 40px; height: 24px; }
   .switch input { display: none; }
-  .slider { position: absolute; inset: 0; background: #30363d; border-radius: 24px; transition: .2s; }
+  .slider { position: absolute; inset: 0; background: var(--border2); border-radius: 24px; transition: .2s; }
   .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
-  input:checked + .slider { background: #238636; }
+  input:checked + .slider { background: var(--green); }
   input:checked + .slider::before { transform: translateX(16px); }
 
   #modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   #modal.open { display: flex; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
   .card h3 { margin: 0; font-size: 16px; }
-  .card label { font-size: 12px; color: #8b949e; display: flex; flex-direction: column; gap: 5px; }
-  .card input, .card select { background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 9px; font-size: 15px; }
+  .card label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
+  .card input, .card select { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
   .card .row { display: flex; gap: 10px; justify-content: flex-end; }
-  .card .row button { padding: 9px 14px; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: #e6edf3; font-size: 14px; }
-  .card .row button.primary { background: #238636; border-color: #238636; }
+  .card .row button { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 14px; }
+  .card .row button.primary { background: var(--green); border-color: var(--green); color: #fff; }
 </style>
 </head>
 <body>
@@ -78,6 +106,7 @@
     <select id="session" aria-label="Oturum"></select>
     <button id="newSession" title="Yeni oturum">＋</button>
     <span class="spacer"></span>
+    <button id="theme" title="Tema" aria-label="Tema">🌗</button>
     <button id="reset">Yeni sohbet</button>
   </header>
 
@@ -123,11 +152,24 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
   const agentById = {};
+
+  // ---------- Preferences (persisted) ----------
+  const THEMES = ["system", "light", "dark"];
+  let prefs = {};
+  try { prefs = JSON.parse(localStorage.getItem("vb_prefs") || "{}"); } catch (_) { prefs = {}; }
+  const savePrefs = () => { try { localStorage.setItem("vb_prefs", JSON.stringify(prefs)); } catch (_) {} };
+  function applyTheme() {
+    const t = prefs.theme || "system";
+    if (t === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = t;
+    themeBtn.textContent = t === "light" ? "☀️" : t === "dark" ? "🌙" : "🌗";
+    themeBtn.title = "Tema: " + t;
+  }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizing = false;
@@ -149,7 +191,7 @@
     }
   }
 
-  // ---------- Render: turn markdown-ish text into bubbles with code blocks ----------
+  // ---------- Render: markdown-ish text → bubble with code blocks ----------
   function renderInto(el, text) {
     el.textContent = "";
     const parts = text.split(/```/);
@@ -383,7 +425,14 @@
   });
 
   sessionSel.addEventListener("change", () => switchTo(sessionSel.value));
-  modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; });
+  modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; prefs.mode = modeSel.value; savePrefs(); });
+  langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); });
+  handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
+  themeBtn.addEventListener("click", () => {
+    const cur = prefs.theme || "system";
+    prefs.theme = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+    savePrefs(); applyTheme();
+  });
 
   // ---------- New-session modal ----------
   const nsAgent = $("ns-agent"), nsMode = $("ns-mode");
@@ -416,6 +465,9 @@
   })();
 
   // ---------- Boot ----------
+  applyTheme();
+  if (prefs.lang) langSel.value = prefs.lang;
+  if (prefs.handsfree) handsfree.checked = true;
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
