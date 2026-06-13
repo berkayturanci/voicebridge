@@ -35,7 +35,8 @@ Each session has a **runner**:
   agent on its own host, so the project directory refers to the remote machine.
 
 Pick the runner in the new-session dialog (the selector appears only when a cloud
-runner is configured).
+runner is configured). A ready-to-run reference runner lives in
+[`examples/cloud-runner/`](../examples/cloud-runner/).
 
 ## Agents
 
