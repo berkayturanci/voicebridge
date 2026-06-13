@@ -67,6 +67,9 @@
 
   footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); flex: none; display: flex; flex-direction: column; gap: 9px; }
   #status { text-align: center; min-height: 18px; font-size: 12px; color: var(--muted); }
+  .chips { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .chip { flex: none; padding: 6px 11px; border-radius: 16px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 13px; white-space: nowrap; }
+  .chip:disabled { opacity: .4; }
   .composer { display: flex; align-items: flex-end; gap: 8px; }
   #composer {
     flex: 1; resize: none; min-height: 44px; max-height: 140px; padding: 11px 12px;
@@ -117,6 +120,7 @@
 
   <footer>
     <div id="status"></div>
+    <div class="chips" id="chips"></div>
     <div class="composer">
       <textarea id="composer" rows="1" placeholder="Yaz ya da 🎤 ile konuş…" enterkeyhint="send"></textarea>
       <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
@@ -156,7 +160,7 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
@@ -321,7 +325,9 @@
     if (recognizing) { micBtn.classList.add("listening"); micBtn.textContent = "🎤"; }
     else if (st && st.turn.busy) { micBtn.classList.add("thinking"); micBtn.textContent = "⏹"; micBtn.setAttribute("aria-label", "Dur"); }
     else { micBtn.textContent = "🎤"; micBtn.setAttribute("aria-label", "Konuş"); }
-    sendBtn.disabled = !!(st && st.turn.busy);
+    const busy = !!(st && st.turn.busy);
+    sendBtn.disabled = busy;
+    chipsEl.querySelectorAll(".chip").forEach((c) => { c.disabled = busy; });
   }
 
   // ---------- Speech synthesis ----------
@@ -416,6 +422,29 @@
     ensureAudio(); ensureToken();
     composer.value = ""; autoGrow();
     addMsg(activeId, t, "me"); ask(activeId, t);
+  }
+  // ---------- Quick command shortcuts (canned prompts) ----------
+  const QUICK = [
+    { label: "Ne değişti?", prompt: "Summarize what changed in the working tree (git status and diff), briefly." },
+    { label: "Testler", prompt: "Run the test suite and tell me concisely whether it passes; if not, what failed." },
+    { label: "Commit & push", prompt: "Commit the current changes with a clear message and push to the current branch." },
+    { label: "Düzelt", prompt: "Find the failing test or error and fix it, then re-run the tests." },
+    { label: "Özetle", prompt: "Give me a one-paragraph summary of the current state of this project." },
+  ];
+  function quickSend(text) {
+    const st = active();
+    if (!text || !st || st.turn.busy) return;
+    ensureAudio(); ensureToken();
+    addMsg(activeId, text, "me"); ask(activeId, text);
+  }
+  function renderChips() {
+    chipsEl.innerHTML = "";
+    QUICK.forEach((q) => {
+      const b = document.createElement("button");
+      b.className = "chip"; b.type = "button"; b.textContent = q.label;
+      b.addEventListener("click", () => quickSend(q.prompt));
+      chipsEl.appendChild(b);
+    });
   }
   function autoGrow() { composer.style.height = "auto"; composer.style.height = Math.min(composer.scrollHeight, 140) + "px"; }
   composer.addEventListener("input", autoGrow);
@@ -522,6 +551,7 @@
 
   // ---------- Boot ----------
   applyTheme();
+  renderChips();
   if (prefs.lang) langSel.value = prefs.lang;
   if (prefs.handsfree) handsfree.checked = true;
   cuesChk.checked = cuesOn();

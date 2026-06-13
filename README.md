@@ -142,6 +142,8 @@ transcribes). Hands-free loop is browser-mode only.
   language, hands-free toggle, and mode are remembered across reloads.
 - **Eyes-free audio cues**: optional earcons signal *listening*, *reply done*, and
   *error* — so you can run or cycle without looking at the screen.
+- **Quick commands**: one-tap chips send canned prompts ("Ne değişti?", "Testler",
+  "Commit & push", …) to the active session — handy one-handed.
 
 ### Modes (autonomy)
 
