@@ -1,0 +1,76 @@
+# Configuration
+
+All configuration is via environment variables read at startup. None are
+required — the defaults run a local, Claude-backed bridge on port 8787.
+
+## Environment variables
+
+| Env var | Default | Meaning |
+|---------|---------|---------|
+| `PORT` | `8787` | Port the bridge listens on. |
+| `HOST` | `127.0.0.1` | Bind address. Keep it local and expose with `tailscale serve`. |
+| `PUBLIC_URL` | _(none)_ | Public URL shown in the startup QR (e.g. your Tailscale `https://…ts.net`). Falls back to `http://HOST:PORT`. |
+| `PROJECT_DIR` | current dir | Default working directory for new sessions. |
+| `AGENT` | `claude` | Default agent for the boot session: `claude`, `codex`, or `antigravity`. |
+| `CLAUDE_BIN` | `claude` | Path to the Claude Code executable. |
+| `CODEX_BIN` | `codex` | Path to the Codex executable. |
+| `AGY_BIN` | `agy` | Path to the Antigravity executable. |
+| `ACCESS_TOKEN` | _(none)_ | If set, every `/api/*` route (except `/api/config`) requires `Authorization: Bearer <token>`. |
+| `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
+| `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
+
+## Agents
+
+| Agent | CLI invocation | Prompt delivery | Output | Continuity |
+|-------|----------------|-----------------|--------|------------|
+| `claude` | `claude -p --output-format stream-json --verbose` | positional arg | NDJSON (parsed) | `--continue` (yes) |
+| `codex` | `codex exec` | stdin | plain text | per-turn (no) |
+| `antigravity` | `agy --print` | stdin | plain text | per-turn (no) |
+
+The Claude backend is fully implemented and tested. The Codex and Antigravity
+backends mirror the invocations used by
+[ai-jury](https://github.com/berkayturanci/ai-jury); verify them on a machine
+that has those CLIs installed.
+
+## Modes
+
+A session's **mode** sets how much autonomy the agent has by adding flags to its
+invocation. Pick a fuller-auto mode for hands-free use; the agent then edits and
+runs commands without asking.
+
+| Agent | Mode | Flags | Behavior |
+|-------|------|-------|----------|
+| Claude | `ask` (default) | — | Normal permissions. |
+| Claude | `autoEdit` | `--permission-mode acceptEdits` | Auto-accepts edits. |
+| Claude | `full` | `--dangerously-skip-permissions` | No prompts at all. |
+| Codex | `safe` | `-s read-only` | Read-only sandbox. |
+| Codex | `auto` (default) | `--full-auto` | Workspace-write, no approvals. |
+| Codex | `full` | `--dangerously-bypass-approvals-and-sandbox` | No sandbox, no approvals. |
+| Antigravity | `safe` (default) | `--sandbox` | Sandboxed. |
+| Antigravity | `full` | `--yolo` | No restrictions. |
+
+Modes are chosen in the new-session dialog and can be changed per session from
+the footer selector (`/api/ask` carries the mode and switches it on the fly).
+
+> ⚠️ See [security.md](security.md) before using full-auto modes.
+
+## Examples
+
+A read-only Codex session on a second project, behind a token, exposed publicly:
+
+```bash
+export ACCESS_TOKEN="$(openssl rand -hex 16)"
+export PUBLIC_URL="https://mybox.tailnet.ts.net"
+export AGENT=codex
+export PROJECT_DIR="$HOME/code/service"
+npm start
+# scan the printed QR (it already carries ?token=…)
+```
+
+Fully-local speech-to-text with whisper.cpp:
+
+```bash
+export STT_MODE=whisper
+export STT_CMD='ffmpeg -nostdin -i {file} -ar 16000 -ac 1 -f wav - 2>/dev/null | whisper-cli -m ~/models/ggml-base.bin -nt -f - 2>/dev/null'
+npm start
+```
