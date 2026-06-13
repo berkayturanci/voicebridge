@@ -160,6 +160,21 @@ test("createSession defaults runner to local and stores it", () => {
   assert.strictEqual(s.runner, "local");
 });
 
+test("createSession enforces a session cap", () => {
+  const saved = new Map(srv.sessions);
+  const prev = process.env.MAX_SESSIONS;
+  srv.sessions.clear();
+  process.env.MAX_SESSIONS = "3";
+  try {
+    for (let i = 0; i < 3; i++) srv.createSession({ agent: "claude", projectDir: process.cwd() });
+    assert.throws(() => srv.createSession({ agent: "claude", projectDir: process.cwd() }), /too many sessions/);
+  } finally {
+    srv.sessions.clear();
+    for (const [k, v] of saved) srv.sessions.set(k, v);
+    if (prev === undefined) delete process.env.MAX_SESSIONS; else process.env.MAX_SESSIONS = prev;
+  }
+});
+
 test("sessions persist to a file and reload", () => {
   const fs = require("node:fs"); const os = require("node:os"); const path = require("node:path");
   const f = path.join(os.tmpdir(), "vb-sess-" + Date.now() + ".json");

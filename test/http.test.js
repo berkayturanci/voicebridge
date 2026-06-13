@@ -35,6 +35,13 @@ test("a malformed percent-encoded path returns 400, not a crash", async () => {
   assert.strictEqual((await request(server, "GET", "/api/health")).status, 200);
 });
 
+test("responses carry security headers", async () => {
+  const r = await request(server, "GET", "/api/health");
+  assert.strictEqual(r.headers["x-content-type-options"], "nosniff");
+  assert.strictEqual(r.headers["x-frame-options"], "DENY");
+  assert.match(r.headers["content-security-policy"], /default-src 'self'/);
+});
+
 test("GET /api/health reports ok, version, and session count", async () => {
   const { status, data } = await request(server, "GET", "/api/health");
   assert.strictEqual(status, 200);

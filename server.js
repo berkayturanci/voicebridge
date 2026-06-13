@@ -205,7 +205,10 @@ function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
+function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
+
 function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
+  if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
   if (mode && !AGENTS[agent].modes[mode]) throw new Error("unknown mode: " + mode);
@@ -316,8 +319,20 @@ function sendPush(payload) {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
+// Security headers applied to every response. The single-file UI uses inline
+// script/style, so script-src/style-src allow 'unsafe-inline'; everything else
+// is same-origin only.
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'",
+};
+
 function send(res, status, body, headers) {
-  res.writeHead(status, Object.assign({ "Cache-Control": "no-store" }, headers || {}));
+  res.writeHead(status, Object.assign({ "Cache-Control": "no-store" }, SECURITY_HEADERS, headers || {}));
   res.end(body);
 }
 function sendJson(res, status, obj) {
@@ -387,11 +402,11 @@ function buildPrompt(voice, text) {
 function cloudRunnerUrl() { return process.env.CLOUD_RUNNER_URL || ""; }
 
 function streamAsk(session, prompt, res) {
-  res.writeHead(200, {
+  res.writeHead(200, Object.assign({
     "Content-Type": "application/x-ndjson; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Accel-Buffering": "no",
-  });
+  }, SECURITY_HEADERS));
   const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
   return streamLocal(session, prompt, res, emit);
@@ -641,9 +656,10 @@ function handleRequest(req, res) {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const ep = data.subscription && data.subscription.endpoint;
         if (typeof ep !== "string" || !/^https:\/\//i.test(ep)) return sendJson(res, 400, { error: "Bad subscription" });
-        const idx = pushSubs.findIndex((s) => s.sub.endpoint === data.subscription.endpoint);
+        const idx = pushSubs.findIndex((s) => s.sub.endpoint === ep);
         const entry = { sub: data.subscription, sessionId: data.sessionId || null };
         if (idx >= 0) pushSubs[idx] = entry; else pushSubs.push(entry);
+        while (pushSubs.length > 500) pushSubs.shift(); // bound memory; evict oldest
         return sendJson(res, 200, { ok: true });
       });
     }
@@ -711,6 +727,12 @@ function start() {
     console.log(`sessions: ${sessions.size}${sessionsFile() ? "  (persisted)" : ""}`);
     console.log(`agents: ${Object.keys(AGENTS).join(", ")}`);
     console.log(`STT mode: ${STT_MODE}${ACCESS_TOKEN ? "  (access token required)" : ""}`);
+    const loopback = HOST === "127.0.0.1" || HOST === "::1" || HOST === "localhost";
+    if (!loopback && !ACCESS_TOKEN) {
+      console.warn("\n⚠️  WARNING: bound to a non-loopback address WITHOUT ACCESS_TOKEN.");
+      console.warn("    Anyone who can reach this host can drive an agent on your machine.");
+      console.warn("    Set ACCESS_TOKEN, or bind to 127.0.0.1 and expose via `tailscale serve`.\n");
+    }
     console.log(`Expose it to your phone with:  tailscale serve --bg ${PORT}`);
     printPhoneQr(phoneUrl({ publicUrl: process.env.PUBLIC_URL, host: HOST, port: PORT, token: ACCESS_TOKEN }));
   });
