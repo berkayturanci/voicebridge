@@ -148,7 +148,7 @@ function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
-function createSession({ name, agent, projectDir, mode } = {}) {
+function createSession({ name, agent, projectDir, mode, voice } = {}) {
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
   if (mode && !AGENTS[agent].modes[mode]) throw new Error("unknown mode: " + mode);
@@ -161,6 +161,7 @@ function createSession({ name, agent, projectDir, mode } = {}) {
     agent,
     projectDir: dir,
     mode: resolveMode(agent, mode),
+    voice: !!voice,
     started: false,
   };
   sessions.set(id, s);
@@ -170,7 +171,7 @@ function createSession({ name, agent, projectDir, mode } = {}) {
 function publicSession(s) {
   return {
     id: s.id, name: s.name, agent: s.agent,
-    agentLabel: AGENTS[s.agent].label, projectDir: s.projectDir, mode: s.mode, started: s.started,
+    agentLabel: AGENTS[s.agent].label, projectDir: s.projectDir, mode: s.mode, voice: s.voice, started: s.started,
   };
 }
 
@@ -239,11 +240,20 @@ function readBody(req, limitBytes, cb) {
 // Streaming a turn (NDJSON out: {type:"delta"|"done"|"error"})
 // ---------------------------------------------------------------------------
 
+// In voice-friendly mode, prepend a short instruction so the agent answers in a
+// way that reads well aloud. The user's visible message is unchanged.
+const VOICE_PREAMBLE =
+  "Answer concisely, optimized for being read aloud by text-to-speech: avoid long " +
+  "code blocks unless explicitly asked, and finish with a one-sentence spoken summary.";
+function buildPrompt(voice, text) {
+  return voice ? VOICE_PREAMBLE + "\n\n" + text : text;
+}
+
 function streamAsk(session, prompt, res) {
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
   const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
-  const { argv, stdin } = agent.command(prompt, { cont, modeArgs });
+  const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, modeArgs });
 
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -411,6 +421,7 @@ function handleRequest(req, res) {
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
         if (data.reset) session.started = false;
         if (data.mode && AGENTS[session.agent].modes[data.mode]) session.mode = data.mode;
+        if (typeof data.voice === "boolean") session.voice = data.voice;
         streamAsk(session, text, res);
       });
     }
@@ -489,6 +500,7 @@ module.exports = {
   AGENTS,
   parseClaudeLine,
   resolveMode,
+  buildPrompt,
   phoneUrl,
   sessions,
   createSession,
