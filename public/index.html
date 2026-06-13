@@ -270,7 +270,9 @@
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const STANDALONE = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
-  const noVoiceMsg = () => STANDALONE
+  const noVoiceMsg = () => !window.isSecureContext
+    ? "Sesli giriş HTTPS ister — `tailscale serve` ile https:// adresinden aç (http'de mikrofon yok). Yazabilirsin."
+    : STANDALONE
     ? "Sesli giriş için uygulamayı Safari sekmesinde aç (kurulu uygulamada mikrofon yok). Yine de yazabilirsin."
     : "Bu tarayıcı sesli girişi desteklemiyor — yazabilirsin (iOS'ta Safari sekmesi).";
   let recognizing = false;
