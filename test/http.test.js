@@ -2,6 +2,9 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const http = require("node:http");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { installStubAgents, request, ndjson } = require("./helpers");
 
 installStubAgents();
@@ -113,6 +116,26 @@ test("creating a session with an unknown agent is rejected", async () => {
 test("empty prompt and unknown session are rejected", async () => {
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "  ", sessionId: boot.id })).status, 400);
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "hi", sessionId: "nope" })).status, 404);
+});
+
+test("activity events are streamed for claude tool_use", async () => {
+  const stub = path.join(os.tmpdir(), "vb-claude-act-" + Date.now() + ".js");
+  fs.writeFileSync(stub, `#!/usr/bin/env node
+process.stdout.write(JSON.stringify({type:"assistant",message:{content:[{type:"tool_use",name:"Edit",input:{file_path:"/r/app.js"}}]}})+"\\n");
+process.stdout.write(JSON.stringify({type:"assistant",message:{content:[{type:"text",text:"done."}]}})+"\\n");
+process.stdout.write(JSON.stringify({type:"result",subtype:"success"})+"\\n");
+`);
+  fs.chmodSync(stub, 0o755);
+  const prev = process.env.CLAUDE_BIN;
+  process.env.CLAUDE_BIN = stub;
+  try {
+    const { session } = JSON.parse((await request(server, "POST", "/api/sessions", { agent: "claude", projectDir: process.cwd() })).data);
+    const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "activity" && /Edit app\.js/.test(e.text)));
+    assert.ok(evs.some((e) => e.type === "delta" && /done/.test(e.text)));
+  } finally {
+    process.env.CLAUDE_BIN = prev; fs.unlinkSync(stub);
+  }
 });
 
 test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {

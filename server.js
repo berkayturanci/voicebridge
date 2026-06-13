@@ -88,6 +88,28 @@ function parseClaudeLine(line) {
   return null;
 }
 
+// A short, human label for a tool_use block, e.g. "Edit server.js" / "Bash npm test".
+function toolLabel(b) {
+  const v = b.input && (b.input.file_path || b.input.path || b.input.pattern || b.input.command || b.input.url);
+  const detail = v ? " " + String(v).split("/").slice(-1)[0].slice(0, 40) : "";
+  return (b.name || "tool") + detail;
+}
+
+// Parse one Claude `stream-json` line into events: assistant text -> delta,
+// tool_use -> activity (what the agent is doing). Returns [] for other lines.
+function parseClaudeEvents(line) {
+  let obj;
+  try { obj = JSON.parse(line); } catch (_) { return []; }
+  const out = [];
+  if (obj.type === "assistant" && obj.message && Array.isArray(obj.message.content)) {
+    for (const b of obj.message.content) {
+      if (b && b.type === "text" && b.text) out.push({ type: "delta", text: b.text });
+      else if (b && b.type === "tool_use") out.push({ type: "activity", text: toolLabel(b) });
+    }
+  }
+  return out;
+}
+
 // Per-agent "mode" = how much autonomy the agent has. The flags mirror
 // ai-jury's privilege handling. Full-auto modes skip approval prompts — handy
 // hands-free, risky otherwise.
@@ -111,6 +133,7 @@ const AGENTS = {
       return { argv, stdin: null };
     },
     parseLine: parseClaudeLine,
+    parseEvents: parseClaudeEvents,
   },
   codex: {
     label: "Codex",
@@ -337,6 +360,14 @@ function streamLocal(session, prompt, res, emit) {
   let gotText = false;
 
   const onText = (text) => { if (text) { gotText = true; emit({ type: "delta", text }); } };
+  // NDJSON agents may report activity (tool_use) alongside text.
+  const onLine = (line) => {
+    if (agent.parseEvents) {
+      for (const ev of agent.parseEvents(line)) { if (ev.type === "delta") gotText = true; emit(ev); }
+    } else {
+      onText(agent.parseLine(line));
+    }
+  };
 
   child.stdout.on("data", (d) => {
     const s = d.toString();
@@ -346,7 +377,7 @@ function streamLocal(session, prompt, res, emit) {
       while ((idx = buf.indexOf("\n")) >= 0) {
         const line = buf.slice(0, idx).trim();
         buf = buf.slice(idx + 1);
-        if (line) onText(agent.parseLine(line));
+        if (line) onLine(line);
       }
     } else {
       onText(s); // plain-text agents: stream stdout straight through
@@ -366,7 +397,7 @@ function streamLocal(session, prompt, res, emit) {
   });
   child.on("close", (code) => {
     clearTimeout(timer);
-    if (agent.stream === "ndjson" && buf.trim()) onText(agent.parseLine(buf));
+    if (agent.stream === "ndjson" && buf.trim()) onLine(buf);
     if (code !== 0 && !gotText) {
       emit({ type: "error", error: stderr.trim() || `${agent.label} exited with code ${code}.` });
     } else {
@@ -571,6 +602,7 @@ if (require.main === module) {
 module.exports = {
   AGENTS,
   parseClaudeLine,
+  parseClaudeEvents,
   resolveMode,
   resolveRunner,
   buildPrompt,
