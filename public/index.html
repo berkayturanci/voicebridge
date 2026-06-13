@@ -235,6 +235,26 @@
     function fallback() { try { const n = new Notification(title, opts); n.onclick = () => { window.focus(); n.close(); }; } catch (_) {} }
   }
 
+  // Real Web Push (works when the app is closed) — only if the server advertises VAPID.
+  function urlB64ToUint8(b64) {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const s = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(s); const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+  async function ensurePush() {
+    try {
+      if (!prefs.notify || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      const cfg = await (await fetch("/api/push/key")).json();
+      if (!cfg.enabled || !cfg.key) return;
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(cfg.key) });
+      await fetch("/api/push/subscribe", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ subscription: sub, sessionId: activeId }) });
+    } catch (_) {}
+  }
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizing = false;
 
@@ -593,9 +613,10 @@
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
   notifyChk.addEventListener("change", () => {
     prefs.notify = notifyChk.checked; savePrefs();
-    if (notifyChk.checked && "Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().then((p) => { if (p !== "granted") { notifyChk.checked = false; prefs.notify = false; savePrefs(); } });
-    }
+    if (!notifyChk.checked || !("Notification" in window)) return;
+    const after = (p) => { if (p === "granted") ensurePush(); else { notifyChk.checked = false; prefs.notify = false; savePrefs(); } };
+    if (Notification.permission === "default") Notification.requestPermission().then(after);
+    else after(Notification.permission);
   });
   themeBtn.addEventListener("click", () => {
     const cur = prefs.theme || "system";
@@ -699,6 +720,7 @@
     rebuildSessionSelect();
     if (prefs.voice) for (const st of S.values()) st.meta.voice = true;
     if (activeId) switchTo(activeId);
+    if (prefs.notify) ensurePush();
   })();
 })();
 </script>

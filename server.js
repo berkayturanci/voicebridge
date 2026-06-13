@@ -280,6 +280,39 @@ function loadSessions(file) {
 }
 
 // ---------------------------------------------------------------------------
+// Web Push (optional): real OS notifications even when the app is closed.
+// Enabled when VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY are set and the optional
+// `web-push` dependency is installed.
+// ---------------------------------------------------------------------------
+let webpush; // undefined = not tried, null = unavailable
+const pushSubs = []; // [{ sub, sessionId }]
+
+function pushEnabled() {
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return false;
+  if (webpush === undefined) { try { webpush = require("web-push"); } catch (_) { webpush = null; } }
+  if (!webpush) return false;
+  try {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:voicebridge@localhost",
+      process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY
+    );
+  } catch (_) { return false; }
+  return true;
+}
+
+function looksLikeQuestion(text) { return /\?["')\]]*\s*$/.test((text || "").trim()); }
+
+function sendPush(payload) {
+  if (!pushEnabled() || !pushSubs.length) return;
+  const data = JSON.stringify(payload);
+  for (let i = pushSubs.length - 1; i >= 0; i--) {
+    webpush.sendNotification(pushSubs[i].sub, data).catch((e) => {
+      if (e && (e.statusCode === 404 || e.statusCode === 410)) pushSubs.splice(i, 1); // gone
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
@@ -408,12 +441,13 @@ function streamLocal(session, prompt, res, emit) {
   let buf = "";
   let stderr = "";
   let gotText = false;
+  let replyText = ""; // accumulated for the optional push-on-question
 
-  const onText = (text) => { if (text) { gotText = true; emit({ type: "delta", text }); } };
+  const onText = (text) => { if (text) { gotText = true; replyText += text; emit({ type: "delta", text }); } };
   // NDJSON agents may report activity (tool_use) alongside text.
   const onLine = (line) => {
     if (agent.parseEvents) {
-      for (const ev of agent.parseEvents(line)) { if (ev.type === "delta") gotText = true; emit(ev); }
+      for (const ev of agent.parseEvents(line)) { if (ev.type === "delta") { gotText = true; replyText += ev.text; } emit(ev); }
     } else {
       onText(agent.parseLine(line));
     }
@@ -453,6 +487,9 @@ function streamLocal(session, prompt, res, emit) {
     } else {
       session.started = true;
       emit({ type: "done" });
+      if (looksLikeQuestion(replyText)) {
+        sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: replyText.trim().slice(-160), sessionId: session.id });
+      }
     }
     res.end();
   });
@@ -492,6 +529,11 @@ function transcribe(audioBuf, contentType, cb) {
 
 function handleRequest(req, res) {
   const urlPath = req.url.split("?")[0];
+
+  // Public: Web Push availability + the VAPID public key for the client.
+  if (req.method === "GET" && urlPath === "/api/push/key") {
+    return sendJson(res, 200, { enabled: pushEnabled(), key: process.env.VAPID_PUBLIC_KEY || "" });
+  }
 
   // Public: liveness/readiness probe.
   if (req.method === "GET" && urlPath === "/api/health") {
@@ -592,6 +634,17 @@ function handleRequest(req, res) {
       });
     }
 
+    if (req.method === "POST" && urlPath === "/api/push/subscribe") {
+      return readBody(req, 64 * 1024, (e, body) => {
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        if (!data.subscription || !data.subscription.endpoint) return sendJson(res, 400, { error: "Bad subscription" });
+        const idx = pushSubs.findIndex((s) => s.sub.endpoint === data.subscription.endpoint);
+        const entry = { sub: data.subscription, sessionId: data.sessionId || null };
+        if (idx >= 0) pushSubs[idx] = entry; else pushSubs.push(entry);
+        return sendJson(res, 200, { ok: true });
+      });
+    }
+
     if (req.method === "POST" && urlPath === "/api/reset") {
       return readBody(req, 64 * 1024, (e, body) => {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
@@ -665,6 +718,7 @@ module.exports = {
   resolveMode,
   resolveRunner,
   buildPrompt,
+  looksLikeQuestion,
   parseFavorites,
   phoneUrl,
   sessions,

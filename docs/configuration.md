@@ -24,6 +24,22 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `CLOUD_RUNNER_URL` | _(none)_ | If set, enables **cloud** sessions: turns are proxied here instead of spawning a local CLI. The endpoint must speak the same NDJSON protocol. |
 | `CLOUD_RUNNER_TOKEN` | _(none)_ | Optional `Authorization: Bearer` token sent to the cloud runner. |
 | `SESSIONS_FILE` | _(none)_ | If set, sessions (name/agent/dir/mode/voice/runner) are saved here and restored on restart, e.g. `~/.voicebridge/sessions.json`. Unset = in-memory only. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | _(none)_ | Enable real Web Push (OS notifications even when the app is closed). Generate with `node scripts/gen-vapid-keys.js` (needs the optional `web-push` dependency). |
+| `VAPID_SUBJECT` | `mailto:voicebridge@localhost` | Contact URI sent with push (a `mailto:` or `https:`). |
+
+## Web Push (notifications when the app is closed)
+
+In-page notifications fire while the tab is open or backgrounded. For real OS
+push when the app is fully closed:
+
+1. Install the optional dependency: `npm install web-push`.
+2. Generate keys: `node scripts/gen-vapid-keys.js` and set the printed
+   `VAPID_*` env vars.
+3. Start the bridge and enable **Bildirim** in the UI — the browser subscribes
+   and the server pushes when a reply ends with a question.
+
+Without VAPID keys (or `web-push`), the app silently falls back to in-page
+notifications. Push currently triggers for **local** runner turns.
 
 ## Runners: local vs cloud
 

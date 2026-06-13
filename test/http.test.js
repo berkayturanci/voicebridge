@@ -18,6 +18,16 @@ const server = srv.buildServer();
 test.before(() => new Promise((r) => server.listen(0, "127.0.0.1", r)));
 test.after(() => new Promise((r) => server.close(r)));
 
+test("push endpoints: key disabled by default, subscribe validates", async () => {
+  const key = JSON.parse((await request(server, "GET", "/api/push/key")).data);
+  assert.strictEqual(key.enabled, false); // no VAPID env in tests
+  const bad = await request(server, "POST", "/api/push/subscribe", { subscription: {} });
+  assert.strictEqual(bad.status, 400);
+  const ok = await request(server, "POST", "/api/push/subscribe", { subscription: { endpoint: "https://example.com/x", keys: { p256dh: "a", auth: "b" } }, sessionId: boot.id });
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual(JSON.parse(ok.data).ok, true);
+});
+
 test("GET /api/health reports ok, version, and session count", async () => {
   const { status, data } = await request(server, "GET", "/api/health");
   assert.strictEqual(status, 200);
