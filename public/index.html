@@ -23,6 +23,7 @@
     --bg: #0d1117; --panel: #161b22; --panel2: #21262d;
     --border: #21262d; --border2: #30363d; --field: #0d1117;
     --text: #e6edf3; --muted: #8b949e; --accent: #1f6feb; --green: #238636;
+    --chat-fs: 15px;
     color-scheme: dark;
   }
   :root[data-theme="light"] {
@@ -64,7 +65,7 @@
   #jump.show { display: block; }
   .log { position: absolute; inset: 0; overflow-y: auto; padding: 14px; display: none; flex-direction: column; gap: 10px; }
   .log.active { display: flex; }
-  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; font-size: var(--chat-fs); }
   .me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .claude { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
   .codewrap { position: relative; margin: 8px 0 2px; }
@@ -106,13 +107,18 @@
   input:checked + .slider { background: var(--green); }
   input:checked + .slider::before { transform: translateX(16px); }
 
-  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
-  #modal.open { display: flex; }
-  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+  #modal, #settings { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  #modal.open, #settings.open { display: flex; }
+  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
   .card h3 { margin: 0; font-size: 16px; }
   .card label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
+  .card label.opt { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+  .card label.opt > select, .card label.opt > input[type=range] { flex: 0 0 auto; width: 150px; }
+  .card .srow { display: flex; align-items: center; justify-content: space-between; }
+  .card .srow button { background: none; border: none; color: var(--muted); font-size: 18px; }
+  .card label.opt > #theme { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card input, .card select { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
-  .card .row { display: flex; gap: 10px; justify-content: flex-end; }
+  .card .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
   .card .row button { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 14px; }
   .card .row button.primary { background: var(--green); border-color: var(--green); color: #fff; }
 </style>
@@ -122,11 +128,8 @@
     <span class="dot"></span>
     <select id="session" aria-label="Oturum"></select>
     <button id="newSession" title="Yeni oturum">＋</button>
-    <button id="renameSession" title="Yeniden adlandır" aria-label="Yeniden adlandır">✎</button>
-    <button id="delSession" title="Oturumu sil" aria-label="Oturumu sil">🗑</button>
     <span class="spacer"></span>
-    <button id="theme" title="Tema" aria-label="Tema">🌗</button>
-    <button id="reset">Yeni sohbet</button>
+    <button id="settingsBtn" title="Ayarlar" aria-label="Ayarlar">⚙</button>
   </header>
 
   <div id="logs">
@@ -141,22 +144,33 @@
       <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
     </div>
-    <div class="opts">
-      <label>Mod <select id="mode"></select></label>
-      <label>Dil
+  </footer>
+
+  <div id="settings">
+    <div class="card">
+      <div class="srow"><h3>Ayarlar</h3><button id="settingsClose" aria-label="Kapat">✕</button></div>
+      <label class="opt">Tema <button id="theme" title="Tema" aria-label="Tema">🌗</button></label>
+      <label class="opt">Yazı boyutu <input type="range" id="fontSize" min="13" max="24" step="1" /></label>
+      <label class="opt">Dil
         <select id="lang">
           <option value="tr-TR">Türkçe</option>
           <option value="en-US">English</option>
         </select>
       </label>
-      <label>Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
-      <label>Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
-      <label>Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
-      <label>Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
-      <label>Ses <select id="ttsVoice"></select></label>
-      <label>Hız <input type="range" id="rate" min="0.6" max="1.6" step="0.1" style="width:80px" /></label>
+      <label class="opt">Mod <select id="mode"></select></label>
+      <label class="opt">Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
+      <label class="opt">Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
+      <label class="opt">Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
+      <label class="opt">Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
+      <label class="opt">Ses <select id="ttsVoice"></select></label>
+      <label class="opt">Hız <input type="range" id="rate" min="0.6" max="1.6" step="0.1" /></label>
+      <div class="row">
+        <button id="renameSession">✎ Adlandır</button>
+        <button id="delSession">🗑 Sil</button>
+        <button id="reset" class="primary">Yeni sohbet</button>
+      </div>
     </div>
-  </footer>
+  </div>
 
   <div id="modal">
     <div class="card">
@@ -187,6 +201,14 @@
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
   const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify"), ttsVoiceSel = $("ttsVoice"), rateInput = $("rate"), jumpBtn = $("jump");
+  const settingsEl = $("settings"), settingsBtn = $("settingsBtn"), fontSizeInput = $("fontSize");
+  // Settings sheet open/close + backdrop dismiss.
+  settingsBtn.addEventListener("click", () => settingsEl.classList.add("open"));
+  $("settingsClose").addEventListener("click", () => settingsEl.classList.remove("open"));
+  settingsEl.addEventListener("click", (e) => { if (e.target === settingsEl) settingsEl.classList.remove("open"); });
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
+  function applyFontSize() { document.documentElement.style.setProperty("--chat-fs", (prefs.fontSize || 15) + "px"); }
+  fontSizeInput.addEventListener("input", () => { prefs.fontSize = parseInt(fontSizeInput.value, 10) || 15; savePrefs(); applyFontSize(); });
 
   // Auto-scroll only when the user is already near the bottom (don't fight them).
   function nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 80; }
@@ -746,6 +768,8 @@
   cuesChk.checked = cuesOn();
   notifyChk.checked = !!prefs.notify;
   rateInput.value = prefs.rate || 1;
+  fontSizeInput.value = prefs.fontSize || 15;
+  applyFontSize();
   populateVoices();
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
