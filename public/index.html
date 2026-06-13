@@ -118,6 +118,11 @@
   .card .srow button { background: none; border: none; color: var(--muted); font-size: 18px; }
   .card label.opt > #theme { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card input, .card select { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
+  #ns-tree { max-height: 190px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  #ns-tree .cur { font-size: 11px; color: var(--muted); padding: 2px 4px; word-break: break-all; }
+  #ns-tree button { text-align: left; background: none; border: none; color: var(--text); padding: 7px 8px; border-radius: 6px; font-size: 14px; }
+  #ns-tree button.up { color: var(--accent); }
+  #ns-browse { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
   .card .row button { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 14px; }
   .card .row button.primary { background: var(--green); border-color: var(--green); color: #fff; }
@@ -184,7 +189,9 @@
       <label id="ns-runner-row" style="display:none">Çalışma yeri <select id="ns-runner"></select></label>
       <label id="ns-omodel-row" style="display:none">Ollama model <select id="ns-omodel"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
-      <label>Proje klasörü <input id="ns-dir" placeholder="/Users/you/project" /></label>
+      <label class="opt">Proje klasörü <button id="ns-browse" type="button">📁 Gözat</button></label>
+      <input id="ns-dir" placeholder="/Users/you/project" />
+      <div id="ns-tree" style="display:none"></div>
       <div class="row">
         <button id="ns-save">★ Kaydet</button>
         <button id="ns-cancel">İptal</button>
@@ -706,6 +713,7 @@
     runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
     $("ns-runner-row").style.display = runners.length > 1 ? "flex" : "none";
     $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
+    $("ns-tree").style.display = "none";
     fillModeSelect(nsMode, nsAgent.value);
     refreshOllamaModels();
     renderFavSelect();
@@ -722,6 +730,29 @@
     } catch (_) {}
   }
   nsAgent.addEventListener("change", () => { fillModeSelect(nsMode, nsAgent.value); refreshOllamaModels(); });
+
+  // Folder browser for the project directory.
+  const nsTree = $("ns-tree");
+  async function browseTo(p) {
+    try {
+      const u = new URLSearchParams(); if (p) u.set("path", p);
+      const data = await (await fetch("/api/browse?" + u.toString(), { headers: authHeaders() })).json();
+      $("ns-dir").value = data.path || "";
+      nsTree.innerHTML = "";
+      const cur = document.createElement("div"); cur.className = "cur"; cur.textContent = data.path || ""; nsTree.appendChild(cur);
+      if (data.parent) { const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.textContent = "⬆ üst"; b.addEventListener("click", () => browseTo(data.parent)); nsTree.appendChild(b); }
+      (data.dirs || []).forEach((d) => {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = "📁 " + d;
+        b.addEventListener("click", () => browseTo((data.path.endsWith("/") ? data.path : data.path + "/") + d));
+        nsTree.appendChild(b);
+      });
+      nsTree.style.display = "flex";
+    } catch (_) {}
+  }
+  $("ns-browse").addEventListener("click", () => {
+    if (nsTree.style.display === "none") browseTo($("ns-dir").value.trim());
+    else nsTree.style.display = "none";
+  });
   nsFav.addEventListener("change", applyFav);
   $("ns-save").addEventListener("click", () => {
     const dir = $("ns-dir").value.trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }

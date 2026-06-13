@@ -705,6 +705,27 @@ function handleRequest(req, res) {
   if (urlPath.startsWith("/api/")) {
     if (!authorized(req)) return sendJson(res, 401, { error: "Unauthorized" });
 
+    // Browse local directories (for the project-folder picker).
+    if (req.method === "GET" && urlPath === "/api/browse") {
+      let dir;
+      try { dir = path.resolve(new URL(req.url, "http://x").searchParams.get("path") || DEFAULT_PROJECT_DIR || os.homedir()); }
+      catch (_) { dir = os.homedir(); }
+      let dirs = [];
+      try {
+        dirs = fs.readdirSync(dir, { withFileTypes: true })
+          .filter((e) => {
+            if (e.name.startsWith(".")) return false;
+            try { return e.isDirectory() || (e.isSymbolicLink() && fs.statSync(path.join(dir, e.name)).isDirectory()); }
+            catch (_) { return false; }
+          })
+          .map((e) => e.name).sort((a, b) => a.localeCompare(b));
+      } catch (e) {
+        return sendJson(res, 200, { path: dir, parent: path.dirname(dir), dirs: [], error: e.message });
+      }
+      const parent = path.dirname(dir);
+      return sendJson(res, 200, { path: dir, parent: parent === dir ? null : parent, dirs });
+    }
+
     if (req.method === "GET" && urlPath === "/api/sessions") {
       return sendJson(res, 200, {
         sessions: Array.from(sessions.values()).map(publicSession),
