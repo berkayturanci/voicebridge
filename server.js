@@ -315,6 +315,10 @@ function serveStatic(req, res) {
       ext === ".html" ? "text/html; charset=utf-8" :
       ext === ".js" ? "text/javascript; charset=utf-8" :
       ext === ".css" ? "text/css; charset=utf-8" :
+      ext === ".svg" ? "image/svg+xml" :
+      ext === ".json" ? "application/json; charset=utf-8" :
+      ext === ".webmanifest" ? "application/manifest+json; charset=utf-8" :
+      ext === ".png" ? "image/png" :
       "application/octet-stream";
     send(res, 200, data, { "Content-Type": type });
   });
