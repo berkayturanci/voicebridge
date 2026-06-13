@@ -19,6 +19,8 @@ All notable changes to voicebridge are documented here. This project adheres to
   `ACCESS_TOKEN`.
 - Caps on sessions (`MAX_SESSIONS`, default 200) and stored push subscriptions
   to bound memory.
+- A concurrency cap (`MAX_INFLIGHT`, default 8) on in-flight agent turns;
+  `/api/ask` returns `429` past it, so a client can't exhaust the host.
 
 ## [0.2.0] - 2026-06-13
 

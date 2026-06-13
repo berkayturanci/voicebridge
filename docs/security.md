@@ -57,6 +57,23 @@ and Antigravity on stdin — never interpolated into a shell command. The whispe
 `STT_CMD` is operator-provided and runs via `/bin/sh`; only configure it with
 commands you trust.
 
+## Built-in limits & hardening
+
+- **Security headers** on every response: a same-origin `Content-Security-Policy`,
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`.
+- **Exposure warning**: starting on a non-loopback address without `ACCESS_TOKEN`
+  prints a prominent warning.
+- **Resource caps**: `MAX_SESSIONS` (default 200), a cap on stored push
+  subscriptions, and `MAX_INFLIGHT` (default 8) concurrent agent turns — past
+  which `/api/ask` returns `429` — so an authenticated client can't exhaust the
+  host.
+- **Robust parsing**: request bodies are size-limited; malformed URLs and JSON
+  return `4xx` (never crash); every handler is wrapped so a synchronous error
+  can't take the process down.
+- **Injection-safe**: prompts go to agents as a separate argv element (Claude) or
+  on stdin (Codex/Antigravity/Ollama) — never through a shell.
+- **Push**: only `https` subscription endpoints are accepted.
+
 ## Reporting
 
 Found a vulnerability? Please open a private report via the repository's
