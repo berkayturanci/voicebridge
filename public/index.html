@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>voicebridge · Claude Code</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: -apple-system, system-ui, sans-serif;
+    background: #0d1117; color: #e6edf3;
+    display: flex; flex-direction: column; height: 100dvh;
+  }
+  header {
+    padding: 14px 16px; border-bottom: 1px solid #21262d;
+    display: flex; align-items: center; gap: 10px; font-weight: 600;
+  }
+  header .dot { width: 9px; height: 9px; border-radius: 50%; background: #3fb950; }
+  header .spacer { flex: 1; }
+  header button {
+    background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px;
+  }
+  #log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
+  .me { align-self: flex-end; background: #1f6feb; color: #fff; border-bottom-right-radius: 4px; }
+  .claude { align-self: flex-start; background: #161b22; border: 1px solid #21262d; border-bottom-left-radius: 4px; }
+  .sys { align-self: center; color: #8b949e; font-size: 13px; text-align: center; }
+  footer { padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #21262d; }
+  #status { text-align: center; min-height: 20px; font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+  .controls { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  #mic {
+    width: 76px; height: 76px; border-radius: 50%; border: none;
+    background: #238636; color: #fff; font-size: 30px; transition: transform .1s, background .2s;
+  }
+  #mic:active { transform: scale(.94); }
+  #mic.listening { background: #da3633; animation: pulse 1.2s infinite; }
+  #mic.thinking { background: #9e6a03; }
+  #mic:disabled { opacity: .4; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(218,54,51,.6); } 50% { box-shadow: 0 0 0 14px rgba(218,54,51,0); } }
+  .toggle { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #8b949e; gap: 4px; }
+  select { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 6px; max-width: 120px; }
+  .switch { position: relative; width: 44px; height: 26px; }
+  .switch input { display: none; }
+  .slider { position: absolute; inset: 0; background: #30363d; border-radius: 26px; transition: .2s; }
+  .slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  input:checked + .slider { background: #238636; }
+  input:checked + .slider::before { transform: translateX(18px); }
+</style>
+</head>
+<body>
+  <header>
+    <span class="dot"></span> voicebridge
+    <span class="spacer"></span>
+    <button id="reset">Yeni sohbet</button>
+  </header>
+
+  <div id="log">
+    <div class="msg sys">Mikrofona dokun, konuş. Claude Code yazarken cümle cümle sesli cevap verir.</div>
+  </div>
+
+  <footer>
+    <div id="status"></div>
+    <div class="controls">
+      <label class="toggle">
+        <span>Dil</span>
+        <select id="lang">
+          <option value="tr-TR">Türkçe</option>
+          <option value="en-US">English</option>
+        </select>
+      </label>
+      <button id="mic" aria-label="Konuş">🎤</button>
+      <label class="toggle">
+        <span>Eller serbest</span>
+        <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span>
+      </label>
+    </div>
+  </footer>
+
+<script>
+(() => {
+  "use strict";
+  const log = document.getElementById("log");
+  const statusEl = document.getElementById("status");
+  const micBtn = document.getElementById("mic");
+  const langSel = document.getElementById("lang");
+  const handsfree = document.getElementById("handsfree");
+  const resetBtn = document.getElementById("reset");
+
+  let CONFIG = { sttMode: "browser", authRequired: false };
+  let token = localStorage.getItem("vb_token") || "";
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognizing = false, busy = false;
+
+  function setStatus(t) { statusEl.textContent = t || ""; }
+  function add(text, cls) {
+    const div = document.createElement("div");
+    div.className = "msg " + cls;
+    div.textContent = text || "";
+    log.appendChild(div); log.scrollTop = log.scrollHeight;
+    return div;
+  }
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    if (CONFIG.authRequired && token) h["Authorization"] = "Bearer " + token;
+    return h;
+  }
+  function ensureToken() {
+    if (CONFIG.authRequired && !token) {
+      token = (prompt("Erişim token'ı:") || "").trim();
+      if (token) localStorage.setItem("vb_token", token);
+    }
+  }
+
+  // ---------- Speech synthesis (on-device, free), sentence queue ----------
+  let speakBuf = "", speaking = false; const speakQueue = [];
+  function cleanForSpeech(t) {
+    return t
+      .replace(/```[\s\S]*?```/g, " kod bloğu. ")
+      .replace(/`([^`]*)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[*_#>`|]/g, "")
+      .trim();
+  }
+  function pickVoice() {
+    const want = langSel.value.split("-")[0];
+    const vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    return vs.find(v => v.lang && v.lang.toLowerCase().startsWith(want)) || null;
+  }
+  function drainSpeak() {
+    if (speaking || !speakQueue.length || !("speechSynthesis" in window)) return;
+    speaking = true;
+    const u = new SpeechSynthesisUtterance(speakQueue.shift());
+    u.lang = langSel.value;
+    const v = pickVoice(); if (v) u.voice = v;
+    u.onend = u.onerror = () => { speaking = false; drainSpeak(); };
+    window.speechSynthesis.speak(u);
+  }
+  function feedSpeech(chunk) {
+    speakBuf += chunk;
+    let m;
+    // Speak each complete sentence as soon as it's available.
+    while ((m = speakBuf.match(/[\s\S]*?[.!?\n]+/))) {
+      const sentence = cleanForSpeech(m[0]);
+      speakBuf = speakBuf.slice(m[0].length);
+      if (sentence) { speakQueue.push(sentence); drainSpeak(); }
+    }
+  }
+  function flushSpeech() {
+    const rest = cleanForSpeech(speakBuf); speakBuf = "";
+    if (rest) { speakQueue.push(rest); drainSpeak(); }
+  }
+
+  // ---------- Send to Claude Code and stream the reply ----------
+  async function ask(text) {
+    busy = true; micBtn.classList.add("thinking"); setStatus("Claude düşünüyor…");
+    speakBuf = ""; speakQueue.length = 0;
+    const bubble = add("", "claude"); let full = "";
+    try {
+      const r = await fetch("/api/ask", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ text }),
+      });
+      if (r.status === 401) { localStorage.removeItem("vb_token"); token = ""; throw new Error("Token geçersiz. Sayfayı yenile."); }
+      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 1);
+          if (!line) continue;
+          let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
+          if (ev.type === "delta") {
+            full += ev.text; bubble.textContent = full; log.scrollTop = log.scrollHeight;
+            micBtn.classList.remove("thinking"); setStatus("");
+            feedSpeech(ev.text);
+          } else if (ev.type === "error") {
+            throw new Error(ev.error || "Sunucu hatası");
+          }
+        }
+      }
+      flushSpeech();
+      if (!full) bubble.textContent = "(boş cevap)";
+    } catch (e) {
+      micBtn.classList.remove("thinking");
+      bubble.remove(); add("⚠️ " + e.message, "sys"); setStatus("");
+    } finally {
+      busy = false;
+      if (handsfree.checked && CONFIG.sttMode === "browser") startBrowserSTT();
+    }
+  }
+
+  // ---------- Browser speech recognition ----------
+  let rec = null;
+  function startBrowserSTT() {
+    if (recognizing || busy || !SR) return;
+    rec = new SR();
+    rec.lang = langSel.value; rec.interimResults = false; rec.maxAlternatives = 1;
+    rec.onstart = () => { recognizing = true; micBtn.classList.add("listening"); setStatus("Dinliyorum…"); };
+    rec.onerror = (e) => {
+      recognizing = false; micBtn.classList.remove("listening");
+      setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error);
+    };
+    rec.onend = () => { recognizing = false; micBtn.classList.remove("listening"); };
+    rec.onresult = (ev) => {
+      const text = ev.results[0][0].transcript.trim();
+      if (text) { add(text, "me"); ask(text); }
+    };
+    try { rec.start(); } catch (_) {}
+  }
+  function stopBrowserSTT() { if (rec && recognizing) rec.stop(); }
+
+  // ---------- Whisper recording (server-side STT) ----------
+  let mediaRec = null, chunks = [];
+  async function startWhisper() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRec = new MediaRecorder(stream);
+      chunks = [];
+      mediaRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      mediaRec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        micBtn.classList.remove("listening"); recognizing = false;
+        const blob = new Blob(chunks, { type: mediaRec.mimeType || "audio/webm" });
+        setStatus("Yazıya çevriliyor…");
+        try {
+          const r = await fetch("/api/stt", { method: "POST", headers: authHeaders({ "Content-Type": blob.type }), body: blob });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || "STT hatası");
+          setStatus("");
+          if (data.text) { add(data.text, "me"); ask(data.text); }
+          else setStatus("Ses anlaşılmadı.");
+        } catch (e) { setStatus("⚠️ " + e.message); }
+      };
+      mediaRec.start(); recognizing = true; micBtn.classList.add("listening"); setStatus("Kaydediyorum… (bitince dokun)");
+    } catch (e) { setStatus("Mikrofon açılamadı: " + e.message); }
+  }
+  function stopWhisper() { if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop(); }
+
+  // ---------- Mic button ----------
+  micBtn.addEventListener("click", () => {
+    if ("speechSynthesis" in window) window.speechSynthesis.getVoices(); // unlock TTS on iOS
+    ensureToken();
+    if (CONFIG.sttMode === "whisper") {
+      if (recognizing) stopWhisper(); else startWhisper();
+    } else {
+      if (recognizing) stopBrowserSTT(); else startBrowserSTT();
+    }
+  });
+
+  resetBtn.addEventListener("click", async () => {
+    try { await fetch("/api/reset", { method: "POST", headers: authHeaders() }); } catch (_) {}
+    log.innerHTML = ""; add("Yeni sohbet başladı.", "sys");
+  });
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  }
+
+  // ---------- Boot ----------
+  (async () => {
+    try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
+    if (CONFIG.sttMode === "browser" && !SR) {
+      setStatus("Tarayıcı konuşma tanımayı desteklemiyor — iOS'ta Safari kullan (ana ekrana ekleme).");
+      micBtn.disabled = true;
+    }
+    if (CONFIG.sttMode === "whisper" && handsfree.parentElement) {
+      handsfree.disabled = true; // hands-free loop only in browser mode
+      handsfree.closest(".toggle").style.opacity = .4;
+    }
+    ensureToken();
+  })();
+})();
+</script>
+</body>
+</html>
