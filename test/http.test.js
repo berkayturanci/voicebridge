@@ -259,6 +259,7 @@ test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {
     let body = ""; rq.on("data", (c) => (body += c)); rq.on("end", () => {
       const payload = JSON.parse(body || "{}");
       rs.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      rs.write(JSON.stringify({ type: "activity", text: "Edit x.js" }) + "\n");
       rs.write(JSON.stringify({ type: "delta", text: "cloud:" + payload.text }) + "\n");
       rs.end(JSON.stringify({ type: "done" }) + "\n");
     });
@@ -271,6 +272,7 @@ test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {
     const { session } = JSON.parse(create.data);
     assert.strictEqual(session.runner, "cloud");
     const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "activity" && /Edit x\.js/.test(e.text))); // forwarded unchanged
     assert.ok(evs.some((e) => e.type === "delta" && /cloud:hi/.test(e.text)));
     assert.strictEqual(evs[evs.length - 1].type, "done");
   } finally {

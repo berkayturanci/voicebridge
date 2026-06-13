@@ -514,9 +514,23 @@ function streamCloud(session, prompt, res, emit) {
   });
   const headers = { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) };
   if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
+  // Forward the remote stream unchanged, but also parse a copy so cloud turns
+  // reach parity with local ones (activity passes through; reply text drives
+  // push-on-question).
+  let pbuf = "", reply = "";
+  const scan = (line) => { try { const ev = JSON.parse(line); if (ev.type === "delta" && ev.text) reply += ev.text; } catch (_) {} };
   const up = lib.request(url, { method: "POST", headers }, (r) => {
-    r.on("data", (d) => { try { res.write(d); } catch (_) {} });
-    r.on("end", () => { session.started = true; res.end(); });
+    r.on("data", (d) => {
+      try { res.write(d); } catch (_) {}
+      pbuf += d.toString();
+      let i; while ((i = pbuf.indexOf("\n")) >= 0) { const line = pbuf.slice(0, i).trim(); pbuf = pbuf.slice(i + 1); if (line) scan(line); }
+    });
+    r.on("end", () => {
+      if (pbuf.trim()) scan(pbuf.trim());
+      session.started = true;
+      if (looksLikeQuestion(reply)) sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: reply.trim().slice(-160), sessionId: session.id });
+      res.end();
+    });
   });
   up.on("error", (e) => { emit({ type: "error", error: "cloud runner: " + e.message }); res.end(); });
   up.write(payload); up.end();
