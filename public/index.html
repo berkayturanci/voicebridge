@@ -495,7 +495,7 @@
           } else if (ev.type === "error") { throw new Error(ev.error || "Sunucu hatası"); }
         }
       }
-      if (full) renderInto(bubble, full); else bubble.textContent = "(boş cevap)";
+      if (full) renderInto(bubble, full); else bubble.textContent = emptyReplyHint(st.meta.agent);
       if (sessionId === activeId) { flushSpeech(); setStatus(""); }
       cue("done");
       if (full) maybeNotify(st.meta.name, full);
@@ -507,6 +507,12 @@
       if (sessionId === activeId) refreshMic();
       if (!st.turn.stopped && handsfree.checked && CONFIG.sttMode === "browser" && sessionId === activeId) startBrowserSTT();
     }
+  }
+
+  function emptyReplyHint(agent) {
+    if (agent === "antigravity") return "(boş cevap — agy farklı çağrı isteyebilir; sunucuda AGY_PROMPT_ARG=1 deneyin)";
+    if (agent === "ollama") return "(boş cevap — model çekildi mi? `ollama pull <model>` ve OLLAMA_MODEL'i kontrol edin)";
+    return "(boş cevap)";
   }
 
   // ---------- Text composer ----------
