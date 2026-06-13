@@ -44,6 +44,19 @@ like a phone call with your agent, with a keyboard when you want one.
 
 ---
 
+## Quickstart
+
+```bash
+git clone <your-repo-url> voicebridge && cd voicebridge && npm install
+cp .env.example .env                                  # set PROJECT_DIR + ACCESS_TOKEN
+CLAUDE_BIN=$(which claude) npm start                  # prints a QR for your phone
+tailscale serve --bg 8787                             # expose over HTTPS (separate terminal)
+```
+
+Then open the printed `https://…ts.net` URL in your phone's browser (Safari on
+iOS) and tap 🎤 or just type. New to it? See [Requirements](#requirements) and
+[Troubleshooting](#troubleshooting).
+
 ## Requirements
 
 - A computer (macOS/Linux) with **Claude Code** installed and logged in
@@ -228,6 +241,26 @@ CLAUDE_BIN=/tmp/claude npm start   # open the printed URL, type or speak
 - Anyone on your tailnet who opens the URL can drive an agent in a session's
   project directory (and create sessions pointing at other directories). Keep
   your tailnet private and set `ACCESS_TOKEN`.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Mic does nothing / "https şart" | Web Speech needs HTTPS — open the `tailscale serve` URL, not `http://…`. |
+| iOS mic doesn't work | Use the Safari **tab**, not an installed PWA (iOS blocks the mic in installed PWAs). |
+| "Could not find 'claude'…" | Set `CLAUDE_BIN` to the agent's path (`which claude`) and make sure it's logged in. |
+| 401 / keeps asking for a token | `ACCESS_TOKEN` is set — enter it once on the phone, or scan the QR (it carries the token). |
+| Replies don't speak | Tap the screen once (browsers need a gesture to start audio); check the voice/rate options. |
+| No notifications | Enable **Bildirim** and allow the permission; real push needs VAPID keys (see configuration). |
+
+## Security checklist
+
+- [ ] Reach the bridge only over **Tailscale** (keep `HOST=127.0.0.1`); never expose it publicly.
+- [ ] Set `ACCESS_TOKEN` (required if it's reachable beyond localhost — the bridge warns otherwise).
+- [ ] Use read-only / ask **modes** on unfamiliar repos; reserve full-auto for trusted projects.
+- [ ] Keep your tailnet private; anyone on it who has the URL + token can drive an agent.
+
+Details in [docs/security.md](docs/security.md).
 
 ## Documentation
 
