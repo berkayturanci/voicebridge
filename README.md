@@ -52,13 +52,17 @@ work, and the reply is read back aloud — like a phone call with your agent.
 ```bash
 git clone <your-repo-url> voicebridge
 cd voicebridge
+npm install            # installs qrcode-terminal (the only dependency)
 
-# Point Claude Code at the project you want it to work on:
+# Point the agent at the project you want it to work on:
 export PROJECT_DIR="$HOME/code/my-project"
 
 # Start the bridge (binds to 127.0.0.1:8787 by default)
 npm start
 ```
+
+On startup the bridge prints a **QR code** for the phone URL — scan it to open
+the UI (and, when `ACCESS_TOKEN`/`PUBLIC_URL` are set, to authorize on open).
 
 ### 2. Expose it to your phone over HTTPS (Tailscale)
 
@@ -87,6 +91,7 @@ That's it — talk, and Claude Code talks back. 🎧
 |----------------|----------------------|----------------------------------------------------|
 | `PORT`         | `8787`               | Port the bridge listens on                         |
 | `HOST`         | `127.0.0.1`          | Bind address (keep local; expose via `tailscale serve`) |
+| `PUBLIC_URL`   | _(none)_             | Public URL shown in the startup QR (e.g. your Tailscale `https://…ts.net`). Falls back to `http://HOST:PORT`. |
 | `PROJECT_DIR`  | current directory    | Default working directory for new sessions         |
 | `AGENT`        | `claude`             | Default agent for the boot session (`claude`/`codex`/`antigravity`) |
 | `CLAUDE_BIN`   | `claude`             | Path to the `claude` executable                    |

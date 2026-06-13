@@ -400,6 +400,27 @@ function buildServer() {
   return http.createServer(handleRequest);
 }
 
+// The URL to open on the phone. Prefer the real public URL (e.g. the Tailscale
+// hostname) via PUBLIC_URL; otherwise fall back to host:port. When a token is
+// configured, embed it so scanning authorizes the phone on open.
+function phoneUrl({ publicUrl, host, port, token } = {}) {
+  const base = publicUrl && publicUrl.trim()
+    ? publicUrl.trim().replace(/\/+$/, "")
+    : `http://${host || "127.0.0.1"}:${port || "8787"}`;
+  return base + (token ? `?token=${encodeURIComponent(token)}` : "");
+}
+
+// Print a scannable QR for the phone URL. Fail-soft: if qrcode-terminal is not
+// installed the bridge still runs and just prints the URL.
+function printPhoneQr(url) {
+  console.log(`\nOpen on your phone:  ${url}`);
+  try {
+    require("qrcode-terminal").generate(url, { small: true }, (qr) => console.log(qr));
+  } catch (_) {
+    console.log("(run `npm install` to show a scannable QR code here)\n");
+  }
+}
+
 function start() {
   const boot = createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR });
   defaultSessionId = boot.id;
@@ -410,6 +431,7 @@ function start() {
     console.log(`agents: ${Object.keys(AGENTS).join(", ")}`);
     console.log(`STT mode: ${STT_MODE}${ACCESS_TOKEN ? "  (access token required)" : ""}`);
     console.log(`Expose it to your phone with:  tailscale serve --bg ${PORT}`);
+    printPhoneQr(phoneUrl({ publicUrl: process.env.PUBLIC_URL, host: HOST, port: PORT, token: ACCESS_TOKEN }));
   });
   return server;
 }
@@ -421,6 +443,7 @@ if (require.main === module) {
 module.exports = {
   AGENTS,
   parseClaudeLine,
+  phoneUrl,
   sessions,
   createSession,
   resolveSession,

@@ -410,6 +410,12 @@
   }
 
   // ---------- Boot ----------
+  // A QR/link may carry ?token=… so scanning authorizes the phone on open.
+  (() => {
+    const t = new URLSearchParams(location.search).get("token");
+    if (t) { token = t.trim(); localStorage.setItem("vb_token", token); history.replaceState(null, "", location.pathname); }
+  })();
+
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     if (CONFIG.sttMode === "browser" && !SR) {
