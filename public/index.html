@@ -141,6 +141,8 @@
       <label>Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
       <label>Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
       <label>Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
+      <label>Ses <select id="ttsVoice"></select></label>
+      <label>Hız <input type="range" id="rate" min="0.6" max="1.6" step="0.1" style="width:80px" /></label>
     </div>
   </footer>
 
@@ -171,7 +173,7 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify"), ttsVoiceSel = $("ttsVoice"), rateInput = $("rate");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
@@ -359,16 +361,31 @@
     return t.replace(/```[\s\S]*?```/g, " kod bloğu. ").replace(/`([^`]*)`/g, "$1")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_#>`|]/g, "").trim();
   }
-  function pickVoice() {
-    const want = langSel.value.split("-")[0];
+  function langKey() { return langSel.value.split("-")[0]; }
+  function voicesFor(want) {
     const vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-    return vs.find((v) => v.lang && v.lang.toLowerCase().startsWith(want)) || null;
+    return vs.filter((v) => v.lang && v.lang.toLowerCase().startsWith(want));
+  }
+  function pickVoice() {
+    const want = langKey();
+    const vs = voicesFor(want);
+    const name = (prefs.voices || {})[want];
+    if (name) { const v = vs.find((x) => x.name === name); if (v) return v; }
+    return vs[0] || null;
+  }
+  function populateVoices() {
+    const want = langKey();
+    ttsVoiceSel.innerHTML = "";
+    const auto = document.createElement("option"); auto.value = ""; auto.textContent = "Otomatik"; ttsVoiceSel.appendChild(auto);
+    voicesFor(want).forEach((v) => { const o = document.createElement("option"); o.value = v.name; o.textContent = v.name.replace(/\s*\(.*\)$/, ""); ttsVoiceSel.appendChild(o); });
+    ttsVoiceSel.value = (prefs.voices || {})[want] || "";
   }
   function drainSpeak() {
     if (speaking || !speakQueue.length || !("speechSynthesis" in window)) return;
     speaking = true;
     const u = new SpeechSynthesisUtterance(speakQueue.shift());
     u.lang = langSel.value; const v = pickVoice(); if (v) u.voice = v;
+    u.rate = prefs.rate || 1;
     u.onend = u.onerror = () => { speaking = false; drainSpeak(); };
     window.speechSynthesis.speak(u);
   }
@@ -558,7 +575,9 @@
     } catch (e) { alert("⚠️ " + e.message); }
   });
   modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; prefs.mode = modeSel.value; savePrefs(); });
-  langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); });
+  langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); populateVoices(); });
+  ttsVoiceSel.addEventListener("change", () => { prefs.voices = prefs.voices || {}; prefs.voices[langKey()] = ttsVoiceSel.value; savePrefs(); });
+  rateInput.addEventListener("change", () => { prefs.rate = parseFloat(rateInput.value) || 1; savePrefs(); });
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
@@ -635,7 +654,7 @@
     } catch (e) { alert("⚠️ " + e.message); }
   });
 
-  if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); populateVoices(); };
 
   // A QR/link may carry ?token=… so scanning authorizes the phone on open.
   (() => {
@@ -650,6 +669,8 @@
   if (prefs.handsfree) handsfree.checked = true;
   cuesChk.checked = cuesOn();
   notifyChk.checked = !!prefs.notify;
+  rateInput.value = prefs.rate || 1;
+  populateVoices();
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
