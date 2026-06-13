@@ -200,7 +200,19 @@ caveat that the agent then edits/runs without asking.
 
 ```bash
 npm test       # zero-dependency test suite (node:test): adapters, parser,
-               # session registry, streaming, and auth — uses stub agents.
+               # session registry, streaming, modes, runners, push, and auth.
+npm run smoke  # end-to-end HTTP smoke test against a stub agent (no real CLI)
+```
+
+### Try it locally without a real agent
+
+You don't need an agent CLI to see the bridge work end to end — point a `*_BIN`
+env var at a stub that emits the expected output:
+
+```bash
+printf '#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({type:"assistant",message:{content:[{type:"text",text:"hello from the stub."}]}})+"\\n");\n' > /tmp/claude
+chmod +x /tmp/claude
+CLAUDE_BIN=/tmp/claude npm start   # open the printed URL, type or speak
 ```
 
 ## Security notes
