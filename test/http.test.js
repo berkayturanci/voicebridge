@@ -14,6 +14,15 @@ const server = srv.buildServer();
 test.before(() => new Promise((r) => server.listen(0, "127.0.0.1", r)));
 test.after(() => new Promise((r) => server.close(r)));
 
+test("GET /api/health reports ok, version, and session count", async () => {
+  const { status, data } = await request(server, "GET", "/api/health");
+  assert.strictEqual(status, 200);
+  const h = JSON.parse(data);
+  assert.strictEqual(h.ok, true);
+  assert.match(h.version, /^\d+\.\d+\.\d+/);
+  assert.ok(typeof h.sessions === "number" && h.sessions >= 1);
+});
+
 test("GET /api/config advertises agents, their modes, and the default session", async () => {
   const { status, data } = await request(server, "GET", "/api/config");
   assert.strictEqual(status, 200);

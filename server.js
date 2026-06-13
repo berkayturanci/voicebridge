@@ -45,6 +45,8 @@ const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "";
 const STT_MODE = (process.env.STT_MODE || "browser").toLowerCase();
 const STT_CMD = process.env.STT_CMD || "";
 const PUBLIC_DIR = path.join(__dirname, "public");
+let PKG_VERSION = "0.0.0";
+try { PKG_VERSION = require("./package.json").version || PKG_VERSION; } catch (_) {}
 
 // ---------------------------------------------------------------------------
 // Agent backends
@@ -343,6 +345,16 @@ function transcribe(audioBuf, contentType, cb) {
 
 function handleRequest(req, res) {
   const urlPath = req.url.split("?")[0];
+
+  // Public: liveness/readiness probe.
+  if (req.method === "GET" && urlPath === "/api/health") {
+    return sendJson(res, 200, {
+      ok: true,
+      version: PKG_VERSION,
+      uptime: Math.round(process.uptime()),
+      sessions: sessions.size,
+    });
+  }
 
   // Public: client configuration (no secrets).
   if (req.method === "GET" && urlPath === "/api/config") {
