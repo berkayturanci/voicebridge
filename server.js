@@ -243,6 +243,42 @@ function resolveSession(id) {
   return null;
 }
 
+// Optional disk persistence so sessions survive a bridge restart. Off unless
+// SESSIONS_FILE is set (or a file is passed explicitly, e.g. in tests).
+function sessionsFile() { return process.env.SESSIONS_FILE || ""; }
+function saveSessions(file) {
+  file = file || sessionsFile();
+  if (!file) return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const data = {
+      seq: sessionSeq,
+      defaultId: defaultSessionId,
+      sessions: Array.from(sessions.values()).map((s) => ({
+        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner,
+      })),
+    };
+    fs.writeFileSync(file, JSON.stringify(data));
+  } catch (_) {}
+}
+function loadSessions(file) {
+  file = file || sessionsFile();
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch (_) { return; }
+  if (!data || !Array.isArray(data.sessions)) return;
+  for (const s of data.sessions) {
+    if (!s || !AGENTS[s.agent]) continue;
+    sessions.set(s.id, {
+      id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir,
+      mode: AGENTS[s.agent].modes[s.mode] ? s.mode : AGENTS[s.agent].defaultMode,
+      voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local", started: false,
+    });
+  }
+  if (typeof data.seq === "number") sessionSeq = Math.max(sessionSeq, data.seq);
+  if (data.defaultId && sessions.has(data.defaultId)) defaultSessionId = data.defaultId;
+}
+
 // ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
@@ -498,6 +534,7 @@ function handleRequest(req, res) {
         let s;
         try { s = createSession(data); }
         catch (err) { return sendJson(res, 400, { error: err.message }); }
+        saveSessions();
         return sendJson(res, 200, { session: publicSession(s) });
       });
     }
@@ -506,6 +543,7 @@ function handleRequest(req, res) {
       const id = urlPath.slice("/api/sessions/".length);
       if (id === defaultSessionId) return sendJson(res, 400, { error: "Cannot delete the default session" });
       const existed = sessions.delete(id);
+      if (existed) saveSessions();
       return sendJson(res, existed ? 200 : 404, existed ? { ok: true } : { error: "Not found" });
     }
 
@@ -519,6 +557,7 @@ function handleRequest(req, res) {
         if (typeof data.name === "string" && data.name.trim()) s.name = data.name.trim();
         if (data.mode && AGENTS[s.agent].modes[data.mode]) s.mode = data.mode;
         if (typeof data.voice === "boolean") s.voice = data.voice;
+        saveSessions();
         return sendJson(res, 200, { session: publicSession(s) });
       });
     }
@@ -591,12 +630,18 @@ function printPhoneQr(url) {
 }
 
 function start() {
-  const boot = createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR });
-  defaultSessionId = boot.id;
+  loadSessions(); // restore persisted sessions when SESSIONS_FILE is set
+  if (!defaultSessionId || !sessions.has(defaultSessionId)) {
+    const boot = createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR });
+    defaultSessionId = boot.id;
+    saveSessions();
+  }
+  const boot = sessions.get(defaultSessionId);
   const server = buildServer();
   server.listen(PORT, HOST, () => {
     console.log(`voicebridge listening on http://${HOST}:${PORT}`);
     console.log(`default session: ${boot.name} · ${AGENTS[boot.agent].label} · ${boot.projectDir}`);
+    console.log(`sessions: ${sessions.size}${sessionsFile() ? "  (persisted)" : ""}`);
     console.log(`agents: ${Object.keys(AGENTS).join(", ")}`);
     console.log(`STT mode: ${STT_MODE}${ACCESS_TOKEN ? "  (access token required)" : ""}`);
     console.log(`Expose it to your phone with:  tailscale serve --bg ${PORT}`);
@@ -622,6 +667,8 @@ module.exports = {
   createSession,
   resolveSession,
   publicSession,
+  saveSessions,
+  loadSessions,
   buildServer,
   handleRequest,
   start,

@@ -152,6 +152,19 @@ test("createSession defaults runner to local and stores it", () => {
   assert.strictEqual(s.runner, "local");
 });
 
+test("sessions persist to a file and reload", () => {
+  const fs = require("node:fs"); const os = require("node:os"); const path = require("node:path");
+  const f = path.join(os.tmpdir(), "vb-sess-" + Date.now() + ".json");
+  const s = srv.createSession({ agent: "codex", projectDir: process.cwd(), name: "persisted", mode: "full", voice: true });
+  srv.saveSessions(f);
+  srv.sessions.delete(s.id);
+  assert.ok(!srv.sessions.has(s.id));
+  srv.loadSessions(f);
+  const r = srv.sessions.get(s.id);
+  assert.ok(r && r.name === "persisted" && r.agent === "codex" && r.mode === "full" && r.voice === true && r.started === false);
+  fs.unlinkSync(f);
+});
+
 test("phoneUrl prefers PUBLIC_URL and falls back to host:port", () => {
   assert.strictEqual(srv.phoneUrl({ host: "127.0.0.1", port: 8787 }), "http://127.0.0.1:8787");
   assert.strictEqual(srv.phoneUrl({ publicUrl: "https://box.ts.net/" }), "https://box.ts.net");
