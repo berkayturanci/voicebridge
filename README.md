@@ -155,6 +155,8 @@ transcribes). Hands-free loop is browser-mode only.
 - **Notifications**: opt-in "Bildirim" raises a Web Notification when a reply
   finishes in the background or ends with a question — so a hands-free task
   pulls you back when it needs you.
+- **Voice & speed**: pick the TTS voice (per language) and adjust the speaking
+  rate; both are remembered.
 
 ### Modes (autonomy)
 
