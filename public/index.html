@@ -129,8 +129,11 @@
   #talkState { font-size: 19px; font-weight: 600; }
   #talkHeard { font-size: 16px; color: var(--muted); text-align: center; min-height: 44px; max-width: 92%; }
   #talkHint { font-size: 12px; color: var(--muted); text-align: center; max-width: 80%; }
-  #modal, #settings { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
-  #modal.open, #settings.open { display: flex; }
+  #modal, #settings, #palette { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  #modal.open, #settings.open, #palette.open { display: flex; }
+  #paletteList { display: flex; flex-direction: column; gap: 3px; max-height: 52vh; overflow-y: auto; }
+  #paletteList .pal-g { font-size: 11px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
+  #paletteList button { text-align: left; background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
   .card h3 { margin: 0; font-size: 16px; }
   .card label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
@@ -170,6 +173,7 @@
     <div class="chips" id="chips"></div>
     <div class="composer">
       <textarea id="composer" rows="1" placeholder="Yaz ya da 🎤 ile konuş…" enterkeyhint="send"></textarea>
+      <button id="cmdBtn" class="iconbtn" aria-label="Komutlar" title="Komutlar">⌘</button>
       <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
     </div>
@@ -189,6 +193,14 @@
     <div id="talkState">Hazır</div>
     <div id="talkHeard"></div>
     <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler.</div>
+  </div>
+
+  <div id="palette">
+    <div class="card">
+      <div class="srow"><h3>Komutlar</h3><button id="paletteClose" aria-label="Kapat">✕</button></div>
+      <input id="paletteSearch" placeholder="Ara…" autocomplete="off" />
+      <div id="paletteList"></div>
+    </div>
   </div>
 
   <div id="settings">
@@ -776,6 +788,39 @@
   }
   $("talkBtn").addEventListener("click", enterTalking);
   $("talkExit").addEventListener("click", exitTalking);
+
+  // ---------- Command palette: repo's commands (.claude/commands + npm) ----------
+  const paletteEl = $("palette"), paletteListEl = $("paletteList"), paletteSearch = $("paletteSearch");
+  let paletteItems = [];
+  function renderPalette(q) {
+    q = (q || "").toLowerCase();
+    paletteListEl.innerHTML = "";
+    const items = paletteItems.filter((it) => it.label.toLowerCase().includes(q));
+    if (!items.length) { paletteListEl.textContent = paletteItems.length ? "Eşleşme yok." : "Bu projede komut bulunamadı."; return; }
+    let lastG = null;
+    items.forEach((it) => {
+      if (it.group !== lastG) { const h = document.createElement("div"); h.className = "pal-g"; h.textContent = it.group; paletteListEl.appendChild(h); lastG = it.group; }
+      const b = document.createElement("button"); b.type = "button"; b.textContent = it.label;
+      b.addEventListener("click", () => { composer.value = it.value; paletteEl.classList.remove("open"); composer.focus(); composer.dispatchEvent(new Event("input")); });
+      paletteListEl.appendChild(b);
+    });
+  }
+  async function openPalette() {
+    if (!activeId) return;
+    ensureToken();
+    paletteItems = []; paletteListEl.textContent = "Yükleniyor…"; paletteSearch.value = "";
+    paletteEl.classList.add("open");
+    try {
+      const data = await (await fetch("/api/commands?sessionId=" + encodeURIComponent(activeId), { headers: authHeaders() })).json();
+      (data.groups || []).forEach((g) => g.items.forEach((it) => paletteItems.push(Object.assign({ group: g.label }, it))));
+    } catch (_) {}
+    renderPalette("");
+    paletteSearch.focus();
+  }
+  $("cmdBtn").addEventListener("click", openPalette);
+  $("paletteClose").addEventListener("click", () => paletteEl.classList.remove("open"));
+  paletteEl.addEventListener("click", (e) => { if (e.target === paletteEl) paletteEl.classList.remove("open"); });
+  paletteSearch.addEventListener("input", () => renderPalette(paletteSearch.value));
 
   resetBtn.addEventListener("click", async () => {
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}

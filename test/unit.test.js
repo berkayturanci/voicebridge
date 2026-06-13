@@ -96,6 +96,20 @@ test("binExists resolves real executables and rejects fakes", () => {
   assert.strictEqual(srv.agentAvailable("ollama"), true); // HTTP, always "available"
 });
 
+test("listNpmScripts / listSlashCommands read a project's commands", () => {
+  const scripts = srv.listNpmScripts(process.cwd());
+  assert.ok(scripts.some((s) => s.label === "npm run test" && s.value === "npm run test"));
+  // namespaced slash command from a nested .claude/commands dir
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-cmds-"));
+  fs.mkdirSync(path.join(dir, ".claude", "commands", "keel"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".claude", "commands", "deploy.md"), "x");
+  fs.writeFileSync(path.join(dir, ".claude", "commands", "keel", "ship.md"), "x");
+  const cmds = srv.listSlashCommands(dir).map((c) => c.label);
+  assert.deepStrictEqual(cmds, ["/deploy", "/keel:ship"]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("parseClaudeLine extracts assistant text", () => {
   const line = JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Hi" }, { type: "tool_use" }] } });
   assert.strictEqual(srv.parseClaudeLine(line), "Hi");

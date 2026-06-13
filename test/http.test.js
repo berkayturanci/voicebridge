@@ -194,6 +194,13 @@ test("/api/browse lists subdirectories with a parent link", async () => {
   assert.strictEqual(typeof data.parent, "string");
 });
 
+test("/api/commands lists the project's npm scripts for a session", async () => {
+  const { defaultSessionId } = JSON.parse((await request(server, "GET", "/api/sessions")).data);
+  const data = JSON.parse((await request(server, "GET", "/api/commands?sessionId=" + defaultSessionId)).data);
+  const npm = (data.groups || []).find((g) => /npm/.test(g.label));
+  assert.ok(npm && npm.items.some((it) => it.value === "npm run test"));
+});
+
 test("unknown method and endpoint", async () => {
   assert.strictEqual((await request(server, "POST", "/")).status, 405);
   assert.strictEqual((await request(server, "GET", "/api/nope")).status, 404);
