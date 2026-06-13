@@ -238,6 +238,10 @@ const sessions = new Map();
 let sessionSeq = 0;
 let defaultSessionId = null;
 
+// Concurrent in-flight agent turns, capped to bound host resources.
+let inflight = 0;
+function maxInflight() { return parseInt(process.env.MAX_INFLIGHT || "8", 10); }
+
 function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
@@ -671,9 +675,13 @@ function handleRequest(req, res) {
         if (!text) return sendJson(res, 400, { error: "Empty prompt" });
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
+        // Bound concurrent agent processes so a client can't exhaust the host.
+        if (inflight >= maxInflight()) return sendJson(res, 429, { error: "Too many concurrent turns; try again." });
         if (data.reset) session.started = false;
         if (data.mode && AGENTS[session.agent].modes[data.mode]) session.mode = data.mode;
         if (typeof data.voice === "boolean") session.voice = data.voice;
+        inflight++;
+        res.on("close", () => { inflight = Math.max(0, inflight - 1); });
         streamAsk(session, text, res);
       });
     }

@@ -142,6 +142,16 @@ test("empty prompt and unknown session are rejected", async () => {
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "hi", sessionId: "nope" })).status, 404);
 });
 
+test("the concurrency cap rejects with 429", async () => {
+  const prev = process.env.MAX_INFLIGHT;
+  process.env.MAX_INFLIGHT = "0"; // every turn exceeds the cap
+  try {
+    assert.strictEqual((await request(server, "POST", "/api/ask", { text: "hi", sessionId: boot.id })).status, 429);
+  } finally {
+    if (prev === undefined) delete process.env.MAX_INFLIGHT; else process.env.MAX_INFLIGHT = prev;
+  }
+});
+
 test("activity events are streamed for claude tool_use", async () => {
   const stub = path.join(os.tmpdir(), "vb-claude-act-" + Date.now() + ".js");
   fs.writeFileSync(stub, `#!/usr/bin/env node
