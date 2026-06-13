@@ -96,6 +96,14 @@ test("binExists resolves real executables and rejects fakes", () => {
   assert.strictEqual(srv.agentAvailable("ollama"), true); // HTTP, always "available"
 });
 
+test("browseDir lists subdirectories, hides dotfiles, sets parent", () => {
+  const b = srv.browseDir(process.cwd());
+  assert.strictEqual(b.path, process.cwd());
+  assert.ok(b.dirs.includes("public") && b.dirs.includes("test"));
+  assert.ok(!b.dirs.some((d) => d.startsWith(".")));
+  assert.strictEqual(typeof b.parent, "string");
+});
+
 test("listNpmScripts / listSlashCommands read a project's commands", () => {
   const scripts = srv.listNpmScripts(process.cwd());
   assert.ok(scripts.some((s) => s.label === "npm run test" && s.value === "npm run test"));

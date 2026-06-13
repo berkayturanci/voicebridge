@@ -201,6 +201,27 @@ test("/api/commands lists the project's npm scripts for a session", async () => 
   assert.ok(npm && npm.items.some((it) => it.value === "npm run test"));
 });
 
+test("/api/browse?runner=cloud proxies to the cloud runner", async () => {
+  const remote = http.createServer((rq, rs) => {
+    if (rq.method === "GET" && rq.url.split("?")[0] === "/browse") {
+      const p = new URL(rq.url, "http://x").searchParams.get("path");
+      rs.writeHead(200, { "Content-Type": "application/json" });
+      return rs.end(JSON.stringify({ path: p || "/remote", parent: "/", dirs: ["alpha", "beta"] }));
+    }
+    rs.writeHead(404); rs.end();
+  });
+  await new Promise((r) => remote.listen(0, "127.0.0.1", r));
+  process.env.CLOUD_RUNNER_URL = "http://127.0.0.1:" + remote.address().port + "/";
+  try {
+    const data = JSON.parse((await request(server, "GET", "/api/browse?runner=cloud&path=" + encodeURIComponent("/remote/app"))).data);
+    assert.deepStrictEqual(data.dirs, ["alpha", "beta"]);
+    assert.strictEqual(data.path, "/remote/app");
+  } finally {
+    delete process.env.CLOUD_RUNNER_URL;
+    await new Promise((r) => remote.close(r));
+  }
+});
+
 test("unknown method and endpoint", async () => {
   assert.strictEqual((await request(server, "POST", "/")).status, 405);
   assert.strictEqual((await request(server, "GET", "/api/nope")).status, 404);

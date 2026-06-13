@@ -267,6 +267,27 @@ function agentAvailable(id) {
   return id === "ollama" ? true : binExists(AGENTS[id].bin());
 }
 
+// List subdirectories of a path (dotfiles hidden) for the folder picker.
+// Used by the bridge (local) and the reference cloud runner (remote host).
+function browseDir(p) {
+  let dir;
+  try { dir = path.resolve(p || DEFAULT_PROJECT_DIR || os.homedir()); } catch (_) { dir = os.homedir(); }
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => {
+        if (e.name.startsWith(".")) return false;
+        try { return e.isDirectory() || (e.isSymbolicLink() && fs.statSync(path.join(dir, e.name)).isDirectory()); }
+        catch (_) { return false; }
+      })
+      .map((e) => e.name).sort((a, b) => a.localeCompare(b));
+  } catch (e) {
+    return { path: dir, parent: path.dirname(dir), dirs: [], error: e.message };
+  }
+  const parent = path.dirname(dir);
+  return { path: dir, parent: parent === dir ? null : parent, dirs };
+}
+
 // Project slash commands under .claude/commands/**.md → "/name" (nested dirs
 // namespace with ":", e.g. .claude/commands/keel/ship.md → /keel:ship).
 function listSlashCommands(baseDir) {
@@ -492,6 +513,23 @@ function buildPrompt(voice, text) {
 }
 
 function cloudRunnerUrl() { return process.env.CLOUD_RUNNER_URL || ""; }
+
+// Proxy a folder listing to the cloud runner's GET /browse (remote host dirs).
+function proxyCloudBrowse(p, res) {
+  const fail = (error) => sendJson(res, 200, { path: p || "", parent: null, dirs: [], error });
+  let url;
+  try { url = new URL("/browse", cloudRunnerUrl()); } catch (_) { return fail("Invalid CLOUD_RUNNER_URL"); }
+  if (p) url.searchParams.set("path", p);
+  const lib = url.protocol === "https:" ? require("https") : require("http");
+  const headers = {};
+  if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
+  const r = lib.get(url, { headers }, (up) => {
+    let data = "";
+    up.on("data", (d) => (data += d));
+    up.on("end", () => { try { sendJson(res, 200, JSON.parse(data)); } catch (_) { fail("cloud browse failed"); } });
+  });
+  r.on("error", (e) => fail("cloud: " + e.message));
+}
 
 function streamAsk(session, prompt, res) {
   res.writeHead(200, Object.assign({
@@ -749,23 +787,10 @@ function handleRequest(req, res) {
     }
 
     if (req.method === "GET" && urlPath === "/api/browse") {
-      let dir;
-      try { dir = path.resolve(new URL(req.url, "http://x").searchParams.get("path") || DEFAULT_PROJECT_DIR || os.homedir()); }
-      catch (_) { dir = os.homedir(); }
-      let dirs = [];
-      try {
-        dirs = fs.readdirSync(dir, { withFileTypes: true })
-          .filter((e) => {
-            if (e.name.startsWith(".")) return false;
-            try { return e.isDirectory() || (e.isSymbolicLink() && fs.statSync(path.join(dir, e.name)).isDirectory()); }
-            catch (_) { return false; }
-          })
-          .map((e) => e.name).sort((a, b) => a.localeCompare(b));
-      } catch (e) {
-        return sendJson(res, 200, { path: dir, parent: path.dirname(dir), dirs: [], error: e.message });
-      }
-      const parent = path.dirname(dir);
-      return sendJson(res, 200, { path: dir, parent: parent === dir ? null : parent, dirs });
+      const q = new URL(req.url, "http://x").searchParams;
+      // A cloud session's directories live on the remote host: proxy to the runner.
+      if (q.get("runner") === "cloud" && cloudRunnerUrl()) return proxyCloudBrowse(q.get("path"), res);
+      return sendJson(res, 200, browseDir(q.get("path")));
     }
 
     if (req.method === "GET" && urlPath === "/api/sessions") {
@@ -961,6 +986,7 @@ module.exports = {
   resolveRunner,
   binExists,
   agentAvailable,
+  browseDir,
   listSlashCommands,
   listNpmScripts,
   buildPrompt,
