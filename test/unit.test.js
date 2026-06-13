@@ -29,7 +29,7 @@ test("ollama adapter runs a local model with the prompt on stdin", () => {
   let c = srv.AGENTS.ollama.command("hi");
   assert.deepStrictEqual(c.argv, ["run", "llama3.2"]);
   assert.strictEqual(c.stdin, "hi");
-  assert.strictEqual(srv.AGENTS.ollama.supportsContinue, false);
+  assert.strictEqual(srv.AGENTS.ollama.supportsContinue, true); // HTTP path keeps history
   process.env.OLLAMA_MODEL = "qwen2.5-coder";
   assert.deepStrictEqual(srv.AGENTS.ollama.command("hi").argv, ["run", "qwen2.5-coder"]);
   if (prev === undefined) delete process.env.OLLAMA_MODEL; else process.env.OLLAMA_MODEL = prev;
