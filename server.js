@@ -37,6 +37,27 @@ const os = require("os");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
 
+// Minimal .env support (no dependency): load KEY=VALUE lines from ./.env without
+// overriding variables already present in the environment.
+function parseDotEnv(text) {
+  const out = {};
+  for (const line of String(text).split(/\r?\n/)) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!m) continue; // skips blanks and # comments
+    let v = m[2];
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    out[m[1]] = v;
+  }
+  return out;
+}
+function loadDotEnv(file) {
+  try {
+    const env = parseDotEnv(fs.readFileSync(file || path.join(process.cwd(), ".env"), "utf8"));
+    for (const k in env) if (!(k in process.env)) process.env[k] = env[k];
+  } catch (_) {}
+}
+loadDotEnv();
+
 const PORT = parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
 const DEFAULT_PROJECT_DIR = process.env.PROJECT_DIR || process.cwd();
@@ -745,6 +766,7 @@ if (require.main === module) {
 
 module.exports = {
   AGENTS,
+  parseDotEnv,
   parseClaudeLine,
   parseClaudeEvents,
   resolveMode,

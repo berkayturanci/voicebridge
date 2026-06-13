@@ -61,14 +61,16 @@ like a phone call with your agent, with a keyboard when you want one.
 ```bash
 git clone <your-repo-url> voicebridge
 cd voicebridge
-npm install            # installs qrcode-terminal (the only dependency)
+npm install            # qrcode-terminal (web-push is optional, for real push)
 
-# Point the agent at the project you want it to work on:
-export PROJECT_DIR="$HOME/code/my-project"
+# Configure with a .env file (or plain env vars):
+cp .env.example .env   # then edit: PROJECT_DIR, ACCESS_TOKEN, …
 
 # Start the bridge (binds to 127.0.0.1:8787 by default)
 npm start
 ```
+
+Any variable in `.env` is loaded at startup (real environment variables win).
 
 On startup the bridge prints a **QR code** for the phone URL — scan it to open
 the UI (and, when `ACCESS_TOKEN`/`PUBLIC_URL` are set, to authorize on open).
