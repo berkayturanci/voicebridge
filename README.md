@@ -1,5 +1,7 @@
 # voicebridge
 
+[![CI](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml)
+
 **Hands-free, two-way voice for your coding agent from your phone — free, open-source, no ElevenLabs.**
 
 You speak **or type** on your phone, a coding agent (running on your Mac/Linux
