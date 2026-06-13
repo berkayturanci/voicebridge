@@ -69,6 +69,8 @@
   .me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .claude { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
   .codewrap { position: relative; margin: 8px 0 2px; }
+  .codewrap.collapsed pre { max-height: 15em; overflow: hidden; }
+  .togglebtn { display: block; margin: 4px 0 2px; background: var(--panel2); border: 1px solid var(--border2); color: var(--accent); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
   .claude pre { margin: 0; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; overflow-x: auto; }
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
@@ -408,6 +410,16 @@
         codeEl.textContent = code;
         pre.appendChild(codeEl);
         wrap.appendChild(btn); wrap.appendChild(pre);
+        const lines = code.replace(/\n$/, "").split("\n").length;
+        if (lines > 14) { // collapse long output (e.g. npm logs) by default
+          wrap.classList.add("collapsed");
+          const tog = document.createElement("button");
+          tog.className = "togglebtn"; tog.type = "button";
+          const setLabel = () => { tog.textContent = wrap.classList.contains("collapsed") ? ("⌄ tümünü göster (" + lines + " satır)") : "⌃ gizle"; };
+          tog.addEventListener("click", () => { wrap.classList.toggle("collapsed"); setLabel(); });
+          setLabel();
+          wrap.appendChild(tog);
+        }
         el.appendChild(wrap);
       } else if (part) {
         appendInline(el, part);
