@@ -93,7 +93,8 @@
   let token = localStorage.getItem("vb_token") || "";
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognizing = false, busy = false;
+  let recognizing = false, busy = false, stopMode = false;
+  let currentAbort = null, stopRequested = false;
 
   function setStatus(t) { statusEl.textContent = t || ""; }
   function add(text, cls) {
@@ -136,7 +137,10 @@
     const u = new SpeechSynthesisUtterance(speakQueue.shift());
     u.lang = langSel.value;
     const v = pickVoice(); if (v) u.voice = v;
-    u.onend = u.onerror = () => { speaking = false; drainSpeak(); };
+    u.onend = u.onerror = () => {
+      speaking = false; drainSpeak();
+      if (!speaking && !speakQueue.length && !busy) exitStopMode();
+    };
     window.speechSynthesis.speak(u);
   }
   function feedSpeech(chunk) {
@@ -154,16 +158,42 @@
     if (rest) { speakQueue.push(rest); drainSpeak(); }
   }
 
+  // ---------- Stop: cancel the in-flight request and any speech ----------
+  function enterStopMode() {
+    stopMode = true;
+    micBtn.classList.remove("listening");
+    micBtn.classList.add("thinking");
+    micBtn.textContent = "⏹";
+    micBtn.setAttribute("aria-label", "Dur");
+  }
+  function exitStopMode() {
+    stopMode = false;
+    micBtn.classList.remove("thinking");
+    micBtn.textContent = "🎤";
+    micBtn.setAttribute("aria-label", "Konuş");
+  }
+  function stopAll() {
+    stopRequested = true;
+    if (currentAbort) { try { currentAbort.abort(); } catch (_) {} }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    speakQueue.length = 0; speakBuf = ""; speaking = false;
+    busy = false;
+    exitStopMode();
+    setStatus("Durduruldu.");
+  }
+
   // ---------- Send to Claude Code and stream the reply ----------
   async function ask(text) {
-    busy = true; micBtn.classList.add("thinking"); setStatus("Claude düşünüyor…");
+    busy = true; stopRequested = false; enterStopMode(); setStatus("Claude düşünüyor…");
     speakBuf = ""; speakQueue.length = 0;
+    currentAbort = new AbortController();
     const bubble = add("", "claude"); let full = "";
     try {
       const r = await fetch("/api/ask", {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ text }),
+        signal: currentAbort.signal,
       });
       if (r.status === 401) { localStorage.removeItem("vb_token"); token = ""; throw new Error("Token geçersiz. Sayfayı yenile."); }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
@@ -178,7 +208,7 @@
           let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
           if (ev.type === "delta") {
             full += ev.text; bubble.textContent = full; log.scrollTop = log.scrollHeight;
-            micBtn.classList.remove("thinking"); setStatus("");
+            setStatus("Cevap veriyor… (durdurmak için ⏹)");
             feedSpeech(ev.text);
           } else if (ev.type === "error") {
             throw new Error(ev.error || "Sunucu hatası");
@@ -188,11 +218,17 @@
       flushSpeech();
       if (!full) bubble.textContent = "(boş cevap)";
     } catch (e) {
-      micBtn.classList.remove("thinking");
-      bubble.remove(); add("⚠️ " + e.message, "sys"); setStatus("");
+      if (e.name === "AbortError") {
+        // User pressed Stop: keep whatever text already arrived.
+        if (!full) bubble.remove();
+      } else {
+        bubble.remove(); add("⚠️ " + e.message, "sys"); setStatus("");
+      }
     } finally {
       busy = false;
-      if (handsfree.checked && CONFIG.sttMode === "browser") startBrowserSTT();
+      currentAbort = null;
+      if (!speaking && !speakQueue.length) exitStopMode();
+      if (!stopRequested && handsfree.checked && CONFIG.sttMode === "browser") startBrowserSTT();
     }
   }
 
@@ -245,6 +281,7 @@
 
   // ---------- Mic button ----------
   micBtn.addEventListener("click", () => {
+    if (stopMode) { stopAll(); return; }
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices(); // unlock TTS on iOS
     ensureToken();
     if (CONFIG.sttMode === "whisper") {
