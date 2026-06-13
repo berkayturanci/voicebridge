@@ -221,6 +221,38 @@ process.stdout.write(JSON.stringify({type:"result",subtype:"success"})+"\\n");
   }
 });
 
+test("ollama HTTP backend streams and keeps conversation history", async () => {
+  const ollama = http.createServer((rq, rs) => {
+    if (rq.url === "/api/tags") { rs.writeHead(200); return rs.end(JSON.stringify({ models: [{ name: "llama3.2" }, { name: "qwen" }] })); }
+    if (rq.url === "/api/chat") {
+      let b = ""; rq.on("data", (c) => (b += c)); rq.on("end", () => {
+        const msgs = (JSON.parse(b || "{}").messages) || [];
+        rs.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        rs.write(JSON.stringify({ message: { role: "assistant", content: "msgs=" + msgs.length } }) + "\n");
+        rs.end(JSON.stringify({ done: true }) + "\n");
+      });
+      return;
+    }
+    rs.writeHead(404); rs.end();
+  });
+  await new Promise((r) => ollama.listen(0, "127.0.0.1", r));
+  process.env.OLLAMA_URL = "http://127.0.0.1:" + ollama.address().port;
+  try {
+    const { session } = JSON.parse((await request(server, "POST", "/api/sessions", { agent: "ollama", projectDir: process.cwd() })).data);
+    assert.strictEqual(session.agent, "ollama");
+    let evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.strictEqual(evs.filter((e) => e.type === "delta").map((e) => e.text).join(""), "msgs=1");
+    assert.strictEqual(evs[evs.length - 1].type, "done");
+    evs = ndjson((await request(server, "POST", "/api/ask", { text: "again", sessionId: session.id })).data);
+    assert.strictEqual(evs.filter((e) => e.type === "delta").map((e) => e.text).join(""), "msgs=3"); // user+assistant+user
+    const m = JSON.parse((await request(server, "GET", "/api/ollama/models")).data);
+    assert.deepStrictEqual(m.models, ["llama3.2", "qwen"]);
+  } finally {
+    delete process.env.OLLAMA_URL;
+    await new Promise((r) => ollama.close(r));
+  }
+});
+
 test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {
   // A stub remote runner that speaks our NDJSON protocol.
   const remote = http.createServer((rq, rs) => {

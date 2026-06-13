@@ -167,6 +167,7 @@
       <label>İsim <input id="ns-name" placeholder="ör. Backend refactor" /></label>
       <label>Agent <select id="ns-agent"></select></label>
       <label id="ns-runner-row" style="display:none">Çalışma yeri <select id="ns-runner"></select></label>
+      <label id="ns-omodel-row" style="display:none">Ollama model <select id="ns-omodel"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
       <label>Proje klasörü <input id="ns-dir" placeholder="/Users/you/project" /></label>
       <div class="row">
@@ -670,10 +671,21 @@
     $("ns-runner-row").style.display = runners.length > 1 ? "flex" : "none";
     $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
     fillModeSelect(nsMode, nsAgent.value);
+    refreshOllamaModels();
     renderFavSelect();
     modal.classList.add("open");
   }
-  nsAgent.addEventListener("change", () => fillModeSelect(nsMode, nsAgent.value));
+  async function refreshOllamaModels() {
+    const row = $("ns-omodel-row"), sel = $("ns-omodel");
+    if (nsAgent.value !== "ollama") { row.style.display = "none"; return; }
+    row.style.display = "flex";
+    sel.innerHTML = '<option value="">(varsayılan)</option>';
+    try {
+      const { models } = await (await fetch("/api/ollama/models", { headers: authHeaders() })).json();
+      (models || []).forEach((m) => { const o = document.createElement("option"); o.value = m; o.textContent = m; sel.appendChild(o); });
+    } catch (_) {}
+  }
+  nsAgent.addEventListener("change", () => { fillModeSelect(nsMode, nsAgent.value); refreshOllamaModels(); });
   nsFav.addEventListener("change", applyFav);
   $("ns-save").addEventListener("click", () => {
     const dir = $("ns-dir").value.trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
@@ -692,6 +704,7 @@
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {
     const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
+    if (nsAgent.value === "ollama" && $("ns-omodel").value) body.model = $("ns-omodel").value;
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();

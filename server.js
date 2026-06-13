@@ -200,7 +200,7 @@ const AGENTS = {
   ollama: {
     label: "Ollama (yerel)",
     bin: () => process.env.OLLAMA_BIN || "ollama",
-    supportsContinue: false, // each `ollama run` is a fresh, stateless generation
+    supportsContinue: true, // HTTP path keeps per-session message history
     stream: "text",
     defaultMode: "default",
     modes: {
@@ -248,7 +248,7 @@ function isDir(p) {
 
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
-function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
+function createSession({ name, agent, projectDir, mode, voice, runner, model } = {}) {
   if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
@@ -266,6 +266,7 @@ function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
     mode: resolveMode(agent, mode),
     voice: !!voice,
     runner: run,
+    model: (model && String(model).trim()) || undefined, // ollama model override
     started: false,
   };
   sessions.set(id, s);
@@ -275,7 +276,7 @@ function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
 function publicSession(s) {
   return {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
-    projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, started: s.started,
+    projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
   };
 }
 
@@ -299,7 +300,7 @@ function saveSessions(file) {
       seq: sessionSeq,
       defaultId: defaultSessionId,
       sessions: Array.from(sessions.values()).map((s) => ({
-        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner,
+        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model,
       })),
     };
     fs.writeFileSync(file, JSON.stringify(data));
@@ -316,7 +317,8 @@ function loadSessions(file) {
     sessions.set(s.id, {
       id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir,
       mode: AGENTS[s.agent].modes[s.mode] ? s.mode : AGENTS[s.agent].defaultMode,
-      voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local", started: false,
+      voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local",
+      model: (s.model && String(s.model).trim()) || undefined, started: false,
     });
   }
   if (typeof data.seq === "number") sessionSeq = Math.max(sessionSeq, data.seq);
@@ -450,7 +452,52 @@ function streamAsk(session, prompt, res) {
   }, SECURITY_HEADERS));
   const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
+  if (session.agent === "ollama") return streamOllama(session, prompt, res, emit);
   return streamLocal(session, prompt, res, emit);
+}
+
+function ollamaUrl() { return process.env.OLLAMA_URL || "http://127.0.0.1:11434"; }
+
+// Ollama via its local HTTP API (/api/chat). Keeps per-session message history
+// for conversation continuity; the model runs locally.
+function streamOllama(session, prompt, res, emit) {
+  let url;
+  try { url = new URL("/api/chat", ollamaUrl()); } catch (_) { emit({ type: "error", error: "Invalid OLLAMA_URL" }); return res.end(); }
+  const lib = url.protocol === "https:" ? require("https") : require("http");
+  const history = session.history || [];
+  const messages = history.concat([{ role: "user", content: buildPrompt(session.voice, prompt) }]);
+  const payload = JSON.stringify({
+    model: session.model || process.env.OLLAMA_MODEL || "llama3.2",
+    messages, stream: true,
+  });
+  let buf = "", reply = "", errored = false;
+  const upReq = lib.request(url, { method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } }, (r) => {
+    r.on("data", (d) => {
+      buf += d.toString();
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (!line) continue;
+        let obj; try { obj = JSON.parse(line); } catch (_) { continue; }
+        if (obj.error) { errored = true; emit({ type: "error", error: String(obj.error) }); continue; }
+        const c = obj.message && obj.message.content;
+        if (c) { reply += c; emit({ type: "delta", text: c }); }
+      }
+    });
+    r.on("end", () => {
+      if (!errored) {
+        session.history = messages.concat([{ role: "assistant", content: reply }]);
+        session.started = true;
+        emit({ type: "done" });
+        if (looksLikeQuestion(reply)) sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: reply.trim().slice(-160), sessionId: session.id });
+      }
+      res.end();
+    });
+  });
+  upReq.on("error", (e) => { emit({ type: "error", error: "ollama: " + e.message }); res.end(); });
+  upReq.write(payload); upReq.end();
+  res.on("close", () => { try { upReq.destroy(); } catch (_) {} });
 }
 
 // Cloud runner: proxy the turn to a remote endpoint that speaks the same NDJSON
@@ -680,6 +727,7 @@ function handleRequest(req, res) {
         if (data.reset) session.started = false;
         if (data.mode && AGENTS[session.agent].modes[data.mode]) session.mode = data.mode;
         if (typeof data.voice === "boolean") session.voice = data.voice;
+        if (typeof data.model === "string" && data.model.trim()) session.model = data.model.trim();
         inflight++;
         res.on("close", () => { inflight = Math.max(0, inflight - 1); });
         streamAsk(session, text, res);
@@ -713,9 +761,27 @@ function handleRequest(req, res) {
       return readBody(req, 64 * 1024, (e, body) => {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
-        if (session) session.started = false;
+        if (session) { session.started = false; session.history = []; } // also clears Ollama context
         return sendJson(res, 200, { ok: true });
       });
+    }
+
+    // List locally-available Ollama models (proxies /api/tags).
+    if (req.method === "GET" && urlPath === "/api/ollama/models") {
+      let url;
+      try { url = new URL("/api/tags", ollamaUrl()); } catch (_) { return sendJson(res, 200, { models: [] }); }
+      const lib = url.protocol === "https:" ? require("https") : require("http");
+      const r2 = lib.get(url, (up) => {
+        let data = "";
+        up.on("data", (d) => (data += d));
+        up.on("end", () => {
+          let models = [];
+          try { models = (JSON.parse(data).models || []).map((m) => m.name).filter(Boolean); } catch (_) {}
+          sendJson(res, 200, { models });
+        });
+      });
+      r2.on("error", () => sendJson(res, 200, { models: [] }));
+      return;
     }
 
     return sendJson(res, 404, { error: "Not found" });
