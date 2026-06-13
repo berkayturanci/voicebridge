@@ -221,6 +221,7 @@ npm test       # zero-dependency test suite (node:test): adapters, parser,
 - [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, and how to add an agent.
 - [docs/self-hosted-runner.md](docs/self-hosted-runner.md) — run CI on a free self-hosted runner.
+- [CHANGELOG.md](CHANGELOG.md) — release notes.
 
 ## Roadmap
 
