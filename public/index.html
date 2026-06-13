@@ -4,6 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0d1117" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icon.svg" />
+<link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <title>voicebridge</title>
 <script>
   // Apply the saved theme before first paint to avoid a flash.
@@ -222,10 +226,13 @@
     if (!prefs.notify || !("Notification" in window) || Notification.permission !== "granted") return;
     const isQ = /\?["')\]]*\s*$/.test(text.trim());
     if (!document.hidden && !isQ) return;
-    try {
-      const n = new Notification("voicebridge — " + sessionName + (isQ ? " soru sordu" : " hazır"), { body: text.slice(0, 140) });
-      n.onclick = () => { window.focus(); n.close(); };
-    } catch (_) {}
+    const title = "voicebridge — " + sessionName + (isQ ? " soru sordu" : " hazır");
+    const opts = { body: text.slice(0, 140), icon: "/icon.svg" };
+    // Prefer the service worker (more reliable when backgrounded on mobile).
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then((reg) => reg.showNotification(title, opts)).catch(fallback);
+    } else { fallback(); }
+    function fallback() { try { const n = new Notification(title, opts); n.onclick = () => { window.focus(); n.close(); }; } catch (_) {} }
   }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -658,6 +665,9 @@
   });
 
   if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); populateVoices(); };
+
+  // Register the service worker (installable PWA + reliable notifications).
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 
   // A QR/link may carry ?token=… so scanning authorizes the phone on open.
   (() => {

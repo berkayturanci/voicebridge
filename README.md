@@ -162,6 +162,10 @@ transcribes). Hands-free loop is browser-mode only.
   rate; both are remembered.
 - **Activity trail**: when Claude uses tools, the chat shows a subtle running
   log (e.g. `⚙︎ Edit server.js`, `⚙︎ Bash npm test`) so you can watch what it does.
+- **Installable PWA**: a web manifest, icon, and service worker make it
+  installable and cache the app shell; notifications go through the service
+  worker. (On iOS, use the Safari **tab** for voice — installed PWAs can't use
+  the microphone there.)
 
 ### Modes (autonomy)
 
