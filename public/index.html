@@ -364,27 +364,48 @@
   }
 
   // ---------- Session DOM ----------
+  function persistHistory(st) {
+    try { localStorage.setItem("vb_hist_" + st.meta.id, JSON.stringify(st.messages.slice(-200))); } catch (_) {}
+  }
+  function renderMsgEl(st, entry) {
+    const div = document.createElement("div");
+    div.className = "msg " + entry.cls;
+    if (entry.cls === "claude") renderInto(div, entry.text || ""); else div.textContent = entry.text || "";
+    div._entry = entry;
+    st.logEl.appendChild(div);
+    return div;
+  }
   function addSessionState(meta) {
     if (S.has(meta.id)) { S.get(meta.id).meta = meta; return S.get(meta.id); }
     const logEl = document.createElement("div");
     logEl.className = "log"; logEl.dataset.session = meta.id;
     logEl.addEventListener("scroll", () => { if (meta.id === activeId) updateJump(); });
     logs.appendChild(logEl);
-    const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false } };
+    const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false }, messages: [] };
     S.set(meta.id, st);
-    const where = meta.runner === "cloud" ? " · ☁️ Bulut" : "";
-    addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nYaz ya da konuş.`, "sys");
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem("vb_hist_" + meta.id) || "[]"); } catch (_) {}
+    if (Array.isArray(saved) && saved.length) {
+      saved.forEach((m) => { st.messages.push(m); renderMsgEl(st, m); });
+    } else {
+      const where = meta.runner === "cloud" ? " · ☁️ Bulut" : "";
+      addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nYaz ya da konuş.`, "sys");
+    }
     return st;
   }
   function addMsg(sessionId, text, cls) {
     const st = S.get(sessionId); if (!st) return null;
     const pinned = nearBottom(st.logEl);
-    const div = document.createElement("div");
-    div.className = "msg " + cls;
-    div.textContent = text || "";
-    st.logEl.appendChild(div);
+    const entry = { cls, text: text || "" };
+    st.messages.push(entry);
+    const div = renderMsgEl(st, entry);
     if (sessionId === activeId) { if (pinned) st.logEl.scrollTop = st.logEl.scrollHeight; updateJump(); }
+    persistHistory(st);
     return div;
+  }
+  function dropMsg(st, el) { // remove a message + its persisted entry (e.g. aborted empty bubble)
+    if (el && el._entry) { const i = st.messages.indexOf(el._entry); if (i >= 0) st.messages.splice(i, 1); persistHistory(st); }
+    if (el) el.remove();
   }
   function modeLabel(agentId, modeId) {
     const a = agentById[agentId]; if (!a) return modeId || "";
@@ -525,12 +546,13 @@
         }
       }
       if (full) renderInto(bubble, full); else bubble.textContent = emptyReplyHint(st.meta.agent);
+      bubble._entry.text = full || bubble.textContent; persistHistory(st);
       if (sessionId === activeId) { flushSpeech(); setStatus(""); }
       cue("done");
       if (full) maybeNotify(st.meta.name, full);
     } catch (e) {
-      if (e.name === "AbortError") { if (full) renderInto(bubble, full); else bubble.remove(); }
-      else { bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); cue("error"); }
+      if (e.name === "AbortError") { if (full) { renderInto(bubble, full); bubble._entry.text = full; persistHistory(st); } else dropMsg(st, bubble); }
+      else { dropMsg(st, bubble); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); cue("error"); }
     } finally {
       st.turn.busy = false; st.turn.abort = null;
       if (sessionId === activeId) refreshMic();
@@ -634,7 +656,7 @@
 
   resetBtn.addEventListener("click", async () => {
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}
-    const st = active(); if (st) st.logEl.innerHTML = "";
+    const st = active(); if (st) { st.logEl.innerHTML = ""; st.messages = []; persistHistory(st); }
     addMsg(activeId, "Yeni sohbet başladı.", "sys");
   });
 
@@ -659,6 +681,7 @@
       const r = await fetch("/api/sessions/" + activeId, { method: "DELETE", headers: authHeaders() });
       if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Olmadı"); }
       st.logEl.remove(); S.delete(activeId);
+      try { localStorage.removeItem("vb_hist_" + activeId); } catch (_) {}
       activeId = defaultSessionId && S.has(defaultSessionId) ? defaultSessionId : (S.keys().next().value || null);
       rebuildSessionSelect(); if (activeId) switchTo(activeId);
     } catch (e) { alert("⚠️ " + e.message); }
