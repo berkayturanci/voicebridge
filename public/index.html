@@ -939,6 +939,7 @@
   async function browseTo(p) {
     try {
       const u = new URLSearchParams(); if (p) u.set("path", p);
+      if (($("ns-runner").value || "local") === "cloud") u.set("runner", "cloud"); // browse the remote host
       const data = await (await fetch("/api/browse?" + u.toString(), { headers: authHeaders() })).json();
       $("ns-dir").value = data.path || "";
       nsTree.innerHTML = "";
