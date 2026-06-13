@@ -131,6 +131,7 @@
         </select>
       </label>
       <label>Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
+      <label>Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
     </div>
   </footer>
 
@@ -155,7 +156,7 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
@@ -172,6 +173,31 @@
     else document.documentElement.dataset.theme = t;
     themeBtn.textContent = t === "light" ? "☀️" : t === "dark" ? "🌙" : "🌗";
     themeBtn.title = "Tema: " + t;
+  }
+
+  // ---------- Eyes-free audio cues (WebAudio earcons) ----------
+  const cuesOn = () => prefs.cues !== false; // default on
+  let actx = null;
+  function ensureAudio() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!actx && AC) actx = new AC();
+    if (actx && actx.state === "suspended") actx.resume();
+  }
+  function tone(freq, startAt, dur, gain) {
+    if (!actx) return;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    const t0 = actx.currentTime + startAt;
+    g.gain.setValueAtTime(gain || 0.05, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t0); o.stop(t0 + dur);
+  }
+  function cue(name) {
+    if (!cuesOn() || !actx) return;
+    if (name === "listen") tone(660, 0, 0.12);
+    else if (name === "done") { tone(880, 0, 0.1); tone(1320, 0.11, 0.13); }
+    else if (name === "error") tone(200, 0, 0.28, 0.07);
   }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -372,9 +398,10 @@
       }
       if (full) renderInto(bubble, full); else bubble.textContent = "(boş cevap)";
       if (sessionId === activeId) { flushSpeech(); setStatus(""); }
+      cue("done");
     } catch (e) {
       if (e.name === "AbortError") { if (full) renderInto(bubble, full); else bubble.remove(); }
-      else { bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); }
+      else { bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); cue("error"); }
     } finally {
       st.turn.busy = false; st.turn.abort = null;
       if (sessionId === activeId) refreshMic();
@@ -386,7 +413,7 @@
   function sendText() {
     const t = composer.value.trim(); const st = active();
     if (!t || !st || st.turn.busy) return;
-    ensureToken();
+    ensureAudio(); ensureToken();
     composer.value = ""; autoGrow();
     addMsg(activeId, t, "me"); ask(activeId, t);
   }
@@ -404,7 +431,7 @@
     if (recognizing || (st && st.turn.busy) || !SR) return;
     rec = new SR();
     rec.lang = langSel.value; rec.interimResults = false; rec.maxAlternatives = 1;
-    rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Dinliyorum…"); };
+    rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Dinliyorum…"); cue("listen"); };
     rec.onerror = (e) => { recognizing = false; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
     rec.onend = () => { recognizing = false; refreshMic(); };
     rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) { addMsg(activeId, t, "me"); ask(activeId, t); } };
@@ -430,13 +457,14 @@
           setStatus(""); if (data.text) { addMsg(activeId, data.text, "me"); ask(activeId, data.text); } else setStatus("Ses anlaşılmadı.");
         } catch (e) { setStatus("⚠️ " + e.message); }
       };
-      mediaRec.start(); recognizing = true; refreshMic(); setStatus("Kaydediyorum… (bitince dokun)");
+      mediaRec.start(); recognizing = true; refreshMic(); setStatus("Kaydediyorum… (bitince dokun)"); cue("listen");
     } catch (e) { setStatus("Mikrofon açılamadı: " + e.message); }
   }
   function stopWhisper() { if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop(); }
 
   // ---------- Mic button ----------
   micBtn.addEventListener("click", () => {
+    ensureAudio();
     const st = active();
     if (st && st.turn.busy) { stopActive(); return; }
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
@@ -455,6 +483,7 @@
   modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; prefs.mode = modeSel.value; savePrefs(); });
   langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); });
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
+  cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
   themeBtn.addEventListener("click", () => {
     const cur = prefs.theme || "system";
     prefs.theme = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
@@ -495,6 +524,7 @@
   applyTheme();
   if (prefs.lang) langSel.value = prefs.lang;
   if (prefs.handsfree) handsfree.checked = true;
+  cuesChk.checked = cuesOn();
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
