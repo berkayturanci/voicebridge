@@ -186,6 +186,14 @@ test("/api/stt is rejected when whisper is not configured", async () => {
   assert.strictEqual(r.status, 500);
 });
 
+test("/api/browse lists subdirectories with a parent link", async () => {
+  const data = JSON.parse((await request(server, "GET", "/api/browse?path=" + encodeURIComponent(process.cwd()))).data);
+  assert.strictEqual(data.path, process.cwd());
+  assert.ok(Array.isArray(data.dirs) && data.dirs.includes("public") && data.dirs.includes("test"));
+  assert.ok(!data.dirs.includes(".git")); // dotfiles hidden
+  assert.strictEqual(typeof data.parent, "string");
+});
+
 test("unknown method and endpoint", async () => {
   assert.strictEqual((await request(server, "POST", "/")).status, 405);
   assert.strictEqual((await request(server, "GET", "/api/nope")).status, 404);
