@@ -137,6 +137,7 @@
       <label>Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
       <label>Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
       <label>Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
+      <label>Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
     </div>
   </footer>
 
@@ -166,7 +167,7 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
@@ -208,6 +209,16 @@
     if (name === "listen") tone(660, 0, 0.12);
     else if (name === "done") { tone(880, 0, 0.1); tone(1320, 0.11, 0.13); }
     else if (name === "error") tone(200, 0, 0.28, 0.07);
+  }
+  // Pull the user back when a reply finishes in the background or looks like a question.
+  function maybeNotify(sessionName, text) {
+    if (!prefs.notify || !("Notification" in window) || Notification.permission !== "granted") return;
+    const isQ = /\?["')\]]*\s*$/.test(text.trim());
+    if (!document.hidden && !isQ) return;
+    try {
+      const n = new Notification("voicebridge — " + sessionName + (isQ ? " soru sordu" : " hazır"), { body: text.slice(0, 140) });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch (_) {}
   }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -412,6 +423,7 @@
       if (full) renderInto(bubble, full); else bubble.textContent = "(boş cevap)";
       if (sessionId === activeId) { flushSpeech(); setStatus(""); }
       cue("done");
+      if (full) maybeNotify(st.meta.name, full);
     } catch (e) {
       if (e.name === "AbortError") { if (full) renderInto(bubble, full); else bubble.remove(); }
       else { bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); cue("error"); }
@@ -521,6 +533,12 @@
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
+  notifyChk.addEventListener("change", () => {
+    prefs.notify = notifyChk.checked; savePrefs();
+    if (notifyChk.checked && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then((p) => { if (p !== "granted") { notifyChk.checked = false; prefs.notify = false; savePrefs(); } });
+    }
+  });
   themeBtn.addEventListener("click", () => {
     const cur = prefs.theme || "system";
     prefs.theme = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
@@ -597,6 +615,7 @@
   if (prefs.lang) langSel.value = prefs.lang;
   if (prefs.handsfree) handsfree.checked = true;
   cuesChk.checked = cuesOn();
+  notifyChk.checked = !!prefs.notify;
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
