@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "smoke": "bash scripts/smoke.sh"
   },
   "engines": {
     "node": ">=18"
