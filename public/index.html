@@ -58,6 +58,10 @@
   header #session { font-weight: 600; max-width: 30vw; }
   header button { padding: 6px 8px; }
   #logs { flex: 1; position: relative; overflow: hidden; }
+  #jump { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: none;
+    background: var(--accent); color: #fff; border: none; border-radius: 16px; padding: 6px 12px;
+    font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.3); z-index: 5; }
+  #jump.show { display: block; }
   .log { position: absolute; inset: 0; overflow-y: auto; padding: 14px; display: none; flex-direction: column; gap: 10px; }
   .log.active { display: flex; }
   .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
@@ -124,7 +128,9 @@
     <button id="reset">Yeni sohbet</button>
   </header>
 
-  <div id="logs"></div>
+  <div id="logs">
+    <button id="jump" aria-label="En alta git">↓ en son</button>
+  </div>
 
   <footer>
     <div id="status"></div>
@@ -178,7 +184,12 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify"), ttsVoiceSel = $("ttsVoice"), rateInput = $("rate");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify"), ttsVoiceSel = $("ttsVoice"), rateInput = $("rate"), jumpBtn = $("jump");
+
+  // Auto-scroll only when the user is already near the bottom (don't fight them).
+  function nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 80; }
+  function updateJump() { const st = active(); jumpBtn.classList.toggle("show", !!(st && !nearBottom(st.logEl))); }
+  function toBottom() { const st = active(); if (st) { st.logEl.scrollTop = st.logEl.scrollHeight; updateJump(); } }
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
@@ -320,6 +331,7 @@
     if (S.has(meta.id)) { S.get(meta.id).meta = meta; return S.get(meta.id); }
     const logEl = document.createElement("div");
     logEl.className = "log"; logEl.dataset.session = meta.id;
+    logEl.addEventListener("scroll", () => { if (meta.id === activeId) updateJump(); });
     logs.appendChild(logEl);
     const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false } };
     S.set(meta.id, st);
@@ -329,11 +341,12 @@
   }
   function addMsg(sessionId, text, cls) {
     const st = S.get(sessionId); if (!st) return null;
+    const pinned = nearBottom(st.logEl);
     const div = document.createElement("div");
     div.className = "msg " + cls;
     div.textContent = text || "";
     st.logEl.appendChild(div);
-    if (sessionId === activeId) st.logEl.scrollTop = st.logEl.scrollHeight;
+    if (sessionId === activeId) { if (pinned) st.logEl.scrollTop = st.logEl.scrollHeight; updateJump(); }
     return div;
   }
   function modeLabel(agentId, modeId) {
@@ -368,8 +381,9 @@
     fillModeSelect(modeSel, active().meta.agent, active().meta.mode);
     voiceChk.checked = !!active().meta.voice;
     refreshMic();
-    active().logEl.scrollTop = active().logEl.scrollHeight;
+    toBottom();
   }
+  jumpBtn.addEventListener("click", toBottom);
 
   // ---------- Mic / send UI ----------
   function refreshMic() {
@@ -462,9 +476,10 @@
           if (!line) continue;
           let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
           if (ev.type === "delta") {
+            const pinned = sessionId === activeId && nearBottom(st.logEl);
             full += ev.text; bubble.textContent = full;
             if (sessionId === activeId) {
-              st.logEl.scrollTop = st.logEl.scrollHeight;
+              if (pinned) st.logEl.scrollTop = st.logEl.scrollHeight; else updateJump();
               setStatus("Cevap veriyor… (durdurmak için ⏹)"); feedSpeech(ev.text);
             }
           } else if (ev.type === "activity") {
