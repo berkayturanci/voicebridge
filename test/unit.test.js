@@ -4,7 +4,7 @@ const assert = require("node:assert");
 const srv = require("../server.js");
 
 test("claude adapter: fresh turn has no --continue, prompt after -p", () => {
-  const { argv, stdin } = srv.AGENTS.claude.command("hello", false);
+  const { argv, stdin } = srv.AGENTS.claude.command("hello", { cont: false });
   assert.strictEqual(stdin, null);
   assert.ok(!argv.includes("--continue"));
   assert.ok(argv.includes("--output-format"));
@@ -14,8 +14,13 @@ test("claude adapter: fresh turn has no --continue, prompt after -p", () => {
 });
 
 test("claude adapter: continued turn adds --continue", () => {
-  const { argv } = srv.AGENTS.claude.command("hi", true);
-  assert.strictEqual(argv[0], "--continue");
+  const { argv } = srv.AGENTS.claude.command("hi", { cont: true });
+  assert.ok(argv.includes("--continue"));
+});
+
+test("codex/antigravity adapters still pipe the prompt on stdin", () => {
+  assert.strictEqual(srv.AGENTS.codex.command("do it").stdin, "do it");
+  assert.strictEqual(srv.AGENTS.antigravity.command("go").stdin, "go");
 });
 
 test("codex adapter: `exec` with prompt on stdin", () => {
@@ -54,6 +59,29 @@ test("createSession validates agent and directory", () => {
 test("createSession defaults name to the agent label", () => {
   const s = srv.createSession({ agent: "claude", projectDir: process.cwd() });
   assert.strictEqual(s.name, "Claude Code");
+});
+
+test("mode flags are threaded into each agent's argv", () => {
+  const cl = srv.AGENTS.claude.command("p", { modeArgs: srv.AGENTS.claude.modes.full.args });
+  assert.ok(cl.argv.includes("--dangerously-skip-permissions"));
+  const cx = srv.AGENTS.codex.command("p", { modeArgs: srv.AGENTS.codex.modes.full.args });
+  assert.deepStrictEqual(cx.argv, ["exec", "--dangerously-bypass-approvals-and-sandbox"]);
+  const ag = srv.AGENTS.antigravity.command("p", { modeArgs: srv.AGENTS.antigravity.modes.safe.args });
+  assert.deepStrictEqual(ag.argv, ["--print", "--sandbox"]);
+});
+
+test("resolveMode falls back to the agent default for unknown/empty modes", () => {
+  assert.strictEqual(srv.resolveMode("claude", "nope"), "ask");
+  assert.strictEqual(srv.resolveMode("codex", undefined), "auto");
+  assert.strictEqual(srv.resolveMode("claude", "full"), "full");
+});
+
+test("createSession validates mode and stores it", () => {
+  assert.throws(() => srv.createSession({ agent: "claude", projectDir: process.cwd(), mode: "ghost" }), /unknown mode/);
+  const s = srv.createSession({ agent: "claude", projectDir: process.cwd(), mode: "full" });
+  assert.strictEqual(s.mode, "full");
+  const d = srv.createSession({ agent: "codex", projectDir: process.cwd() });
+  assert.strictEqual(d.mode, "auto"); // agent default
 });
 
 test("phoneUrl prefers PUBLIC_URL and falls back to host:port", () => {

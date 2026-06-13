@@ -70,15 +70,24 @@ function parseClaudeLine(line) {
   return null;
 }
 
+// Per-agent "mode" = how much autonomy the agent has. The flags mirror
+// ai-jury's privilege handling. Full-auto modes skip approval prompts — handy
+// hands-free, risky otherwise.
 const AGENTS = {
   claude: {
     label: "Claude Code",
     bin: () => process.env.CLAUDE_BIN || "claude",
     supportsContinue: true,
     stream: "ndjson",
+    defaultMode: "ask",
+    modes: {
+      ask: { label: "Onay iste", args: [] },
+      autoEdit: { label: "Düzenlemeleri onayla", args: ["--permission-mode", "acceptEdits"] },
+      full: { label: "Tam otonom", args: ["--dangerously-skip-permissions"] },
+    },
     // Prompt is passed positionally after -p (claude also accepts it on stdin).
-    command(prompt, cont) {
-      const argv = [];
+    command(prompt, { cont, modeArgs } = {}) {
+      const argv = [...(modeArgs || [])];
       if (cont) argv.push("--continue");
       argv.push("--output-format", "stream-json", "--verbose", "-p", prompt);
       return { argv, stdin: null };
@@ -90,9 +99,15 @@ const AGENTS = {
     bin: () => process.env.CODEX_BIN || "codex",
     supportsContinue: false,
     stream: "text",
+    defaultMode: "auto",
+    modes: {
+      safe: { label: "Salt-okunur", args: ["-s", "read-only"] },
+      auto: { label: "Otomatik (yazma)", args: ["--full-auto"] },
+      full: { label: "Tam otonom", args: ["--dangerously-bypass-approvals-and-sandbox"] },
+    },
     // `codex exec` reads the prompt from stdin in non-interactive runs.
-    command(prompt) {
-      return { argv: ["exec"], stdin: prompt };
+    command(prompt, { modeArgs } = {}) {
+      return { argv: ["exec", ...(modeArgs || [])], stdin: prompt };
     },
   },
   antigravity: {
@@ -100,12 +115,24 @@ const AGENTS = {
     bin: () => process.env.AGY_BIN || "agy",
     supportsContinue: false,
     stream: "text",
+    defaultMode: "safe",
+    modes: {
+      safe: { label: "Sandbox", args: ["--sandbox"] },
+      full: { label: "Tam otonom", args: ["--yolo"] },
+    },
     // `agy --print` reads the prompt from stdin when none is given positionally.
-    command(prompt) {
-      return { argv: ["--print"], stdin: prompt };
+    command(prompt, { modeArgs } = {}) {
+      return { argv: ["--print", ...(modeArgs || [])], stdin: prompt };
     },
   },
 };
+
+// The valid mode for a session, falling back to the agent default.
+function resolveMode(agentId, mode) {
+  const agent = AGENTS[agentId];
+  if (mode && agent.modes[mode]) return mode;
+  return agent.defaultMode;
+}
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -119,9 +146,10 @@ function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
-function createSession({ name, agent, projectDir } = {}) {
+function createSession({ name, agent, projectDir, mode } = {}) {
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
+  if (mode && !AGENTS[agent].modes[mode]) throw new Error("unknown mode: " + mode);
   const dir = projectDir || DEFAULT_PROJECT_DIR;
   if (!isDir(dir)) throw new Error("project directory not found: " + dir);
   const id = "s" + (++sessionSeq);
@@ -130,6 +158,7 @@ function createSession({ name, agent, projectDir } = {}) {
     name: (name && String(name).trim()) || AGENTS[agent].label,
     agent,
     projectDir: dir,
+    mode: resolveMode(agent, mode),
     started: false,
   };
   sessions.set(id, s);
@@ -139,7 +168,7 @@ function createSession({ name, agent, projectDir } = {}) {
 function publicSession(s) {
   return {
     id: s.id, name: s.name, agent: s.agent,
-    agentLabel: AGENTS[s.agent].label, projectDir: s.projectDir, started: s.started,
+    agentLabel: AGENTS[s.agent].label, projectDir: s.projectDir, mode: s.mode, started: s.started,
   };
 }
 
@@ -211,7 +240,8 @@ function readBody(req, limitBytes, cb) {
 function streamAsk(session, prompt, res) {
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
-  const { argv, stdin } = agent.command(prompt, cont);
+  const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
+  const { argv, stdin } = agent.command(prompt, { cont, modeArgs });
 
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -321,6 +351,8 @@ function handleRequest(req, res) {
       authRequired: !!ACCESS_TOKEN,
       agents: Object.keys(AGENTS).map((id) => ({
         id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
+        defaultMode: AGENTS[id].defaultMode,
+        modes: Object.keys(AGENTS[id].modes).map((m) => ({ id: m, label: AGENTS[id].modes[m].label })),
       })),
       defaultProjectDir: DEFAULT_PROJECT_DIR,
       defaultSessionId,
@@ -366,6 +398,7 @@ function handleRequest(req, res) {
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
         if (data.reset) session.started = false;
+        if (data.mode && AGENTS[session.agent].modes[data.mode]) session.mode = data.mode;
         streamAsk(session, text, res);
       });
     }
@@ -443,6 +476,7 @@ if (require.main === module) {
 module.exports = {
   AGENTS,
   parseClaudeLine,
+  resolveMode,
   phoneUrl,
   sessions,
   createSession,

@@ -14,45 +14,53 @@
     display: flex; flex-direction: column; height: 100dvh;
   }
   header {
-    padding: 12px 14px; border-bottom: 1px solid #21262d;
-    display: flex; align-items: center; gap: 8px; font-weight: 600;
+    padding: 10px 12px; border-bottom: 1px solid #21262d;
+    display: flex; align-items: center; gap: 8px; font-weight: 600; flex: none;
   }
   header .dot { width: 9px; height: 9px; border-radius: 50%; background: #3fb950; flex: none; }
   header .spacer { flex: 1; }
   header select, header button {
     background: #21262d; color: #e6edf3; border: 1px solid #30363d;
-    border-radius: 8px; padding: 6px 9px; font-size: 13px; max-width: 46vw;
+    border-radius: 8px; padding: 6px 9px; font-size: 13px; max-width: 44vw;
   }
   header #session { font-weight: 600; }
   #logs { flex: 1; position: relative; overflow: hidden; }
-  .log { position: absolute; inset: 0; overflow-y: auto; padding: 16px; display: none; flex-direction: column; gap: 10px; }
+  .log { position: absolute; inset: 0; overflow-y: auto; padding: 14px; display: none; flex-direction: column; gap: 10px; }
   .log.active { display: flex; }
-  .msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .me { align-self: flex-end; background: #1f6feb; color: #fff; border-bottom-right-radius: 4px; }
   .claude { align-self: flex-start; background: #161b22; border: 1px solid #21262d; border-bottom-left-radius: 4px; }
+  .claude pre { margin: 8px 0 2px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 10px; overflow-x: auto; }
+  .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .sys { align-self: center; color: #8b949e; font-size: 13px; text-align: center; }
-  footer { padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #21262d; }
-  #status { text-align: center; min-height: 20px; font-size: 13px; color: #8b949e; margin-bottom: 10px; }
-  .controls { display: flex; align-items: center; justify-content: center; gap: 16px; }
-  #mic {
-    width: 76px; height: 76px; border-radius: 50%; border: none;
-    background: #238636; color: #fff; font-size: 30px; transition: transform .1s, background .2s;
+
+  footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #21262d; flex: none; display: flex; flex-direction: column; gap: 9px; }
+  #status { text-align: center; min-height: 18px; font-size: 12px; color: #8b949e; }
+  .composer { display: flex; align-items: flex-end; gap: 8px; }
+  #composer {
+    flex: 1; resize: none; min-height: 44px; max-height: 140px; padding: 11px 12px;
+    background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 12px;
+    font: inherit; font-size: 16px; line-height: 1.3;
   }
+  .iconbtn { flex: none; width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 21px; color: #fff; }
+  #send { background: #1f6feb; }
+  #send:disabled { opacity: .4; }
+  #mic { background: #238636; transition: transform .1s, background .2s; }
   #mic:active { transform: scale(.94); }
   #mic.listening { background: #da3633; animation: pulse 1.2s infinite; }
   #mic.thinking { background: #9e6a03; }
   #mic:disabled { opacity: .4; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(218,54,51,.6); } 50% { box-shadow: 0 0 0 14px rgba(218,54,51,0); } }
-  .toggle { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #8b949e; gap: 4px; }
-  select#lang { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 6px; max-width: 110px; }
-  .switch { position: relative; width: 44px; height: 26px; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(218,54,51,.6); } 50% { box-shadow: 0 0 0 12px rgba(218,54,51,0); } }
+  .opts { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #8b949e; }
+  .opts select { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 5px 7px; font-size: 12px; }
+  .opts label { display: inline-flex; align-items: center; gap: 6px; }
+  .switch { position: relative; width: 40px; height: 24px; }
   .switch input { display: none; }
-  .slider { position: absolute; inset: 0; background: #30363d; border-radius: 26px; transition: .2s; }
-  .slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .slider { position: absolute; inset: 0; background: #30363d; border-radius: 24px; transition: .2s; }
+  .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
   input:checked + .slider { background: #238636; }
-  input:checked + .slider::before { transform: translateX(18px); }
+  input:checked + .slider::before { transform: translateX(16px); }
 
-  /* New-session modal */
   #modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   #modal.open { display: flex; }
   .card { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
@@ -77,34 +85,30 @@
 
   <footer>
     <div id="status"></div>
-    <div class="controls">
-      <label class="toggle">
-        <span>Dil</span>
+    <div class="composer">
+      <textarea id="composer" rows="1" placeholder="Yaz ya da 🎤 ile konuş…" enterkeyhint="send"></textarea>
+      <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
+      <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
+    </div>
+    <div class="opts">
+      <label>Mod <select id="mode"></select></label>
+      <label>Dil
         <select id="lang">
           <option value="tr-TR">Türkçe</option>
           <option value="en-US">English</option>
         </select>
       </label>
-      <button id="mic" aria-label="Konuş">🎤</button>
-      <label class="toggle">
-        <span>Eller serbest</span>
-        <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span>
-      </label>
+      <label>Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
     </div>
   </footer>
 
   <div id="modal">
     <div class="card">
       <h3>Yeni oturum</h3>
-      <label>İsim
-        <input id="ns-name" placeholder="ör. Backend refactor" />
-      </label>
-      <label>Agent
-        <select id="ns-agent"></select>
-      </label>
-      <label>Proje klasörü
-        <input id="ns-dir" placeholder="/Users/you/project" />
-      </label>
+      <label>İsim <input id="ns-name" placeholder="ör. Backend refactor" /></label>
+      <label>Agent <select id="ns-agent"></select></label>
+      <label>Mod <select id="ns-mode"></select></label>
+      <label>Proje klasörü <input id="ns-dir" placeholder="/Users/you/project" /></label>
       <div class="row">
         <button id="ns-cancel">İptal</button>
         <button id="ns-create" class="primary">Oluştur</button>
@@ -115,28 +119,23 @@
 <script>
 (() => {
   "use strict";
-  const logs = document.getElementById("logs");
-  const statusEl = document.getElementById("status");
-  const micBtn = document.getElementById("mic");
-  const langSel = document.getElementById("lang");
-  const handsfree = document.getElementById("handsfree");
-  const resetBtn = document.getElementById("reset");
-  const sessionSel = document.getElementById("session");
-  const newSessionBtn = document.getElementById("newSession");
-  const modal = document.getElementById("modal");
+  const $ = (id) => document.getElementById(id);
+  const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
+  const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
+  const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
+  const modeSel = $("mode"), modal = $("modal");
 
   let CONFIG = { sttMode: "browser", authRequired: false, agents: [] };
   let token = localStorage.getItem("vb_token") || "";
+  const agentById = {};
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizing = false;
 
-  // Per-session state: { meta, logEl, turn:{busy, abort, bubble, full} }
-  const S = new Map();
+  const S = new Map();   // sessionId -> { meta, logEl, turn }
   let activeId = null;
-
-  function active() { return S.get(activeId); }
-  function setStatus(t) { statusEl.textContent = t || ""; }
+  const active = () => S.get(activeId);
+  const setStatus = (t) => { statusEl.textContent = t || ""; };
 
   function authHeaders(extra) {
     const h = Object.assign({}, extra || {});
@@ -150,16 +149,31 @@
     }
   }
 
+  // ---------- Render: turn markdown-ish text into bubbles with code blocks ----------
+  function renderInto(el, text) {
+    el.textContent = "";
+    const parts = text.split(/```/);
+    parts.forEach((part, i) => {
+      if (i % 2 === 1) {
+        const pre = document.createElement("pre");
+        const code = document.createElement("code");
+        code.textContent = part.replace(/^\w*\n/, "");
+        pre.appendChild(code); el.appendChild(pre);
+      } else if (part) {
+        el.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+
   // ---------- Session DOM ----------
   function addSessionState(meta) {
     if (S.has(meta.id)) { S.get(meta.id).meta = meta; return S.get(meta.id); }
     const logEl = document.createElement("div");
-    logEl.className = "log";
-    logEl.dataset.session = meta.id;
+    logEl.className = "log"; logEl.dataset.session = meta.id;
     logs.appendChild(logEl);
-    const st = { meta, logEl, turn: { busy: false, abort: null, bubble: null, full: "" } };
+    const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false } };
     S.set(meta.id, st);
-    addMsg(meta.id, `${meta.name} · ${meta.agentLabel}\nMikrofona dokun, konuş.`, "sys");
+    addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}\nYaz ya da konuş.`, "sys");
     return st;
   }
   function addMsg(sessionId, text, cls) {
@@ -171,15 +185,27 @@
     if (sessionId === activeId) st.logEl.scrollTop = st.logEl.scrollHeight;
     return div;
   }
+  function modeLabel(agentId, modeId) {
+    const a = agentById[agentId]; if (!a) return modeId || "";
+    const m = (a.modes || []).find((x) => x.id === modeId);
+    return m ? m.label : (modeId || "");
+  }
   function rebuildSessionSelect() {
     sessionSel.innerHTML = "";
     for (const st of S.values()) {
       const o = document.createElement("option");
-      o.value = st.meta.id;
-      o.textContent = st.meta.name + " · " + st.meta.agentLabel;
+      o.value = st.meta.id; o.textContent = st.meta.name + " · " + st.meta.agentLabel;
       sessionSel.appendChild(o);
     }
     sessionSel.value = activeId;
+  }
+  function fillModeSelect(sel, agentId, current) {
+    sel.innerHTML = "";
+    const a = agentById[agentId]; if (!a) return;
+    (a.modes || []).forEach((m) => {
+      const o = document.createElement("option"); o.value = m.id; o.textContent = m.label; sel.appendChild(o);
+    });
+    sel.value = current || a.defaultMode;
   }
   function switchTo(id) {
     if (!S.has(id)) return;
@@ -188,49 +214,44 @@
     activeId = id;
     for (const st of S.values()) st.logEl.classList.toggle("active", st.meta.id === id);
     sessionSel.value = id;
+    fillModeSelect(modeSel, active().meta.agent, active().meta.mode);
     refreshMic();
-    const st = active(); if (st) st.logEl.scrollTop = st.logEl.scrollHeight;
+    active().logEl.scrollTop = active().logEl.scrollHeight;
   }
 
-  // ---------- Mic UI reflects the active session ----------
+  // ---------- Mic / send UI ----------
   function refreshMic() {
     const st = active();
     micBtn.classList.remove("listening", "thinking");
-    if (recognizing) { micBtn.classList.add("listening"); micBtn.textContent = "🎤"; micBtn.setAttribute("aria-label", "Durdur"); return; }
-    if (st && st.turn.busy) { micBtn.classList.add("thinking"); micBtn.textContent = "⏹"; micBtn.setAttribute("aria-label", "Dur"); return; }
-    micBtn.textContent = "🎤"; micBtn.setAttribute("aria-label", "Konuş");
+    if (recognizing) { micBtn.classList.add("listening"); micBtn.textContent = "🎤"; }
+    else if (st && st.turn.busy) { micBtn.classList.add("thinking"); micBtn.textContent = "⏹"; micBtn.setAttribute("aria-label", "Dur"); }
+    else { micBtn.textContent = "🎤"; micBtn.setAttribute("aria-label", "Konuş"); }
+    sendBtn.disabled = !!(st && st.turn.busy);
   }
 
-  // ---------- Speech synthesis (on-device), sentence queue ----------
+  // ---------- Speech synthesis ----------
   let speakBuf = "", speaking = false; const speakQueue = [];
   function cleanForSpeech(t) {
-    return t
-      .replace(/```[\s\S]*?```/g, " kod bloğu. ")
-      .replace(/`([^`]*)`/g, "$1")
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/[*_#>`|]/g, "")
-      .trim();
+    return t.replace(/```[\s\S]*?```/g, " kod bloğu. ").replace(/`([^`]*)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_#>`|]/g, "").trim();
   }
   function pickVoice() {
     const want = langSel.value.split("-")[0];
     const vs = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-    return vs.find(v => v.lang && v.lang.toLowerCase().startsWith(want)) || null;
+    return vs.find((v) => v.lang && v.lang.toLowerCase().startsWith(want)) || null;
   }
   function drainSpeak() {
     if (speaking || !speakQueue.length || !("speechSynthesis" in window)) return;
     speaking = true;
     const u = new SpeechSynthesisUtterance(speakQueue.shift());
-    u.lang = langSel.value;
-    const v = pickVoice(); if (v) u.voice = v;
+    u.lang = langSel.value; const v = pickVoice(); if (v) u.voice = v;
     u.onend = u.onerror = () => { speaking = false; drainSpeak(); };
     window.speechSynthesis.speak(u);
   }
   function feedSpeech(chunk) {
-    speakBuf += chunk;
-    let m;
+    speakBuf += chunk; let m;
     while ((m = speakBuf.match(/[\s\S]*?[.!?\n]+/))) {
-      const sentence = cleanForSpeech(m[0]);
-      speakBuf = speakBuf.slice(m[0].length);
+      const sentence = cleanForSpeech(m[0]); speakBuf = speakBuf.slice(m[0].length);
       if (sentence) { speakQueue.push(sentence); drainSpeak(); }
     }
   }
@@ -239,31 +260,26 @@
     if (rest) { speakQueue.push(rest); drainSpeak(); }
   }
 
-  // ---------- Stop the active session's turn + speech ----------
+  // ---------- Stop ----------
   function stopActive() {
     const st = active(); if (!st) return;
+    st.turn.stopped = true;
     if (st.turn.abort) { try { st.turn.abort.abort(); } catch (_) {} }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    speakQueue.length = 0; speakBuf = ""; speaking = false;
-    st.turn.busy = false;
-    refreshMic();
-    setStatus("Durduruldu.");
+    speakQueue.length = 0; speakBuf = ""; speaking = false; st.turn.busy = false;
+    refreshMic(); setStatus("Durduruldu.");
   }
 
-  // ---------- Send to the agent and stream the reply ----------
+  // ---------- Ask the agent and stream the reply ----------
   async function ask(sessionId, text) {
-    const st = S.get(sessionId); if (!st) return;
-    st.turn.busy = true; st.turn.stopped = false;
-    st.turn.abort = new AbortController();
-    if (sessionId === activeId) { refreshMic(); setStatus("Düşünüyor…"); }
-    if (sessionId === activeId) { speakBuf = ""; speakQueue.length = 0; }
+    const st = S.get(sessionId); if (!st || st.turn.busy) return;
+    st.turn.busy = true; st.turn.stopped = false; st.turn.abort = new AbortController();
+    if (sessionId === activeId) { refreshMic(); setStatus("Düşünüyor…"); speakBuf = ""; speakQueue.length = 0; }
     const bubble = addMsg(sessionId, "", "claude"); let full = "";
     try {
       const r = await fetch("/api/ask", {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ text, sessionId }),
-        signal: st.turn.abort.signal,
+        method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ text, sessionId, mode: st.meta.mode }), signal: st.turn.abort.signal,
       });
       if (r.status === 401) { localStorage.removeItem("vb_token"); token = ""; throw new Error("Token geçersiz. Sayfayı yenile."); }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
@@ -280,29 +296,37 @@
             full += ev.text; bubble.textContent = full;
             if (sessionId === activeId) {
               st.logEl.scrollTop = st.logEl.scrollHeight;
-              setStatus("Cevap veriyor… (durdurmak için ⏹)");
-              feedSpeech(ev.text);
+              setStatus("Cevap veriyor… (durdurmak için ⏹)"); feedSpeech(ev.text);
             }
-          } else if (ev.type === "error") {
-            throw new Error(ev.error || "Sunucu hatası");
-          }
+          } else if (ev.type === "error") { throw new Error(ev.error || "Sunucu hatası"); }
         }
       }
-      if (sessionId === activeId) flushSpeech();
-      if (!full) bubble.textContent = "(boş cevap)";
+      if (full) renderInto(bubble, full); else bubble.textContent = "(boş cevap)";
+      if (sessionId === activeId) { flushSpeech(); setStatus(""); }
     } catch (e) {
-      if (e.name === "AbortError") {
-        if (!full) bubble.remove();
-      } else {
-        bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys");
-        if (sessionId === activeId) setStatus("");
-      }
+      if (e.name === "AbortError") { if (full) renderInto(bubble, full); else bubble.remove(); }
+      else { bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); }
     } finally {
       st.turn.busy = false; st.turn.abort = null;
       if (sessionId === activeId) refreshMic();
       if (!st.turn.stopped && handsfree.checked && CONFIG.sttMode === "browser" && sessionId === activeId) startBrowserSTT();
     }
   }
+
+  // ---------- Text composer ----------
+  function sendText() {
+    const t = composer.value.trim(); const st = active();
+    if (!t || !st || st.turn.busy) return;
+    ensureToken();
+    composer.value = ""; autoGrow();
+    addMsg(activeId, t, "me"); ask(activeId, t);
+  }
+  function autoGrow() { composer.style.height = "auto"; composer.style.height = Math.min(composer.scrollHeight, 140) + "px"; }
+  composer.addEventListener("input", autoGrow);
+  composer.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); }
+  });
+  sendBtn.addEventListener("click", sendText);
 
   // ---------- Browser speech recognition ----------
   let rec = null;
@@ -312,39 +336,29 @@
     rec = new SR();
     rec.lang = langSel.value; rec.interimResults = false; rec.maxAlternatives = 1;
     rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Dinliyorum…"); };
-    rec.onerror = (e) => {
-      recognizing = false; refreshMic();
-      setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error);
-    };
+    rec.onerror = (e) => { recognizing = false; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
     rec.onend = () => { recognizing = false; refreshMic(); };
-    rec.onresult = (ev) => {
-      const text = ev.results[0][0].transcript.trim();
-      if (text) { addMsg(activeId, text, "me"); ask(activeId, text); }
-    };
+    rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) { addMsg(activeId, t, "me"); ask(activeId, t); } };
     try { rec.start(); } catch (_) {}
   }
   function stopBrowserSTT() { if (rec && recognizing) rec.stop(); }
 
-  // ---------- Whisper recording (server-side STT) ----------
+  // ---------- Whisper recording ----------
   let mediaRec = null, chunks = [];
   async function startWhisper() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRec = new MediaRecorder(stream);
-      chunks = [];
+      mediaRec = new MediaRecorder(stream); chunks = [];
       mediaRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
       mediaRec.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        recognizing = false; refreshMic();
+        stream.getTracks().forEach((t) => t.stop()); recognizing = false; refreshMic();
         const blob = new Blob(chunks, { type: mediaRec.mimeType || "audio/webm" });
         setStatus("Yazıya çevriliyor…");
         try {
           const r = await fetch("/api/stt", { method: "POST", headers: authHeaders({ "Content-Type": blob.type }), body: blob });
           const data = await r.json();
           if (!r.ok) throw new Error(data.error || "STT hatası");
-          setStatus("");
-          if (data.text) { addMsg(activeId, data.text, "me"); ask(activeId, data.text); }
-          else setStatus("Ses anlaşılmadı.");
+          setStatus(""); if (data.text) { addMsg(activeId, data.text, "me"); ask(activeId, data.text); } else setStatus("Ses anlaşılmadı.");
         } catch (e) { setStatus("⚠️ " + e.message); }
       };
       mediaRec.start(); recognizing = true; refreshMic(); setStatus("Kaydediyorum… (bitince dokun)");
@@ -356,76 +370,57 @@
   micBtn.addEventListener("click", () => {
     const st = active();
     if (st && st.turn.busy) { stopActive(); return; }
-    if ("speechSynthesis" in window) window.speechSynthesis.getVoices(); // unlock TTS on iOS
+    if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
     ensureToken();
-    if (CONFIG.sttMode === "whisper") {
-      if (recognizing) stopWhisper(); else startWhisper();
-    } else {
-      if (recognizing) stopBrowserSTT(); else startBrowserSTT();
-    }
+    if (CONFIG.sttMode === "whisper") { if (recognizing) stopWhisper(); else startWhisper(); }
+    else { if (recognizing) stopBrowserSTT(); else startBrowserSTT(); }
   });
 
   resetBtn.addEventListener("click", async () => {
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}
-    const st = active(); if (st) { st.logEl.innerHTML = ""; }
+    const st = active(); if (st) st.logEl.innerHTML = "";
     addMsg(activeId, "Yeni sohbet başladı.", "sys");
   });
 
   sessionSel.addEventListener("change", () => switchTo(sessionSel.value));
+  modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; });
 
   // ---------- New-session modal ----------
+  const nsAgent = $("ns-agent"), nsMode = $("ns-mode");
   function openModal() {
-    const agentSel = document.getElementById("ns-agent");
-    agentSel.innerHTML = "";
-    (CONFIG.agents || []).forEach(a => {
-      const o = document.createElement("option"); o.value = a.id; o.textContent = a.label; agentSel.appendChild(o);
-    });
-    document.getElementById("ns-name").value = "";
-    document.getElementById("ns-dir").value = CONFIG.defaultProjectDir || "";
+    nsAgent.innerHTML = "";
+    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label; nsAgent.appendChild(o); });
+    $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
+    fillModeSelect(nsMode, nsAgent.value);
     modal.classList.add("open");
   }
+  nsAgent.addEventListener("change", () => fillModeSelect(nsMode, nsAgent.value));
   newSessionBtn.addEventListener("click", openModal);
-  document.getElementById("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
-  document.getElementById("ns-create").addEventListener("click", async () => {
-    const name = document.getElementById("ns-name").value.trim();
-    const agent = document.getElementById("ns-agent").value;
-    const projectDir = document.getElementById("ns-dir").value.trim();
+  $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
+  $("ns-create").addEventListener("click", async () => {
+    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim() };
     try {
-      const r = await fetch("/api/sessions", {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ name, agent, projectDir }),
-      });
+      const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Oluşturulamadı");
-      addSessionState(data.session);
-      rebuildSessionSelect();
-      modal.classList.remove("open");
-      switchTo(data.session.id);
+      addSessionState(data.session); rebuildSessionSelect(); modal.classList.remove("open"); switchTo(data.session.id);
     } catch (e) { alert("⚠️ " + e.message); }
   });
 
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-  }
+  if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 
-  // ---------- Boot ----------
   // A QR/link may carry ?token=… so scanning authorizes the phone on open.
   (() => {
     const t = new URLSearchParams(location.search).get("token");
     if (t) { token = t.trim(); localStorage.setItem("vb_token", token); history.replaceState(null, "", location.pathname); }
   })();
 
+  // ---------- Boot ----------
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
-    if (CONFIG.sttMode === "browser" && !SR) {
-      setStatus("Tarayıcı konuşma tanımayı desteklemiyor — iOS'ta Safari kullan.");
-      micBtn.disabled = true;
-    }
-    if (CONFIG.sttMode === "whisper") {
-      handsfree.disabled = true; // hands-free loop only in browser mode
-      handsfree.closest(".toggle").style.opacity = .4;
-    }
+    (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
+    if (CONFIG.sttMode === "browser" && !SR) { setStatus("Tarayıcı konuşma tanımayı desteklemiyor — iOS'ta Safari kullan."); micBtn.disabled = true; }
+    if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }
     ensureToken();
     let list = { sessions: [], defaultSessionId: null };
     try { list = await (await fetch("/api/sessions", { headers: authHeaders() })).json(); } catch (_) {}
