@@ -23,6 +23,23 @@ test("codex/antigravity adapters still pipe the prompt on stdin", () => {
   assert.strictEqual(srv.AGENTS.antigravity.command("go").stdin, "go");
 });
 
+test("antigravity invocation is configurable via AGY_ARGS / AGY_PROMPT_ARG", () => {
+  const a = process.env.AGY_ARGS, p = process.env.AGY_PROMPT_ARG;
+  try {
+    delete process.env.AGY_ARGS; delete process.env.AGY_PROMPT_ARG;
+    assert.deepStrictEqual(srv.AGENTS.antigravity.command("hi").argv, ["--print"]);
+    process.env.AGY_PROMPT_ARG = "1"; // prompt as a positional arg, not stdin
+    const c1 = srv.AGENTS.antigravity.command("hi");
+    assert.deepStrictEqual(c1.argv, ["--print", "hi"]);
+    assert.strictEqual(c1.stdin, null);
+    process.env.AGY_ARGS = "chat -q"; // override the base args
+    assert.deepStrictEqual(srv.AGENTS.antigravity.command("hi").argv, ["chat", "-q", "hi"]);
+  } finally {
+    if (a === undefined) delete process.env.AGY_ARGS; else process.env.AGY_ARGS = a;
+    if (p === undefined) delete process.env.AGY_PROMPT_ARG; else process.env.AGY_PROMPT_ARG = p;
+  }
+});
+
 test("ollama adapter runs a local model with the prompt on stdin", () => {
   const prev = process.env.OLLAMA_MODEL;
   delete process.env.OLLAMA_MODEL;

@@ -20,6 +20,8 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama HTTP API base. Ollama sessions stream via `/api/chat` and keep per-session history (continuity); models are listed from `/api/tags`. |
 | `CODEX_CONTINUE_ARGS` | _(none)_ | Opt-in Codex resume: argv added on continued turns (e.g. `resume --last`). When set, Codex sessions keep context. Best-effort — verify your build's resume flag. |
 | `AGY_CONTINUE_ARGS` | _(none)_ | Opt-in Antigravity resume: argv added on continued turns. Best-effort. |
+| `AGY_ARGS` | `--print` | Override Antigravity's base args if your `agy` build differs. |
+| `AGY_PROMPT_ARG` | _(unset)_ | If set (e.g. `1`), pass the prompt as a positional argument instead of stdin. Try this if `agy` returns an empty reply. |
 | `ACCESS_TOKEN` | _(none)_ | If set, every `/api/*` route (except `/api/config`) requires `Authorization: Bearer <token>`. |
 | `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
 | `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
