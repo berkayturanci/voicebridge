@@ -143,11 +143,16 @@
   <div id="modal">
     <div class="card">
       <h3>Yeni oturum</h3>
+      <label>Favori <span style="display:flex;gap:8px;">
+        <select id="ns-fav" style="flex:1"></select>
+        <button id="ns-fav-del" type="button" title="Favoriyi sil">🗑</button>
+      </span></label>
       <label>İsim <input id="ns-name" placeholder="ör. Backend refactor" /></label>
       <label>Agent <select id="ns-agent"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
       <label>Proje klasörü <input id="ns-dir" placeholder="/Users/you/project" /></label>
       <div class="row">
+        <button id="ns-save">★ Kaydet</button>
         <button id="ns-cancel">İptal</button>
         <button id="ns-create" class="primary">Oluştur</button>
       </div>
@@ -523,15 +528,49 @@
   });
 
   // ---------- New-session modal ----------
-  const nsAgent = $("ns-agent"), nsMode = $("ns-mode");
+  const nsAgent = $("ns-agent"), nsMode = $("ns-mode"), nsFav = $("ns-fav");
+  // Favorites: server-provided (CONFIG.favorites) followed by local (prefs.favorites).
+  const serverFavs = () => CONFIG.favorites || [];
+  const localFavs = () => prefs.favorites || (prefs.favorites = []);
+  const allFavs = () => serverFavs().concat(localFavs());
+  function renderFavSelect() {
+    nsFav.innerHTML = "";
+    const ph = document.createElement("option"); ph.value = ""; ph.textContent = "— favori seç —"; nsFav.appendChild(ph);
+    allFavs().forEach((f, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = (i < serverFavs().length ? "🌐 " : "★ ") + (f.name || f.projectDir); nsFav.appendChild(o); });
+    nsFav.value = "";
+  }
+  function applyFav() {
+    const i = parseInt(nsFav.value, 10);
+    if (isNaN(i)) return;
+    const f = allFavs()[i]; if (!f) return;
+    if (f.agent && agentById[f.agent]) nsAgent.value = f.agent;
+    $("ns-name").value = f.name || "";
+    $("ns-dir").value = f.projectDir || "";
+    fillModeSelect(nsMode, nsAgent.value, f.mode);
+  }
   function openModal() {
     nsAgent.innerHTML = "";
     (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label; nsAgent.appendChild(o); });
     $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
     fillModeSelect(nsMode, nsAgent.value);
+    renderFavSelect();
     modal.classList.add("open");
   }
   nsAgent.addEventListener("change", () => fillModeSelect(nsMode, nsAgent.value));
+  nsFav.addEventListener("change", applyFav);
+  $("ns-save").addEventListener("click", () => {
+    const dir = $("ns-dir").value.trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
+    const fav = { name: $("ns-name").value.trim() || dir, agent: nsAgent.value, mode: nsMode.value, projectDir: dir };
+    const lf = localFavs();
+    const existing = lf.findIndex((f) => f.projectDir === dir && f.agent === fav.agent);
+    if (existing >= 0) lf[existing] = fav; else lf.push(fav);
+    savePrefs(); renderFavSelect();
+  });
+  $("ns-fav-del").addEventListener("click", () => {
+    const i = parseInt(nsFav.value, 10);
+    if (isNaN(i) || i < serverFavs().length) { alert("Sadece kendi favorilerini silebilirsin."); return; }
+    localFavs().splice(i - serverFavs().length, 1); savePrefs(); renderFavSelect();
+  });
   newSessionBtn.addEventListener("click", openModal);
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {

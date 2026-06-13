@@ -96,6 +96,19 @@ test("createSession stores the voice flag", () => {
   assert.strictEqual(srv.createSession({ agent: "claude", projectDir: process.cwd(), voice: true }).voice, true);
 });
 
+test("parseFavorites reads valid entries and ignores junk", () => {
+  assert.deepStrictEqual(srv.parseFavorites(undefined), []);
+  assert.deepStrictEqual(srv.parseFavorites("not json"), []);
+  const favs = srv.parseFavorites(JSON.stringify([
+    { name: "App", projectDir: "/a", agent: "claude", mode: "full" },
+    { projectDir: "/b" },
+    { name: "no dir" },
+  ]));
+  assert.strictEqual(favs.length, 2);
+  assert.strictEqual(favs[0].name, "App");
+  assert.strictEqual(favs[1].name, "/b"); // falls back to the dir
+});
+
 test("phoneUrl prefers PUBLIC_URL and falls back to host:port", () => {
   assert.strictEqual(srv.phoneUrl({ host: "127.0.0.1", port: 8787 }), "http://127.0.0.1:8787");
   assert.strictEqual(srv.phoneUrl({ publicUrl: "https://box.ts.net/" }), "https://box.ts.net");
