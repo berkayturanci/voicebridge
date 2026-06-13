@@ -2,3 +2,6 @@ node_modules/
 *.log
 .DS_Store
 .env
+
+# keel runtime state (run ledger, checkpoints) — not source config
+.keel/state/
