@@ -111,6 +111,14 @@ test("createSession validates mode and stores it", () => {
   assert.strictEqual(d.mode, "auto"); // agent default
 });
 
+test("looksLikeQuestion detects trailing questions", () => {
+  assert.strictEqual(srv.looksLikeQuestion("Should I proceed?"), true);
+  assert.strictEqual(srv.looksLikeQuestion("Done.\nReady?"), true);
+  assert.strictEqual(srv.looksLikeQuestion('Is that ok?"'), true);
+  assert.strictEqual(srv.looksLikeQuestion("All set."), false);
+  assert.strictEqual(srv.looksLikeQuestion(""), false);
+});
+
 test("buildPrompt prepends the voice preamble only in voice mode", () => {
   assert.strictEqual(srv.buildPrompt(false, "hello"), "hello");
   const v = srv.buildPrompt(true, "hello");

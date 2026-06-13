@@ -26,6 +26,12 @@ self.addEventListener("fetch", (e) => {
   );
 });
 
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: "voicebridge", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "voicebridge", { body: d.body || "", icon: "/icon.svg", data: d }));
+});
+
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   e.waitUntil(
