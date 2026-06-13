@@ -19,6 +19,23 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
 | `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
 | `FAVORITES` | _(none)_ | JSON array of favorite projects to prefill the new-session dialog, e.g. `[{"name":"App","projectDir":"/Users/me/app","agent":"claude","mode":"full"}]`. Users can also save their own favorites locally. |
+| `CLOUD_RUNNER_URL` | _(none)_ | If set, enables **cloud** sessions: turns are proxied here instead of spawning a local CLI. The endpoint must speak the same NDJSON protocol. |
+| `CLOUD_RUNNER_TOKEN` | _(none)_ | Optional `Authorization: Bearer` token sent to the cloud runner. |
+
+## Runners: local vs cloud
+
+Each session has a **runner**:
+
+- **local** (default) — the bridge spawns the agent CLI on this machine, in the
+  session's project directory.
+- **cloud** — available only when `CLOUD_RUNNER_URL` is set. The bridge POSTs
+  `{ text, agent, mode, projectDir, sessionId, continue }` to that URL and
+  streams the response straight back to the phone. The remote runner is expected
+  to emit the same NDJSON events (`{type:"delta"|"done"|"error"}`); it runs the
+  agent on its own host, so the project directory refers to the remote machine.
+
+Pick the runner in the new-session dialog (the selector appears only when a cloud
+runner is configured).
 
 ## Agents
 

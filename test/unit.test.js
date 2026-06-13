@@ -109,6 +109,22 @@ test("parseFavorites reads valid entries and ignores junk", () => {
   assert.strictEqual(favs[1].name, "/b"); // falls back to the dir
 });
 
+test("resolveRunner: local always ok, cloud needs CLOUD_RUNNER_URL", () => {
+  const prev = process.env.CLOUD_RUNNER_URL;
+  delete process.env.CLOUD_RUNNER_URL;
+  assert.strictEqual(srv.resolveRunner(undefined), "local");
+  assert.throws(() => srv.resolveRunner("cloud"), /not configured/);
+  assert.throws(() => srv.resolveRunner("weird"), /unknown runner/);
+  process.env.CLOUD_RUNNER_URL = "http://127.0.0.1:9/";
+  assert.strictEqual(srv.resolveRunner("cloud"), "cloud");
+  if (prev === undefined) delete process.env.CLOUD_RUNNER_URL; else process.env.CLOUD_RUNNER_URL = prev;
+});
+
+test("createSession defaults runner to local and stores it", () => {
+  const s = srv.createSession({ agent: "claude", projectDir: process.cwd() });
+  assert.strictEqual(s.runner, "local");
+});
+
 test("phoneUrl prefers PUBLIC_URL and falls back to host:port", () => {
   assert.strictEqual(srv.phoneUrl({ host: "127.0.0.1", port: 8787 }), "http://127.0.0.1:8787");
   assert.strictEqual(srv.phoneUrl({ publicUrl: "https://box.ts.net/" }), "https://box.ts.net");
