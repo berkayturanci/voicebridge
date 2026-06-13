@@ -337,7 +337,9 @@ function authorized(req) {
 }
 
 function serveStatic(req, res) {
-  let rel = decodeURIComponent(req.url.split("?")[0]);
+  let rel;
+  try { rel = decodeURIComponent(req.url.split("?")[0]); }
+  catch (_) { return send(res, 400, "Bad request"); } // malformed %-encoding
   if (rel === "/") rel = "/index.html";
   const filePath = path.join(PUBLIC_DIR, rel);
   if (!filePath.startsWith(PUBLIC_DIR)) return send(res, 403, "Forbidden");
@@ -637,7 +639,8 @@ function handleRequest(req, res) {
     if (req.method === "POST" && urlPath === "/api/push/subscribe") {
       return readBody(req, 64 * 1024, (e, body) => {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
-        if (!data.subscription || !data.subscription.endpoint) return sendJson(res, 400, { error: "Bad subscription" });
+        const ep = data.subscription && data.subscription.endpoint;
+        if (typeof ep !== "string" || !/^https:\/\//i.test(ep)) return sendJson(res, 400, { error: "Bad subscription" });
         const idx = pushSubs.findIndex((s) => s.sub.endpoint === data.subscription.endpoint);
         const entry = { sub: data.subscription, sessionId: data.sessionId || null };
         if (idx >= 0) pushSubs[idx] = entry; else pushSubs.push(entry);
@@ -662,7 +665,14 @@ function handleRequest(req, res) {
 }
 
 function buildServer() {
-  return http.createServer(handleRequest);
+  // Defense in depth: never let a synchronous throw in a handler crash the process.
+  return http.createServer((req, res) => {
+    try {
+      handleRequest(req, res);
+    } catch (e) {
+      try { sendJson(res, 500, { error: "Internal error" }); } catch (_) {}
+    }
+  });
 }
 
 // The URL to open on the phone. Prefer the real public URL (e.g. the Tailscale

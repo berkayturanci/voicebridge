@@ -3,6 +3,17 @@
 All notable changes to voicebridge are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-06-13
+
+### Fixed (security)
+- A malformed percent-encoded request path (e.g. `GET /%E0%A4%A`) crashed the
+  server (an unauthenticated denial of service). The static handler now returns
+  `400`, and every request handler is wrapped so no synchronous error can take
+  the process down.
+
+### Hardened
+- `POST /api/push/subscribe` rejects non-`https` endpoints (SSRF hardening).
+
 ## [0.2.0] - 2026-06-13
 
 The "type or speak, any agent, anywhere" release.
