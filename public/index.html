@@ -498,7 +498,7 @@
   function sessionPreview(st) {
     for (let i = st.messages.length - 1; i >= 0; i--) {
       const m = st.messages[i];
-      if (m.cls === "me" || m.cls === "claude") return (m.cls === "me" ? "Sen: " : "") + (m.text || "").replace(/\s+/g, " ").slice(0, 90);
+      if ((m.cls === "me" || m.cls === "claude") && m.text) return (m.cls === "me" ? "Sen: " : "") + m.text.replace(/\s+/g, " ").slice(0, 90);
     }
     return "Henüz mesaj yok";
   }
@@ -845,6 +845,7 @@
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}
     const st = active(); if (st) { st.logEl.innerHTML = ""; st.messages = []; persistHistory(st); }
     addMsg(activeId, "Yeni sohbet başladı.", "sys");
+    settingsEl.classList.remove("open"); // reveal the fresh chat
   });
 
   sessionSel.addEventListener("change", () => switchTo(sessionSel.value));
@@ -857,7 +858,7 @@
       const r = await fetch("/api/sessions/" + activeId, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ name }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Olmadı");
-      st.meta = data.session; rebuildSessionSelect();
+      st.meta = data.session; rebuildSessionSelect(); settingsEl.classList.remove("open");
     } catch (e) { alert("⚠️ " + e.message); }
   });
   $("delSession").addEventListener("click", async () => {
@@ -870,7 +871,8 @@
       st.logEl.remove(); S.delete(activeId);
       try { localStorage.removeItem("vb_hist_" + activeId); } catch (_) {}
       activeId = defaultSessionId && S.has(defaultSessionId) ? defaultSessionId : (S.keys().next().value || null);
-      rebuildSessionSelect(); if (activeId) switchTo(activeId);
+      rebuildSessionSelect(); settingsEl.classList.remove("open");
+      if (activeId) switchTo(activeId); else showHome();
     } catch (e) { alert("⚠️ " + e.message); }
   });
   modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; prefs.mode = modeSel.value; savePrefs(); });
