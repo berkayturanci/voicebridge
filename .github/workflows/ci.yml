@@ -17,4 +17,6 @@ jobs:
           node-version: '20'
       - run: npm ci
       - run: node --check server.js
+      - run: node --check examples/cloud-runner/server.js
       - run: npm test
+      - run: npm run smoke
