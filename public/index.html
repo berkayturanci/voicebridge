@@ -150,7 +150,7 @@
   #paletteList { display: flex; flex-direction: column; gap: 3px; max-height: 52vh; overflow-y: auto; }
   #paletteList .pal-g { font-size: 11px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
   #paletteList button { text-align: left; background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; max-height: 88dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 12px; }
   .card h3 { margin: 0; font-size: 16px; }
   .card label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
   .card label.opt { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
@@ -160,7 +160,7 @@
   .card label.opt > #theme { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card input, .card select, .card textarea { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
   #ns-dir { width: 100%; resize: none; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.45; word-break: break-all; overflow-y: auto; max-height: 132px; }
-  #ns-tree { max-height: 190px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  #ns-tree { max-height: 38vh; max-height: 34dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
   #ns-tree .cur { font-size: 11px; color: var(--muted); padding: 2px 4px; word-break: break-all; }
   #ns-tree button { text-align: left; background: none; border: none; color: var(--text); padding: 7px 8px; border-radius: 6px; font-size: 14px; overflow-wrap: anywhere; word-break: break-word; }
   #ns-tree button.up { color: var(--accent); }
@@ -680,7 +680,17 @@
     const vs = voicesFor(want);
     const name = (prefs.voices || {})[want];
     if (name) { const v = vs.find((x) => x.name === name); if (v) return v; }
-    return vs[0] || null;
+    // Auto-pick the most natural-sounding voice: prefer enhanced/premium/neural/Siri
+    // over the robotic "compact" default; network voices tend to sound better too.
+    const score = (v) => {
+      const n = (v.name || "").toLowerCase();
+      let s = 0;
+      if (/premium|enhanced|neural|siri|natural/.test(n)) s += 3;
+      if (/compact/.test(n)) s -= 2;
+      if (v.localService === false) s += 1;
+      return s;
+    };
+    return vs.slice().sort((a, b) => score(b) - score(a))[0] || null;
   }
   function populateVoices() {
     const want = langKey();
@@ -767,6 +777,7 @@
       if (sessionId === activeId) refreshMic();
       if (!talking && !st.turn.stopped && handsfree.checked && CONFIG.sttMode === "browser" && sessionId === activeId) startBrowserSTT();
     }
+    return full;
   }
 
   function emptyReplyHint(agent) {
@@ -925,8 +936,10 @@
   async function talkTurn(text) {
     setTalkState("thinking", "Düşünüyor…"); talkHeard.textContent = text;
     addMsg(activeId, text, "me");
-    await ask(activeId, text);
+    const reply = await ask(activeId, text);
     if (!talking) return;
+    // empty reply (e.g. Antigravity flakiness): say so out loud instead of silently re-listening
+    if (!reply || !reply.trim()) { feedSpeech("Cevap alınamadı, tekrar söyler misin?"); flushSpeech(); }
     setTalkState("speaking", "Konuşuyor… (kesmek için dokun)");
     await new Promise((res) => { const t = setInterval(() => { if (!talking || (!speaking && !speakQueue.length)) { clearInterval(t); res(); } }, 200); });
     if (talking) startTalkListen();
