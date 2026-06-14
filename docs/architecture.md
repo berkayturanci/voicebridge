@@ -92,6 +92,8 @@ session is recreated on boot).
 | `POST /api/ask` | Stream a turn `{ text, sessionId, mode?, reset? }` → NDJSON. |
 | `POST /api/reset` | Forget a session's conversation `{ sessionId }`. |
 | `POST /api/stt` | Whisper mode only: transcribe uploaded audio. |
+| `GET /api/ollama/models` | List models from the configured Ollama server (`OLLAMA_URL`). |
+| `POST /api/push/subscribe` | Register a Web Push subscription (https endpoints only). |
 
-All `/api/*` routes except `/api/config` require the access token when
-`ACCESS_TOKEN` is set.
+All `/api/*` routes except `/api/config` and `/api/health` require the access
+token when `ACCESS_TOKEN` is set.

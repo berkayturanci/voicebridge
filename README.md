@@ -205,6 +205,8 @@ transcribes). Hands-free loop is browser-mode only.
   finishes in the background or ends with a question — so a hands-free task
   pulls you back when it needs you. With VAPID keys configured it uses **real
   Web Push** (works even when the app is closed); otherwise in-page notifications.
+- **Rich replies**: full markdown (headings, lists, http(s)-only links) with
+  code blocks (copy button) and **diff coloring** for ` ```diff ` blocks.
 - **Activity trail & collapsible output**: tool use shows a subtle running log
   (e.g. `⚙︎ Edit server.js`), and long output blocks (npm logs, etc.) collapse by
   default with a show-more toggle so the conversation stays readable.

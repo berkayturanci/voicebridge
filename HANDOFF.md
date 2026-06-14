@@ -1,23 +1,24 @@
 # voicebridge — Devir / Handoff Notu
 
-> Bu dosyayı yeni Claude Code oturumunun **ilk mesajına yapıştır** (ya da repoya
-> `HANDOFF.md` olarak koy ve "HANDOFF.md'yi oku ve devam et" de). Amaç: yeni
-> oturumdaki Claude, önceki oturumun tüm bağlamıyla kaldığı yerden devam etsin.
+> Bu dosyayı yeni Claude Code oturumunun **ilk mesajına yapıştır** (ya da repoda
+> dururken "HANDOFF.md'yi oku ve devam et" de). Amaç: yeni oturumdaki Claude,
+> önceki oturumun tüm bağlamıyla kaldığı yerden devam etsin.
 
 ---
 
 ## 1. Proje nedir
 
-**voicebridge** — telefondan, **çift yönlü sesle** Claude Code kullanmayı sağlayan
-bedava/açık kaynak köprü. Sen konuşursun, Claude Code (Mac'inde) çalışır, cevabı
-**sesli** geri okunur. ElevenLabs yok, dakika limiti yok.
+**voicebridge** — telefondan (ve artık native uygulamalardan), **çift yönlü
+sesle** kodlama ajanlarını (Claude Code, Codex, Antigravity, Ollama) kullanmayı
+sağlayan bedava/açık kaynak köprü. Sen konuşursun, ajan senin makinende çalışır,
+cevabı **sesli** geri okunur. ElevenLabs yok, dakika limiti yok.
 
-- Konuşma tanıma (STT) ve seslendirme (TTS) **telefon tarayıcısında** çalışır (Web Speech API).
-- Küçük, **sıfır bağımlılık** Node köprüsü `claude` CLI'ı headless çağırır ve cevabı **stream** eder.
+- STT/TTS **telefon tarayıcısında** (Web Speech) ya da **native** (Flutter) çalışır.
+- Küçük, **sıfır bağımlılık** Node köprüsü ajan CLI'ını headless çağırır ve cevabı **stream** eder.
 - Telefona **Tailscale HTTPS** ile ulaşılır; opsiyonel **erişim token'ı** vardır.
 
 **Repo:** https://github.com/berkayturanci/speak-with-claude-code
-**Lisans:** MIT · **Sahip:** berkayturanci
+**Lisans:** MIT · **Sahip:** berkayturanci · **Sürüm:** 0.4.0
 
 ---
 
@@ -26,92 +27,87 @@ bedava/açık kaynak köprü. Sen konuşursun, Claude Code (Mac'inde) çalışı
 Dosya yapısı:
 ```
 speak-with-claude-code/
-├── server.js            # zero-dep Node köprü (HTTP + claude headless + stream + STT + auth)
-├── public/index.html    # tek dosya web arayüzü (mic, TTS, streaming, dil, eller-serbest)
-├── package.json
-├── README.md
-├── LICENSE              # MIT
-└── .gitignore
+├── server.js              # zero-dep Node köprü (HTTP + ajan adapter'ları + stream + STT + auth)
+├── public/                # web arayüzü (PWA): index.html, sw.js, manifest, icon
+├── app/                   # native Flutter istemcisi (iOS/Android/macOS/Windows/Linux)
+├── desktop/               # Electron masaüstü app (Mac .dmg / Windows / Linux) — köprüyü çalıştırır
+├── examples/cloud-runner/ # referans cloud runner (uzak host'ta ajan)
+├── docs/                  # architecture / configuration / security
+├── test/                  # node:test suite (69 test) + smoke
+├── README.md · CHANGELOG.md · LICENSE (MIT)
 ```
 
-Çalışan özellikler (hepsi offline stub'larla doğrulandı):
-- ✅ **Web Speech STT/TTS** (Türkçe + İngilizce), eller-serbest döngü
-- ✅ **Streaming cevap:** `claude --output-format stream-json` → NDJSON → tarayıcı
-  **cümle cümle** seslendirir
-- ✅ **Yerel Whisper STT** (opsiyonel): `STT_MODE=whisper` + `STT_CMD` → MediaRecorder
-  → `/api/stt` → kendi Whisper komutun (ses Apple'a gitmez)
-- ✅ **Token koruması:** `ACCESS_TOKEN` ayarlıysa `/api/*` için `Bearer` zorunlu (401 testleri geçti)
+Çalışan özellikler (köprü tarafı testlerle, web tarafı DOM-shim testleriyle doğrulandı):
+- ✅ **Çoklu ajan**: Claude Code, Codex, Antigravity, **Ollama** (HTTP API) — adapter katmanı
+- ✅ **Çoklu oturum**: paralel sohbetler, oturum listesi ana ekran, yeniden adlandır/sil, geçmiş kalıcı
+- ✅ **Talking modu**: sürekli sesli konuşma (sessizlikte otomatik gönder → sesli cevap → tekrar dinle), **ayarlanabilir sessizlik + dokun-kes barge-in**
+- ✅ **Yaz ya da konuş**: streaming cevap, **tam markdown** (başlık/liste/link) + **diff renklendirme** + kod kopyala + katlanır uzun çıktı
+- ✅ **Komut paleti** (`.claude/commands` + npm scripts), **klasör gezgini** (yerel + cloud uzak host)
+- ✅ **Login**: `ACCESS_TOKEN` ayarlıysa gerçek doğrulamalı giriş ekranı (web + native)
+- ✅ **Bildirimler**: Web Push (VAPID) / sayfa-içi; arka planda biten veya soru soran turda uyarır
+- ✅ **Yerel Whisper STT** (opsiyonel, `STT_MODE=whisper`): ses üçüncü tarafa gitmez
+- ✅ **Native Flutter app** (`app/`): oturum listesi, streaming, talking modu, geçmiş, palet, gözat
+- ✅ **Electron masaüstü app** (`desktop/`): kontrol paneli (başlat/durdur, port/token, QR, canlı log) + agent/oturum panosu + tray
+- ✅ **PWA**: manifest + service worker; **cloud runner** ile uzak host'ta çalıştırma
 
-Env değişkenleri: `PORT` (8787), `HOST` (127.0.0.1), `PROJECT_DIR`, `CLAUDE_BIN`,
-`ACCESS_TOKEN`, `STT_MODE` (browser|whisper), `STT_CMD`.
+Env: `PORT` (8787), `HOST` (127.0.0.1), `DEFAULT_PROJECT_DIR`, `*_BIN`,
+`ACCESS_TOKEN`, `STT_MODE`, `STT_CMD`, `CLOUD_RUNNER_URL`/`_TOKEN`, `OLLAMA_URL`,
+`MAX_SESSIONS`, `MAX_INFLIGHT`, VAPID anahtarları, `FAVORITES`, `SESSIONS_FILE`.
 
-API: `GET /api/config` · `POST /api/ask` (stream) · `POST /api/stt` · `POST /api/reset`.
+API (tam liste için `docs/architecture.md`): `GET /api/health|config|sessions|browse|commands|ollama/models`,
+`POST /api/ask` (NDJSON stream) `|sessions|reset|stt|push/subscribe`, `DELETE /api/sessions/:id`.
 
 ---
 
-## 3. Mimari (ve dürüst sınırlar)
+## 3. Mimari (iki parça)
 
 ```
-[iPhone Safari] mic → Web Speech STT → metin
-   → (Tailscale HTTPS) → [Mac köprü] → claude -p --continue (stream-json)
-   → speechSynthesis (Yelda) → telefon hoparlörü 🔊
+İSTEMCİ (bağlanılan)                    HOST (ajanın çalıştığı makine)
+  PWA (her tarayıcı)        ──┐
+  Flutter app (iOS/Android) ──┼─ (Tailscale HTTPS + token) ─→  Node köprü (server.js)
+  Flutter desktop (mac/win) ──┤                                  → ajan CLI / Ollama HTTP
+  web                       ──┘                                  → NDJSON stream geri
+                                          Electron app = köprüyü GUI ile çalıştırır
 ```
 
-Bilinmesi gerekenler:
-- Claude **modeli** yine Anthropic bulutunda (Claude Code böyle çalışır); biz sadece
-  **ses aracısını ve limitini** kaldırdık.
-- iOS'ta **kurulu PWA mikrofona erişemez** → Safari **sekmesi** olarak açılmalı.
-- Web Speech **STT** sesi Apple'a gönderir (bedava, yerel değil). Tam yerel istersen `STT_MODE=whisper`.
-- Web Speech **TTS** tamamen cihazda (Türkçe Yelda dahil).
-- Web Speech için **HTTPS şart** → `tailscale serve` gerçek sertifika verir.
+Bilinmesi gerekenler (dürüst sınırlar):
+- Ajan **modeli** yine sağlayıcının bulutunda; biz **ses aracısını ve limitini** kaldırdık.
+- iOS'ta **kurulu PWA mikrofona erişemez** → Safari **sekmesi**; ya da **native app** (native mic) kullan.
+- Web Speech **STT** sesi tarayıcı sağlayıcısına yollar (bedava). Tam yerel → `STT_MODE=whisper`.
+- Web Speech için **HTTPS şart** → `tailscale serve --bg 8787`.
+- **Electron/Flutter bu repo CI'ında derlenmez** (toolchain yok). Kod köprü
+  sözleşmesine yazıldı, `node --check` + DOM-shim testleri + köprü env doğrulamasından
+  geçti. Gerçek `.dmg`/`.ipa`/`.apk` için kendi Mac/Xcode + Flutter/Electron ortamın gerekir.
 
 ---
 
-## 4. Kalan adımlar / yapılacaklar
+## 4. Kalan adımlar / fikirler (roadmap)
 
-### A) Kodu repoya koymak
-Eğer repo henüz boşsa, Mac'te:
-```bash
-tar -xzf voicebridge.tar.gz   # ya da mevcut voicebridge/ klasörü
-cd voicebridge
-git init && git add -A && git commit -m "voicebridge: voice for Claude Code"
-git branch -M main
-git remote add origin https://github.com/berkayturanci/speak-with-claude-code.git
-git push -u origin main        # reddedilirse: git pull --rebase origin main && git push
-```
-> Yeni oturumdaki Claude, repo kapsamdaysa bunu **kendisi de pushlayabilir**
-> (`push_files` ile). Ona "voicebridge dosyalarını bu repoya koy" demen yeter.
-
-### B) Repoyu public yap (açık kaynak paylaşımı için)
-GitHub → repo → Settings → General → Danger Zone → **Change visibility → Public**.
-
-### C) Sıradaki özellik fikirleri (roadmap)
-- [ ] Streaming sırasında **"Dur"** butonu (konuşmayı/talebi iptal)
-- [ ] Telefonda **QR ile hızlı açma** (terminalde URL'yi QR olarak bas)
-- [ ] README'ye **ekran görüntüsü / GIF**
+İlk roadmap'in tamamı bitti (Dur butonu, QR, çoklu oturum, PWA, …). Açık fikirler:
+- [ ] Flutter sohbetinde **markdown/diff** render (şu an düz metin)
+- [ ] Talking modunda **gerçek barge-in** (TTS çalarken dinleme; yankı yönetimi gerekli)
+- [ ] Gerçek **store/installer build'leri** (Mac'te `flutter build` / `electron-builder`)
 - [ ] Tam-yerel STT'yi **WebSocket streaming** ile (whisper.cpp canlı)
-- [ ] `--session-id` ile çoklu/izole oturum
-- [ ] Basit bir **PWA manifest** + ikon (ama iOS mic için yine Safari sekmesi gerekir)
+- [ ] Çoklu kullanıcı / kalıcı kimlik (şu an tek token tabanlı)
 
----
+## 5. Çalıştırma
 
-## 5. Yeni oturum için açılış komutu (kopyala-yapıştır)
+```bash
+# Köprü (host makine):
+PORT=8787 npm start            # http://127.0.0.1:8787  (QR basar)
+tailscale serve --bg 8787      # telefon için HTTPS
 
-> Yeni Claude Code oturumunu **`speak-with-claude-code`** reposuyla başlat, sonra:
+# Testler:
+npm test                       # 69 test
+npm run smoke                  # uçtan uca duman testi
 
+# Native app (Mac/Flutter ortamı):  cd app && flutter create . && flutter run
+# Masaüstü app:                     cd desktop && npm install && npm start
 ```
-Bu repo "voicebridge": telefondan çift yönlü sesle Claude Code kullanmayı sağlayan
-bedava/açık kaynak bir köprü. HANDOFF.md'deki bağlamı esas al. Şu an istediğim:
-1) (gerekiyorsa) voicebridge dosyalarını repoya pushla,
-2) roadmap'teki "Dur butonu" ve "QR ile açma" özelliklerini ekle,
-3) README'ye kısa bir kullanım GIF/ekran görüntüsü yer tut.
-Değişiklikleri ayrı bir dalda yapıp PR aç.
-```
 
----
-
-## 6. Önceki oturumda netleşen kararlar
+## 6. Önceki oturumlarda netleşen kararlar
 - Hedef: **min maliyet + min efor + çalışsın** → ElevenLabs'e bağımlı olma.
-- STT yolu: **Apple (bedava, kolay)** seçildi; yerel Whisper opsiyonel bırakıldı.
-- Repo: **ai-jury'den ayrı**, yeni repo (`speak-with-claude-code`).
-- Kod gizliliği önemli → Tailscale ile **üçüncü taraf relay yok**, opsiyonel token var.
+- Köprü **sıfır bağımlılık** kalsın; istemciler (Flutter/Electron) ayrı klasörlerde kendi bağımlılıklarıyla.
+- Kod gizliliği → Tailscale ile **üçüncü taraf relay yok**, opsiyonel token + login.
+- PWA **sıfır-kurulum** seçeneği kalsın; native app **güvenilir ses** için yol.
+- Geliştirme akışı: değişiklikleri **ayrı dalda** yap, **PR aç ve merge et**, testler yeşil kalsın.

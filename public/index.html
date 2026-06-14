@@ -494,7 +494,7 @@
   // A <pre> for a code block; diffs get +/- line coloring.
   function buildPre(code, lang) {
     const pre = document.createElement("pre");
-    if (lang === "diff" || looksLikeDiff(code)) {
+    if (lang === "diff" || (!lang && looksLikeDiff(code))) { // auto-detect only when untagged (avoid bash/js false positives)
       code.replace(/\n$/, "").split("\n").forEach((line, i) => {
         const span = document.createElement("span");
         if (/^\+/.test(line)) span.className = "add";

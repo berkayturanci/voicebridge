@@ -470,7 +470,9 @@ function serveStatic(req, res) {
   catch (_) { return send(res, 400, "Bad request"); } // malformed %-encoding
   if (rel === "/") rel = "/index.html";
   const filePath = path.join(PUBLIC_DIR, rel);
-  if (!filePath.startsWith(PUBLIC_DIR)) return send(res, 403, "Forbidden");
+  // Must stay inside PUBLIC_DIR. Compare with a trailing separator so a sibling
+  // dir whose name merely starts with PUBLIC_DIR (e.g. "public-x") can't slip by.
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) return send(res, 403, "Forbidden");
   fs.readFile(filePath, (err, data) => {
     if (err) return send(res, 404, "Not found");
     const ext = path.extname(filePath).toLowerCase();
