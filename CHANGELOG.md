@@ -3,6 +3,30 @@
 All notable changes to voicebridge are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-06-14
+
+The "native apps + desktop + richer chat" release.
+
+### Added
+- **Native mobile/desktop app (Flutter)** in [`app/`](app/) — iOS, Android, and
+  macOS/Windows/Linux from one codebase. Native mic (`speech_to_text`) + TTS
+  (`flutter_tts`) so voice works as an installed app (no iOS Safari-tab caveat).
+  Session list, streaming chat, talking mode, **persisted history**, **command
+  palette** (`/api/commands`), and a **folder browser** (`/api/browse`).
+- **Desktop app (Electron)** in [`desktop/`](desktop/) — a Mac `.dmg` / Windows /
+  Linux app that runs the bridge with a control panel (start/stop, port/host/
+  token, open web UI, **live log + phone QR**) and a **live dashboard** of agents
+  and active sessions, plus a tray icon. `electron-builder` bundles the bridge so
+  the install is self-contained.
+- **Login screen** (web + native) with real token validation against an authed
+  endpoint, replacing the `prompt()` flow; re-prompts on a 401.
+- **Richer replies** — full markdown (headings, bullet/numbered lists,
+  blockquotes, http(s)-only links) and **diff coloring** for ` ```diff ` blocks.
+- **Talking mode** — a tunable auto-send silence (0.6–2.5s) and **tap-to-interrupt**
+  (barge-in) on the orb while it's speaking.
+- Remote **folder browser** for cloud sessions (bridge proxies the runner's
+  `GET /browse`).
+
 ## [0.3.0] - 2026-06-13
 
 The "talk to it like a person, on your phone" release.
