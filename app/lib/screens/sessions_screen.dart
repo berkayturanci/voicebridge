@@ -175,6 +175,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   final _name = TextEditingController();
   String? _agent;
   String? _mode;
+  String _projectDir = '';
   bool _busy = false;
 
   List<dynamic> get _modes {
@@ -192,6 +193,15 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
     }
   }
 
+  Future<void> _browse() async {
+    final picked = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => _BrowseScreen(api: widget.api, start: _projectDir)),
+    );
+    if (picked != null) setState(() => _projectDir = picked);
+  }
+
   Future<void> _submit() async {
     setState(() => _busy = true);
     try {
@@ -199,6 +209,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         name: _name.text.trim().isEmpty ? 'Yeni sohbet' : _name.text.trim(),
         agent: _agent ?? 'claude',
         mode: _mode ?? '',
+        projectDir: _projectDir.isEmpty ? null : _projectDir,
       );
       if (mounted) Navigator.pop(context, s);
     } catch (e) {
@@ -263,6 +274,19 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
             ],
             onChanged: (v) => setState(() => _mode = v),
           ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _busy ? null : _browse,
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Proje klasörü',
+                border: OutlineInputBorder(),
+                suffixIcon: Icon(Icons.folder_open),
+              ),
+              child: Text(_projectDir.isEmpty ? '(varsayılan)' : _projectDir,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _busy ? null : _submit,
@@ -270,6 +294,92 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A simple folder browser backed by GET /api/browse. Tap a folder to descend,
+/// use ⬆ for the parent, and "Bu klasörü seç" to return the current path.
+class _BrowseScreen extends StatefulWidget {
+  final Api api;
+  final String start;
+  const _BrowseScreen({required this.api, required this.start});
+
+  @override
+  State<_BrowseScreen> createState() => _BrowseScreenState();
+}
+
+class _BrowseScreenState extends State<_BrowseScreen> {
+  String _path = '';
+  String? _parent;
+  List<String> _dirs = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(widget.start.isEmpty ? null : widget.start);
+  }
+
+  Future<void> _load(String? path) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await widget.api.browse(path);
+      setState(() {
+        _path = (data['path'] ?? '') as String;
+        _parent = data['parent'] as String?;
+        _dirs = ((data['dirs'] as List?) ?? const []).cast<String>();
+      });
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _join(String dir) => _path.endsWith('/') ? '$_path$dir' : '$_path/$dir';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_path.isEmpty ? 'Klasör seç' : _path,
+            style: const TextStyle(fontSize: 14)),
+        actions: [
+          if (_parent != null)
+            IconButton(
+                onPressed: () => _load(_parent),
+                icon: const Icon(Icons.arrow_upward)),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _path.isEmpty ? null : () => Navigator.pop(context, _path),
+        icon: const Icon(Icons.check),
+        label: const Text('Bu klasörü seç'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text('⚠️ $_error'))
+              : ListView(
+                  children: [
+                    for (final d in _dirs)
+                      ListTile(
+                        leading: const Icon(Icons.folder),
+                        title: Text(d),
+                        onTap: () => _load(_join(d)),
+                      ),
+                    if (_dirs.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: Text('Alt klasör yok')),
+                      ),
+                  ],
+                ),
     );
   }
 }
