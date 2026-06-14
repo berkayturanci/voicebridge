@@ -73,6 +73,25 @@ commands you trust.
 - **Injection-safe**: prompts go to agents as a separate argv element (Claude) or
   on stdin (Codex/Antigravity/Ollama) — never through a shell.
 - **Push**: only `https` subscription endpoints are accepted.
+- **Static files**: requests are confined to `public/` — the resolved path must
+  sit under it (separator-aware, so a sibling like `public-x` can't be reached),
+  and traversal attempts return `403`/`404` without leaking source.
+- **Token comparison** is constant-time (`crypto.timingSafeEqual`).
+
+## Audit notes (trust model)
+
+- `/api/*` (except `/api/health` and `/api/config`) require the access token when
+  `ACCESS_TOKEN` is set; **set a token whenever the bridge is reachable beyond
+  loopback.** A holder of the token is trusted — they can drive the agent, and
+  `/api/browse` lists directory **names** anywhere readable by the server process
+  (a folder picker; it does not read file contents).
+- The page ships inline scripts, so the CSP allows `script-src 'unsafe-inline'`.
+  This is low-risk here because replies are rendered as DOM nodes (never
+  `innerHTML` with model/user text) and `connect-src` is `'self'`, so an injected
+  string has no HTML sink and nowhere to exfiltrate to.
+- Whisper STT runs the operator-provided `STT_CMD` via a shell with a
+  server-generated temp path — the template and path are operator/server
+  controlled, not client input.
 
 ## Reporting
 
