@@ -3,6 +3,25 @@
 All notable changes to voicebridge are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Talking mode — mute** 🎙️: a mic toggle (top-left of the talking screen)
+  pauses listening without leaving the conversation; tap the orb or 🎙️ to resume.
+- **Voice-reactive orb**: while listening, the orb grows and glows as your speech
+  is picked up, with a gentle idle breathing when you're quiet.
+
+### Fixed
+- **Replies now speak on iOS.** `speechSynthesis` is primed inside the first user
+  gesture, so streamed replies are no longer silently blocked by Safari.
+- **The mic no longer lingers "in use."** Speech recognizers are released
+  (`abort()` + dropped) when idle, on mute/exit, when hands-free is turned off,
+  and when the tab is backgrounded — so iOS stops showing the mic as active when
+  nothing is listening.
+- **Long text fits on mobile.** The new-session project-path field now wraps (it
+  was cut off at the right edge), and the talking-mode transcript, activity/system
+  lines, and folder-browser names break long URLs/paths instead of overflowing.
+
 ## [0.4.0] - 2026-06-14
 
 The "native apps + desktop + richer chat" release.

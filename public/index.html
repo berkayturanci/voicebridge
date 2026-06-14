@@ -6,8 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#0d1117" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="apple-touch-icon" href="/icon.svg" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <title>voicebridge</title>
 <script>
   // Apply the saved theme before first paint to avoid a flash.
@@ -81,21 +83,21 @@
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
   .copybtn { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); opacity: .85; }
-  .sys { align-self: center; color: var(--muted); font-size: 13px; text-align: center; }
-  .act { align-self: flex-start; color: var(--muted); font-size: 12px; font-style: italic; opacity: .85; padding: 0 4px; }
+  .sys { align-self: center; color: var(--muted); font-size: 13px; text-align: center; max-width: 92%; overflow-wrap: anywhere; }
+  .act { align-self: flex-start; color: var(--muted); font-size: 12px; font-style: italic; opacity: .85; padding: 0 4px; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
 
   footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); flex: none; display: flex; flex-direction: column; gap: 9px; }
   #status { text-align: center; min-height: 18px; font-size: 12px; color: var(--muted); }
   .chips { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
   .chip { flex: none; padding: 6px 11px; border-radius: 16px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 13px; white-space: nowrap; }
   .chip:disabled { opacity: .4; }
-  .composer { display: flex; align-items: flex-end; gap: 8px; }
+  .composer { display: flex; align-items: flex-end; gap: 6px; }
   #composer {
     flex: 1; resize: none; min-height: 44px; max-height: 140px; padding: 11px 12px;
     background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 12px;
     font: inherit; font-size: 16px; line-height: 1.3;
   }
-  .iconbtn { flex: none; width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 21px; color: #fff; }
+  .iconbtn { flex: none; width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 20px; color: #fff; }
   #send { background: var(--accent); }
   #send:disabled { opacity: .4; }
   #mic { background: var(--green); transition: transform .1s, background .2s; }
@@ -129,13 +131,16 @@
   #talk { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 20; padding: 24px; }
   #talk.open { display: flex; }
   #talk #talkExit { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 16px; }
+  #talk #talkMute { position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 17px; }
+  #talk #talkMute.on { background: #da3633; border-color: #da3633; color: #fff; }
   #talk .orb { width: 150px; height: 150px; border-radius: 50%; background: var(--green); transition: background .3s; }
-  #talk .orb.listening { background: #3fb950; animation: orbpulse 1.6s infinite; }
+  #talk .orb.listening { background: #3fb950; will-change: transform, box-shadow; }
   #talk .orb.thinking { background: #9e6a03; animation: orbpulse 1s infinite; }
   #talk .orb.speaking { background: var(--accent); animation: orbpulse 1.1s infinite; cursor: pointer; }
+  #talk .orb.muted { background: var(--muted); animation: none; box-shadow: none; cursor: pointer; opacity: .8; }
   @keyframes orbpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,.45); transform: scale(1); } 50% { box-shadow: 0 0 0 26px rgba(63,185,80,0); transform: scale(1.04); } }
   #talkState { font-size: 19px; font-weight: 600; }
-  #talkHeard { font-size: 16px; color: var(--muted); text-align: center; min-height: 44px; max-width: 92%; }
+  #talkHeard { font-size: 16px; color: var(--muted); text-align: center; min-height: 44px; max-width: 92%; overflow-wrap: anywhere; word-break: break-word; }
   #talkHint { font-size: 12px; color: var(--muted); text-align: center; max-width: 80%; }
   #modal, #settings, #palette { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   #modal.open, #settings.open, #palette.open { display: flex; }
@@ -145,7 +150,7 @@
   #paletteList { display: flex; flex-direction: column; gap: 3px; max-height: 52vh; overflow-y: auto; }
   #paletteList .pal-g { font-size: 11px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
   #paletteList button { text-align: left; background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; max-height: 88dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 12px; }
   .card h3 { margin: 0; font-size: 16px; }
   .card label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
   .card label.opt { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
@@ -153,10 +158,11 @@
   .card .srow { display: flex; align-items: center; justify-content: space-between; }
   .card .srow button { background: none; border: none; color: var(--muted); font-size: 18px; }
   .card label.opt > #theme { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
-  .card input, .card select { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
-  #ns-tree { max-height: 190px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  .card input, .card select, .card textarea { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
+  #ns-dir { width: 100%; resize: none; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.45; word-break: break-all; overflow-y: auto; max-height: 132px; }
+  #ns-tree { max-height: 38vh; max-height: 34dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
   #ns-tree .cur { font-size: 11px; color: var(--muted); padding: 2px 4px; word-break: break-all; }
-  #ns-tree button { text-align: left; background: none; border: none; color: var(--text); padding: 7px 8px; border-radius: 6px; font-size: 14px; }
+  #ns-tree button { text-align: left; background: none; border: none; color: var(--text); padding: 7px 8px; border-radius: 6px; font-size: 14px; overflow-wrap: anywhere; word-break: break-word; }
   #ns-tree button.up { color: var(--accent); }
   #ns-browse { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
@@ -183,7 +189,7 @@
     <div id="status"></div>
     <div class="chips" id="chips"></div>
     <div class="composer">
-      <textarea id="composer" rows="1" placeholder="Yaz ya da 🎤 ile konuş…" enterkeyhint="send"></textarea>
+      <textarea id="composer" rows="1" placeholder="Yaz ya da konuş…" enterkeyhint="send"></textarea>
       <button id="cmdBtn" class="iconbtn" aria-label="Komutlar" title="Komutlar">⌘</button>
       <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
@@ -210,10 +216,11 @@
 
   <div id="talk">
     <button id="talkExit" aria-label="Bitir">✕</button>
+    <button id="talkMute" aria-label="Mikrofonu sessize al">🎙️</button>
     <div class="orb" id="talkOrb"></div>
     <div id="talkState">Hazır</div>
     <div id="talkHeard"></div>
-    <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler.</div>
+    <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler. Sol üstteki 🎙️ ile mikrofonu geçici sessize alabilirsin.</div>
   </div>
 
   <div id="palette">
@@ -264,7 +271,7 @@
       <label id="ns-omodel-row" style="display:none">Ollama model <select id="ns-omodel"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
       <label class="opt">Proje klasörü <button id="ns-browse" type="button">📁 Gözat</button></label>
-      <input id="ns-dir" placeholder="/Users/you/project" />
+      <textarea id="ns-dir" rows="2" placeholder="/Users/you/project"></textarea>
       <div id="ns-tree" style="display:none"></div>
       <div class="row">
         <button id="ns-save">★ Kaydet</button>
@@ -316,11 +323,15 @@
 
   // ---------- Eyes-free audio cues (WebAudio earcons) ----------
   const cuesOn = () => prefs.cues !== false; // default on
-  let actx = null;
+  let actx = null, ttsPrimed = false;
   function ensureAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!actx && AC) actx = new AC();
     if (actx && actx.state === "suspended") actx.resume();
+    // iOS/Safari block speechSynthesis until it's first kicked off inside a user gesture.
+    if (!ttsPrimed && "speechSynthesis" in window) {
+      try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); ttsPrimed = true; } catch (_) {}
+    }
   }
   function tone(freq, startAt, dur, gain) {
     if (!actx) return;
@@ -669,7 +680,17 @@
     const vs = voicesFor(want);
     const name = (prefs.voices || {})[want];
     if (name) { const v = vs.find((x) => x.name === name); if (v) return v; }
-    return vs[0] || null;
+    // Auto-pick the most natural-sounding voice: prefer enhanced/premium/neural/Siri
+    // over the robotic "compact" default; network voices tend to sound better too.
+    const score = (v) => {
+      const n = (v.name || "").toLowerCase();
+      let s = 0;
+      if (/premium|enhanced|neural|siri|natural/.test(n)) s += 3;
+      if (/compact/.test(n)) s -= 2;
+      if (v.localService === false) s += 1;
+      return s;
+    };
+    return vs.slice().sort((a, b) => score(b) - score(a))[0] || null;
   }
   function populateVoices() {
     const want = langKey();
@@ -756,6 +777,7 @@
       if (sessionId === activeId) refreshMic();
       if (!talking && !st.turn.stopped && handsfree.checked && CONFIG.sttMode === "browser" && sessionId === activeId) startBrowserSTT();
     }
+    return full;
   }
 
   function emptyReplyHint(agent) {
@@ -810,12 +832,12 @@
     rec = new SR();
     rec.lang = langSel.value; rec.interimResults = false; rec.maxAlternatives = 1;
     rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Dinliyorum…"); cue("listen"); };
-    rec.onerror = (e) => { recognizing = false; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
-    rec.onend = () => { recognizing = false; refreshMic(); };
+    rec.onerror = (e) => { recognizing = false; rec = null; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
+    rec.onend = () => { recognizing = false; rec = null; refreshMic(); }; // drop the recognizer so iOS releases the mic
     rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) { addMsg(activeId, t, "me"); ask(activeId, t); } };
     try { rec.start(); } catch (_) {}
   }
-  function stopBrowserSTT() { if (rec && recognizing) rec.stop(); }
+  function stopBrowserSTT() { if (rec) { try { rec.onend = null; rec.onresult = null; rec.abort(); } catch (_) {} rec = null; } recognizing = false; refreshMic(); }
 
   // ---------- Whisper recording ----------
   let mediaRec = null, chunks = [];
@@ -853,26 +875,41 @@
   });
 
   // ---------- Talking mode: continuous, hands-free voice conversation ----------
-  const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard");
-  let talking = false, trec = null, talkFinal = "", talkSilence = null;
+  const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard"), muteBtn = $("talkMute");
+  let talking = false, trec = null, talkFinal = "", talkSilence = null, talkMuted = false;
   function setTalkState(s, label) { talkOrb.className = "orb " + s; talkStateEl.textContent = label; }
+  // Voice-reactive orb: grows + glows as your speech is picked up; gentle idle breathing otherwise.
+  let orbLevel = 0, orbRAF = 0;
+  function orbTick(ts) {
+    orbRAF = requestAnimationFrame(orbTick);
+    orbLevel *= 0.86;
+    const idle = 0.5 + 0.5 * Math.sin((ts || 0) / 700);
+    const lvl = Math.max(orbLevel, idle * 0.12);
+    talkOrb.style.transform = "scale(" + (1 + lvl * 0.22).toFixed(3) + ")";
+    talkOrb.style.boxShadow = "0 0 " + Math.round(14 + lvl * 52) + "px rgba(63,185,80," + (0.18 + lvl * 0.32).toFixed(2) + ")";
+  }
+  function orbMeterStart() { if (!orbRAF) orbRAF = requestAnimationFrame(orbTick); }
+  function orbMeterStop() { if (orbRAF) cancelAnimationFrame(orbRAF); orbRAF = 0; orbLevel = 0; talkOrb.style.transform = ""; talkOrb.style.boxShadow = ""; }
+  function orbBump() { orbLevel = Math.min(1, orbLevel + 0.55); }
   function enterTalking() {
     if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
     ensureToken(); ensureAudio();
     talking = true; talkEl.classList.add("open"); talkHeard.textContent = "";
+    talkMuted = false; muteBtn.classList.remove("on"); muteBtn.textContent = "🎙️"; muteBtn.setAttribute("aria-label", "Mikrofonu sessize al");
     startTalkListen();
   }
   function exitTalking() {
-    talking = false;
-    clearTimeout(talkSilence);
-    if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
+    talking = false; talkMuted = false;
+    clearTimeout(talkSilence); orbMeterStop();
+    if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
     talkEl.classList.remove("open");
   }
   function startTalkListen() {
     if (!talking) return;
-    talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = "";
+    if (talkMuted) { setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)"); talkHeard.textContent = ""; return; }
+    talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = ""; orbMeterStart();
     trec = new SR();
     trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
     trec.onresult = (ev) => {
@@ -881,7 +918,7 @@
         const r = ev.results[i];
         if (r.isFinal) talkFinal += r[0].transcript; else interim += r[0].transcript;
       }
-      talkHeard.textContent = (talkFinal + " " + interim).trim();
+      talkHeard.textContent = (talkFinal + " " + interim).trim(); orbBump();
       clearTimeout(talkSilence);
       talkSilence = setTimeout(onTalkSilence, talkSilenceMs());
     };
@@ -893,27 +930,56 @@
     const text = talkFinal.trim();
     if (!text) return; // nothing heard yet; keep listening
     if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; } // pause during the turn (no TTS feedback)
+    orbMeterStop();
     talkTurn(text);
   }
   async function talkTurn(text) {
     setTalkState("thinking", "Düşünüyor…"); talkHeard.textContent = text;
     addMsg(activeId, text, "me");
-    await ask(activeId, text);
+    const reply = await ask(activeId, text);
     if (!talking) return;
+    // empty reply (e.g. Antigravity flakiness): say so out loud instead of silently re-listening
+    if (!reply || !reply.trim()) { feedSpeech("Cevap alınamadı, tekrar söyler misin?"); flushSpeech(); }
     setTalkState("speaking", "Konuşuyor… (kesmek için dokun)");
     await new Promise((res) => { const t = setInterval(() => { if (!talking || (!speaking && !speakQueue.length)) { clearInterval(t); res(); } }, 200); });
     if (talking) startTalkListen();
   }
   $("talkBtn").addEventListener("click", enterTalking);
   $("talkExit").addEventListener("click", exitTalking);
+  // Free the mic if the tab is backgrounded mid-conversation (e.g. you switch to the camera),
+  // so it never lingers "in use". Tap the orb / 🎙️ to resume when you come back.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) return;
+    if (talking && !talkMuted) setTalkMuted(true); // talking mode: release the recognizer
+    stopBrowserSTT();                              // regular STT: release the mic
+    try { stopWhisper(); } catch (_) {}            // whisper recorder: release the mic
+  });
   // Barge-in: tap the orb while it's speaking to cut the reply short. talkTurn
   // is awaiting the speech queue to drain, so clearing it makes it move on to
   // listening on its own (no double-start race).
   talkOrb.addEventListener("click", () => {
-    if (!talking || !talkOrb.classList.contains("speaking")) return;
+    if (!talking) return;
+    if (talkMuted) { setTalkMuted(false); return; } // tap the muted orb to resume listening
+    if (!talkOrb.classList.contains("speaking")) return;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
   });
+  // Mute: pause listening in talking mode without ending the session (resume to continue).
+  function setTalkMuted(m) {
+    talkMuted = m;
+    muteBtn.classList.toggle("on", m);
+    muteBtn.textContent = m ? "🔇" : "🎙️";
+    muteBtn.setAttribute("aria-label", m ? "Mikrofonu aç" : "Mikrofonu sessize al");
+    if (m) {
+      clearTimeout(talkSilence); orbMeterStop();
+      // abort() (not stop()) so iOS releases the mic immediately — no lingering "in use" state.
+      if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
+      if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)");
+    } else if (talking && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
+      startTalkListen();
+    }
+  }
+  muteBtn.addEventListener("click", () => setTalkMuted(!talkMuted));
 
   // ---------- Command palette: repo's commands (.claude/commands + npm) ----------
   const paletteEl = $("palette"), paletteListEl = $("paletteList"), paletteSearch = $("paletteSearch");
@@ -994,7 +1060,7 @@
   ttsVoiceSel.addEventListener("change", () => { prefs.voices = prefs.voices || {}; prefs.voices[langKey()] = ttsVoiceSel.value; savePrefs(); });
   rateInput.addEventListener("change", () => { prefs.rate = parseFloat(rateInput.value) || 1; savePrefs(); });
   talkSilenceInput.addEventListener("change", () => { prefs.talkSilence = parseFloat(talkSilenceInput.value) || 1.3; savePrefs(); });
-  handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
+  handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); if (!handsfree.checked && !talking) stopBrowserSTT(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
   notifyChk.addEventListener("change", () => {
@@ -1028,7 +1094,7 @@
     const f = allFavs()[i]; if (!f) return;
     if (f.agent && agentById[f.agent]) nsAgent.value = f.agent;
     $("ns-name").value = f.name || "";
-    $("ns-dir").value = f.projectDir || "";
+    $("ns-dir").value = f.projectDir || ""; fitNsDir();
     fillModeSelect(nsMode, nsAgent.value, f.mode);
   }
   const RUNNER_LABEL = { local: "💻 Yerel", cloud: "☁️ Bulut" };
@@ -1039,7 +1105,7 @@
     const nsRunner = $("ns-runner"); nsRunner.innerHTML = "";
     runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
     $("ns-runner-row").style.display = runners.length > 1 ? "flex" : "none";
-    $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
+    $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || ""; fitNsDir();
     $("ns-tree").style.display = "none";
     fillModeSelect(nsMode, nsAgent.value);
     refreshOllamaModels();
@@ -1060,12 +1126,16 @@
 
   // Folder browser for the project directory.
   const nsTree = $("ns-tree");
+  function fitNsDir() { const t = $("ns-dir"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 132) + "px"; }
+  $("ns-dir").addEventListener("input", fitNsDir);
+  // It's a textarea (so long paths wrap) but holds a single-line path: Enter submits, never inserts a newline.
+  $("ns-dir").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ns-create").click(); } });
   async function browseTo(p) {
     try {
       const u = new URLSearchParams(); if (p) u.set("path", p);
       if (($("ns-runner").value || "local") === "cloud") u.set("runner", "cloud"); // browse the remote host
       const data = await (await fetch("/api/browse?" + u.toString(), { headers: authHeaders() })).json();
-      $("ns-dir").value = data.path || "";
+      $("ns-dir").value = data.path || ""; fitNsDir();
       nsTree.innerHTML = "";
       const cur = document.createElement("div"); cur.className = "cur"; cur.textContent = data.path || ""; nsTree.appendChild(cur);
       if (data.parent) { const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.textContent = "⬆ üst"; b.addEventListener("click", () => browseTo(data.parent)); nsTree.appendChild(b); }
@@ -1083,7 +1153,7 @@
   });
   nsFav.addEventListener("change", applyFav);
   $("ns-save").addEventListener("click", () => {
-    const dir = $("ns-dir").value.trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
+    const dir = $("ns-dir").value.replace(/[\r\n]+/g, "").trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
     const fav = { name: $("ns-name").value.trim() || dir, agent: nsAgent.value, mode: nsMode.value, projectDir: dir };
     const lf = localFavs();
     const existing = lf.findIndex((f) => f.projectDir === dir && f.agent === fav.agent);
@@ -1098,7 +1168,7 @@
   newSessionBtn.addEventListener("click", openModal);
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {
-    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
+    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.replace(/[\r\n]+/g, "").trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
     if (nsAgent.value === "ollama" && $("ns-omodel").value) body.model = $("ns-omodel").value;
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });

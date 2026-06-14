@@ -1,6 +1,6 @@
 /* voicebridge service worker: cache the app shell, never the API, and focus the
  * app when a notification is tapped. */
-const CACHE = "voicebridge-v1";
+const CACHE = "voicebridge-v2";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (e) => {
