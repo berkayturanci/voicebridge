@@ -648,7 +648,13 @@ function streamLocal(session, prompt, res, emit) {
     try { child.stdin.write(stdin); child.stdin.end(); } catch (_) {}
   }
 
-  const timer = setTimeout(() => child.kill("SIGKILL"), 5 * 60 * 1000);
+  // Per-turn cap so a runaway agent can't hold the host forever. Generous by
+  // default for real coding tasks; set AGENT_TIMEOUT_MS (ms) to tune, 0 = no cap.
+  let timedOut = false;
+  const TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0;
+  const timer = TIMEOUT_MS > 0
+    ? setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, TIMEOUT_MS)
+    : null;
   let buf = "";
   let stderr = "";
   let gotText = false;
@@ -697,7 +703,9 @@ function streamLocal(session, prompt, res, emit) {
   child.on("close", (code) => {
     clearTimeout(timer);
     if (agent.stream === "ndjson" && buf.trim()) onLine(buf);
-    if (code !== 0 && !gotText) {
+    if (timedOut && !gotText) {
+      emit({ type: "error", error: `${agent.label} ${Math.round(TIMEOUT_MS / 60000)} dk içinde tamamlanamadı (zaman aşımı, durduruldu). Yan etkiler (dosya değişikliği, issue vb.) yapılmış olabilir. Daha uzun görevler için sunucuda AGENT_TIMEOUT_MS değerini artırın (0 = sınırsız).` });
+    } else if (code !== 0 && !gotText) {
       emit({ type: "error", error: stderr.trim() || `${agent.label} exited with code ${code}.` });
     } else {
       session.started = true;
