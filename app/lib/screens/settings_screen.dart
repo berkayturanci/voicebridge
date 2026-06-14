@@ -32,7 +32,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ..baseUrl = _url.text
       ..token = _token.text;
     try {
-      await Api(widget.settings).config(); // reachability + auth check
+      final api = Api(widget.settings);
+      final cfg = await api.config(); // reachability
+      if (cfg['authRequired'] == true) {
+        await api.sessions(); // authed call → 401 if the token is wrong
+      }
       await widget.settings.save();
       if (!mounted) return;
       // When opened from the list we pop back; when this is the first-run

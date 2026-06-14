@@ -133,6 +133,9 @@
   #talkHint { font-size: 12px; color: var(--muted); text-align: center; max-width: 80%; }
   #modal, #settings, #palette { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
   #modal.open, #settings.open, #palette.open { display: flex; }
+  #login { position: fixed; inset: 0; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 30; }
+  #login.open { display: flex; }
+  #login .err { color: #f85149; font-size: 13px; min-height: 1em; }
   #paletteList { display: flex; flex-direction: column; gap: 3px; max-height: 52vh; overflow-y: auto; }
   #paletteList .pal-g { font-size: 11px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
   #paletteList button { text-align: left; background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -180,6 +183,16 @@
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
     </div>
   </footer>
+
+  <div id="login">
+    <div class="card">
+      <h3>🔒 Giriş</h3>
+      <p style="margin:0;color:var(--muted);font-size:13px;">Bu köprü bir erişim token'ı ile korunuyor.</p>
+      <label>Token <input id="loginToken" type="password" autocomplete="current-password" placeholder="Erişim token'ı" /></label>
+      <div class="err" id="loginErr"></div>
+      <button id="loginBtn" type="button">Giriş yap</button>
+    </div>
+  </div>
 
   <div id="home">
     <div class="home-head">
@@ -370,10 +383,39 @@
     if (CONFIG.authRequired && token) h["Authorization"] = "Bearer " + token;
     return h;
   }
-  function ensureToken() {
-    if (CONFIG.authRequired && !token) {
-      token = (prompt("Erişim token'ı:") || "").trim();
-      if (token) localStorage.setItem("vb_token", token);
+  // Validate a token against an authed endpoint (200 ok, 401 wrong).
+  async function tokenValid(t) {
+    try {
+      const r = await fetch("/api/sessions", { headers: { "Authorization": "Bearer " + t } });
+      return r.status !== 401;
+    } catch (_) { return true; } // network error: don't block on a transient failure
+  }
+  // Full-screen login; resolves once a valid token is stored.
+  function showLogin(msg) {
+    const ov = $("login"), inp = $("loginToken"), err = $("loginErr"), btn = $("loginBtn");
+    err.textContent = msg || ""; inp.value = "";
+    ov.classList.add("open"); setTimeout(() => inp.focus(), 50);
+    return new Promise((resolve) => {
+      const submit = async () => {
+        const t = (inp.value || "").trim();
+        if (!t) { err.textContent = "Token gerekli."; return; }
+        btn.disabled = true; err.textContent = "Kontrol ediliyor…";
+        if (await tokenValid(t)) {
+          token = t; localStorage.setItem("vb_token", token);
+          ov.classList.remove("open"); btn.disabled = false;
+          inp.removeEventListener("keydown", onKey); btn.removeEventListener("click", submit);
+          resolve();
+        } else { err.textContent = "Token geçersiz."; btn.disabled = false; }
+      };
+      const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } };
+      btn.addEventListener("click", submit); inp.addEventListener("keydown", onKey);
+    });
+  }
+  // Prompt for login when required and missing/invalid. `force` re-auths on 401.
+  async function ensureToken(force) {
+    if (CONFIG.authRequired && (!token || force)) {
+      if (force) { token = ""; localStorage.removeItem("vb_token"); }
+      await showLogin(force ? "Oturum süresi doldu — tekrar giriş yap." : "");
     }
   }
 
@@ -614,7 +656,7 @@
         method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice }), signal: st.turn.abort.signal,
       });
-      if (r.status === 401) { localStorage.removeItem("vb_token"); token = ""; throw new Error("Token geçersiz. Sayfayı yenile."); }
+      if (r.status === 401) { ensureToken(true); throw new Error("Token geçersiz — tekrar giriş yap."); }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
       for (;;) {
         const { value, done } = await reader.read();
@@ -1020,7 +1062,7 @@
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
     if (CONFIG.sttMode === "browser" && !SR) { micBtn.classList.add("na"); setStatus(noVoiceMsg()); }
     if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }
-    ensureToken();
+    await ensureToken();
     let list = { sessions: [], defaultSessionId: null };
     try { list = await (await fetch("/api/sessions", { headers: authHeaders() })).json(); } catch (_) {}
     (list.sessions || []).forEach(addSessionState);

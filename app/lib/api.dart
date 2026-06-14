@@ -29,6 +29,7 @@ class Api {
   /// GET /api/sessions
   Future<List<Session>> sessions() async {
     final r = await http.get(_u('/api/sessions'), headers: _headers());
+    if (r.statusCode == 401) throw Exception('Token geçersiz');
     if (r.statusCode != 200) throw Exception('Oturumlar alınamadı (${r.statusCode})');
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     return (data['sessions'] as List)
