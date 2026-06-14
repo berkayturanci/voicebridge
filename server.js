@@ -191,16 +191,21 @@ const AGENTS = {
       safe: { label: "Sandbox", args: ["--sandbox"] },
       full: { label: "Tam otonom", args: ["--yolo"] },
     },
-    // `agy --print` reads the prompt from stdin when none is given positionally.
+    // `agy --print` reads the prompt from stdin by default. CLIs vary, so the
+    // base args (AGY_ARGS, default "--print") and prompt delivery (AGY_PROMPT_ARG=1
+    // passes the prompt as a positional argument instead of stdin) are overridable.
     command(prompt, { cont, modeArgs } = {}) {
+      const base = process.env.AGY_ARGS ? splitArgs(process.env.AGY_ARGS) : ["--print"];
       const resume = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
-      return { argv: ["--print", ...resume, ...(modeArgs || [])], stdin: prompt };
+      const argv = [...base, ...resume, ...(modeArgs || [])];
+      if (process.env.AGY_PROMPT_ARG) { argv.push(prompt); return { argv, stdin: null }; }
+      return { argv, stdin: prompt };
     },
   },
   ollama: {
     label: "Ollama (yerel)",
     bin: () => process.env.OLLAMA_BIN || "ollama",
-    supportsContinue: false, // each `ollama run` is a fresh, stateless generation
+    supportsContinue: true, // HTTP path keeps per-session message history
     stream: "text",
     defaultMode: "default",
     modes: {
@@ -246,9 +251,74 @@ function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
+// Is an executable resolvable (absolute path, or found on PATH)?
+function binExists(bin) {
+  if (!bin) return false;
+  if (bin.includes("/")) { try { fs.accessSync(bin, fs.constants.X_OK); return true; } catch (_) { return false; } }
+  for (const d of (process.env.PATH || "").split(path.delimiter)) {
+    if (!d) continue;
+    try { fs.accessSync(path.join(d, bin), fs.constants.X_OK); return true; } catch (_) {}
+  }
+  return false;
+}
+
+// Whether an agent looks usable. Ollama is HTTP (reachability checked at use).
+function agentAvailable(id) {
+  return id === "ollama" ? true : binExists(AGENTS[id].bin());
+}
+
+// List subdirectories of a path (dotfiles hidden) for the folder picker.
+// Used by the bridge (local) and the reference cloud runner (remote host).
+function browseDir(p) {
+  let dir;
+  try { dir = path.resolve(p || DEFAULT_PROJECT_DIR || os.homedir()); } catch (_) { dir = os.homedir(); }
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => {
+        if (e.name.startsWith(".")) return false;
+        try { return e.isDirectory() || (e.isSymbolicLink() && fs.statSync(path.join(dir, e.name)).isDirectory()); }
+        catch (_) { return false; }
+      })
+      .map((e) => e.name).sort((a, b) => a.localeCompare(b));
+  } catch (e) {
+    return { path: dir, parent: path.dirname(dir), dirs: [], error: e.message };
+  }
+  const parent = path.dirname(dir);
+  return { path: dir, parent: parent === dir ? null : parent, dirs };
+}
+
+// Project slash commands under .claude/commands/**.md → "/name" (nested dirs
+// namespace with ":", e.g. .claude/commands/keel/ship.md → /keel:ship).
+function listSlashCommands(baseDir) {
+  const out = [];
+  const walk = (d, prefix) => {
+    if (out.length > 200) return;
+    let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of ents) {
+      if (out.length > 200) break;
+      if (e.isDirectory()) walk(path.join(d, e.name), prefix.concat(e.name));
+      else if (e.isFile() && e.name.endsWith(".md")) {
+        const name = prefix.concat(e.name.slice(0, -3)).join(":");
+        out.push({ label: "/" + name, value: "/" + name + " " });
+      }
+    }
+  };
+  walk(path.join(baseDir, ".claude", "commands"), []);
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// package.json scripts → "npm run <name>".
+function listNpmScripts(baseDir) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(baseDir, "package.json"), "utf8"));
+    return Object.keys(pkg.scripts || {}).map((k) => ({ label: "npm run " + k, value: "npm run " + k }));
+  } catch (_) { return []; }
+}
+
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
-function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
+function createSession({ name, agent, projectDir, mode, voice, runner, model } = {}) {
   if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
@@ -266,6 +336,7 @@ function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
     mode: resolveMode(agent, mode),
     voice: !!voice,
     runner: run,
+    model: (model && String(model).trim()) || undefined, // ollama model override
     started: false,
   };
   sessions.set(id, s);
@@ -275,7 +346,7 @@ function createSession({ name, agent, projectDir, mode, voice, runner } = {}) {
 function publicSession(s) {
   return {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
-    projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, started: s.started,
+    projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
   };
 }
 
@@ -299,7 +370,7 @@ function saveSessions(file) {
       seq: sessionSeq,
       defaultId: defaultSessionId,
       sessions: Array.from(sessions.values()).map((s) => ({
-        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner,
+        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model,
       })),
     };
     fs.writeFileSync(file, JSON.stringify(data));
@@ -316,7 +387,8 @@ function loadSessions(file) {
     sessions.set(s.id, {
       id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir,
       mode: AGENTS[s.agent].modes[s.mode] ? s.mode : AGENTS[s.agent].defaultMode,
-      voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local", started: false,
+      voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local",
+      model: (s.model && String(s.model).trim()) || undefined, started: false,
     });
   }
   if (typeof data.seq === "number") sessionSeq = Math.max(sessionSeq, data.seq);
@@ -442,6 +514,23 @@ function buildPrompt(voice, text) {
 
 function cloudRunnerUrl() { return process.env.CLOUD_RUNNER_URL || ""; }
 
+// Proxy a folder listing to the cloud runner's GET /browse (remote host dirs).
+function proxyCloudBrowse(p, res) {
+  const fail = (error) => sendJson(res, 200, { path: p || "", parent: null, dirs: [], error });
+  let url;
+  try { url = new URL("/browse", cloudRunnerUrl()); } catch (_) { return fail("Invalid CLOUD_RUNNER_URL"); }
+  if (p) url.searchParams.set("path", p);
+  const lib = url.protocol === "https:" ? require("https") : require("http");
+  const headers = {};
+  if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
+  const r = lib.get(url, { headers }, (up) => {
+    let data = "";
+    up.on("data", (d) => (data += d));
+    up.on("end", () => { try { sendJson(res, 200, JSON.parse(data)); } catch (_) { fail("cloud browse failed"); } });
+  });
+  r.on("error", (e) => fail("cloud: " + e.message));
+}
+
 function streamAsk(session, prompt, res) {
   res.writeHead(200, Object.assign({
     "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -450,7 +539,52 @@ function streamAsk(session, prompt, res) {
   }, SECURITY_HEADERS));
   const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
+  if (session.agent === "ollama") return streamOllama(session, prompt, res, emit);
   return streamLocal(session, prompt, res, emit);
+}
+
+function ollamaUrl() { return process.env.OLLAMA_URL || "http://127.0.0.1:11434"; }
+
+// Ollama via its local HTTP API (/api/chat). Keeps per-session message history
+// for conversation continuity; the model runs locally.
+function streamOllama(session, prompt, res, emit) {
+  let url;
+  try { url = new URL("/api/chat", ollamaUrl()); } catch (_) { emit({ type: "error", error: "Invalid OLLAMA_URL" }); return res.end(); }
+  const lib = url.protocol === "https:" ? require("https") : require("http");
+  const history = session.history || [];
+  const messages = history.concat([{ role: "user", content: buildPrompt(session.voice, prompt) }]);
+  const payload = JSON.stringify({
+    model: session.model || process.env.OLLAMA_MODEL || "llama3.2",
+    messages, stream: true,
+  });
+  let buf = "", reply = "", errored = false;
+  const upReq = lib.request(url, { method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } }, (r) => {
+    r.on("data", (d) => {
+      buf += d.toString();
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (!line) continue;
+        let obj; try { obj = JSON.parse(line); } catch (_) { continue; }
+        if (obj.error) { errored = true; emit({ type: "error", error: String(obj.error) }); continue; }
+        const c = obj.message && obj.message.content;
+        if (c) { reply += c; emit({ type: "delta", text: c }); }
+      }
+    });
+    r.on("end", () => {
+      if (!errored) {
+        session.history = messages.concat([{ role: "assistant", content: reply }]);
+        session.started = true;
+        emit({ type: "done" });
+        if (looksLikeQuestion(reply)) sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: reply.trim().slice(-160), sessionId: session.id });
+      }
+      res.end();
+    });
+  });
+  upReq.on("error", (e) => { emit({ type: "error", error: "ollama: " + e.message }); res.end(); });
+  upReq.write(payload); upReq.end();
+  res.on("close", () => { try { upReq.destroy(); } catch (_) {} });
 }
 
 // Cloud runner: proxy the turn to a remote endpoint that speaks the same NDJSON
@@ -467,9 +601,23 @@ function streamCloud(session, prompt, res, emit) {
   });
   const headers = { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) };
   if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
+  // Forward the remote stream unchanged, but also parse a copy so cloud turns
+  // reach parity with local ones (activity passes through; reply text drives
+  // push-on-question).
+  let pbuf = "", reply = "";
+  const scan = (line) => { try { const ev = JSON.parse(line); if (ev.type === "delta" && ev.text) reply += ev.text; } catch (_) {} };
   const up = lib.request(url, { method: "POST", headers }, (r) => {
-    r.on("data", (d) => { try { res.write(d); } catch (_) {} });
-    r.on("end", () => { session.started = true; res.end(); });
+    r.on("data", (d) => {
+      try { res.write(d); } catch (_) {}
+      pbuf += d.toString();
+      let i; while ((i = pbuf.indexOf("\n")) >= 0) { const line = pbuf.slice(0, i).trim(); pbuf = pbuf.slice(i + 1); if (line) scan(line); }
+    });
+    r.on("end", () => {
+      if (pbuf.trim()) scan(pbuf.trim());
+      session.started = true;
+      if (looksLikeQuestion(reply)) sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: reply.trim().slice(-160), sessionId: session.id });
+      res.end();
+    });
   });
   up.on("error", (e) => { emit({ type: "error", error: "cloud runner: " + e.message }); res.end(); });
   up.write(payload); up.end();
@@ -610,7 +758,7 @@ function handleRequest(req, res) {
       authRequired: !!ACCESS_TOKEN,
       agents: Object.keys(AGENTS).map((id) => ({
         id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
-        defaultMode: AGENTS[id].defaultMode,
+        defaultMode: AGENTS[id].defaultMode, available: agentAvailable(id),
         modes: Object.keys(AGENTS[id].modes).map((m) => ({ id: m, label: AGENTS[id].modes[m].label })),
       })),
       defaultProjectDir: DEFAULT_PROJECT_DIR,
@@ -622,6 +770,28 @@ function handleRequest(req, res) {
 
   if (urlPath.startsWith("/api/")) {
     if (!authorized(req)) return sendJson(res, 401, { error: "Unauthorized" });
+
+    // Browse local directories (for the project-folder picker).
+    // Commands available in a session's project (slash commands + npm scripts).
+    if (req.method === "GET" && urlPath === "/api/commands") {
+      const sid = new URL(req.url, "http://x").searchParams.get("sessionId");
+      const session = resolveSession(sid);
+      if (!session) return sendJson(res, 404, { error: "unknown session" });
+      if (session.runner === "cloud") return sendJson(res, 200, { groups: [] }); // remote dir; see #89
+      const groups = [];
+      const cmds = listSlashCommands(session.projectDir);
+      if (cmds.length) groups.push({ label: "Komutlar (.claude/commands)", items: cmds });
+      const npm = listNpmScripts(session.projectDir);
+      if (npm.length) groups.push({ label: "npm scripts", items: npm });
+      return sendJson(res, 200, { groups });
+    }
+
+    if (req.method === "GET" && urlPath === "/api/browse") {
+      const q = new URL(req.url, "http://x").searchParams;
+      // A cloud session's directories live on the remote host: proxy to the runner.
+      if (q.get("runner") === "cloud" && cloudRunnerUrl()) return proxyCloudBrowse(q.get("path"), res);
+      return sendJson(res, 200, browseDir(q.get("path")));
+    }
 
     if (req.method === "GET" && urlPath === "/api/sessions") {
       return sendJson(res, 200, {
@@ -680,6 +850,7 @@ function handleRequest(req, res) {
         if (data.reset) session.started = false;
         if (data.mode && AGENTS[session.agent].modes[data.mode]) session.mode = data.mode;
         if (typeof data.voice === "boolean") session.voice = data.voice;
+        if (typeof data.model === "string" && data.model.trim()) session.model = data.model.trim();
         inflight++;
         res.on("close", () => { inflight = Math.max(0, inflight - 1); });
         streamAsk(session, text, res);
@@ -713,9 +884,27 @@ function handleRequest(req, res) {
       return readBody(req, 64 * 1024, (e, body) => {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
-        if (session) session.started = false;
+        if (session) { session.started = false; session.history = []; } // also clears Ollama context
         return sendJson(res, 200, { ok: true });
       });
+    }
+
+    // List locally-available Ollama models (proxies /api/tags).
+    if (req.method === "GET" && urlPath === "/api/ollama/models") {
+      let url;
+      try { url = new URL("/api/tags", ollamaUrl()); } catch (_) { return sendJson(res, 200, { models: [] }); }
+      const lib = url.protocol === "https:" ? require("https") : require("http");
+      const r2 = lib.get(url, (up) => {
+        let data = "";
+        up.on("data", (d) => (data += d));
+        up.on("end", () => {
+          let models = [];
+          try { models = (JSON.parse(data).models || []).map((m) => m.name).filter(Boolean); } catch (_) {}
+          sendJson(res, 200, { models });
+        });
+      });
+      r2.on("error", () => sendJson(res, 200, { models: [] }));
+      return;
     }
 
     return sendJson(res, 404, { error: "Not found" });
@@ -795,6 +984,11 @@ module.exports = {
   parseClaudeEvents,
   resolveMode,
   resolveRunner,
+  binExists,
+  agentAvailable,
+  browseDir,
+  listSlashCommands,
+  listNpmScripts,
   buildPrompt,
   looksLikeQuestion,
   parseFavorites,

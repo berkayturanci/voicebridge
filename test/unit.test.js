@@ -23,13 +23,30 @@ test("codex/antigravity adapters still pipe the prompt on stdin", () => {
   assert.strictEqual(srv.AGENTS.antigravity.command("go").stdin, "go");
 });
 
+test("antigravity invocation is configurable via AGY_ARGS / AGY_PROMPT_ARG", () => {
+  const a = process.env.AGY_ARGS, p = process.env.AGY_PROMPT_ARG;
+  try {
+    delete process.env.AGY_ARGS; delete process.env.AGY_PROMPT_ARG;
+    assert.deepStrictEqual(srv.AGENTS.antigravity.command("hi").argv, ["--print"]);
+    process.env.AGY_PROMPT_ARG = "1"; // prompt as a positional arg, not stdin
+    const c1 = srv.AGENTS.antigravity.command("hi");
+    assert.deepStrictEqual(c1.argv, ["--print", "hi"]);
+    assert.strictEqual(c1.stdin, null);
+    process.env.AGY_ARGS = "chat -q"; // override the base args
+    assert.deepStrictEqual(srv.AGENTS.antigravity.command("hi").argv, ["chat", "-q", "hi"]);
+  } finally {
+    if (a === undefined) delete process.env.AGY_ARGS; else process.env.AGY_ARGS = a;
+    if (p === undefined) delete process.env.AGY_PROMPT_ARG; else process.env.AGY_PROMPT_ARG = p;
+  }
+});
+
 test("ollama adapter runs a local model with the prompt on stdin", () => {
   const prev = process.env.OLLAMA_MODEL;
   delete process.env.OLLAMA_MODEL;
   let c = srv.AGENTS.ollama.command("hi");
   assert.deepStrictEqual(c.argv, ["run", "llama3.2"]);
   assert.strictEqual(c.stdin, "hi");
-  assert.strictEqual(srv.AGENTS.ollama.supportsContinue, false);
+  assert.strictEqual(srv.AGENTS.ollama.supportsContinue, true); // HTTP path keeps history
   process.env.OLLAMA_MODEL = "qwen2.5-coder";
   assert.deepStrictEqual(srv.AGENTS.ollama.command("hi").argv, ["run", "qwen2.5-coder"]);
   if (prev === undefined) delete process.env.OLLAMA_MODEL; else process.env.OLLAMA_MODEL = prev;
@@ -69,6 +86,36 @@ test("parseDotEnv parses KEY=VALUE, skips comments, strips quotes", () => {
   assert.strictEqual(env.EMPTY, "");
   assert.strictEqual(env.SPACED, "x");
   assert.ok(!("BAD" in env));
+});
+
+test("binExists resolves real executables and rejects fakes", () => {
+  assert.strictEqual(srv.binExists("/bin/sh"), true);
+  assert.strictEqual(srv.binExists("sh"), true); // on PATH
+  assert.strictEqual(srv.binExists("/no/such/bin-xyz"), false);
+  assert.strictEqual(srv.binExists("definitely-not-a-real-bin-xyz"), false);
+  assert.strictEqual(srv.agentAvailable("ollama"), true); // HTTP, always "available"
+});
+
+test("browseDir lists subdirectories, hides dotfiles, sets parent", () => {
+  const b = srv.browseDir(process.cwd());
+  assert.strictEqual(b.path, process.cwd());
+  assert.ok(b.dirs.includes("public") && b.dirs.includes("test"));
+  assert.ok(!b.dirs.some((d) => d.startsWith(".")));
+  assert.strictEqual(typeof b.parent, "string");
+});
+
+test("listNpmScripts / listSlashCommands read a project's commands", () => {
+  const scripts = srv.listNpmScripts(process.cwd());
+  assert.ok(scripts.some((s) => s.label === "npm run test" && s.value === "npm run test"));
+  // namespaced slash command from a nested .claude/commands dir
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-cmds-"));
+  fs.mkdirSync(path.join(dir, ".claude", "commands", "keel"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".claude", "commands", "deploy.md"), "x");
+  fs.writeFileSync(path.join(dir, ".claude", "commands", "keel", "ship.md"), "x");
+  const cmds = srv.listSlashCommands(dir).map((c) => c.label);
+  assert.deepStrictEqual(cmds, ["/deploy", "/keel:ship"]);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("parseClaudeLine extracts assistant text", () => {

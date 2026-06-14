@@ -84,6 +84,8 @@ session is recreated on boot).
 |---------------|---------|
 | `GET /api/health` | Public. `{ ok, version, uptime, sessions }` for liveness/uptime checks. |
 | `GET /api/config` | Public. STT mode, whether auth is required, the agent list (with modes), the default project dir and session id. |
+| `GET /api/browse` | List subdirectories of a path (folder picker). `runner=cloud` proxies to the cloud runner's `GET /browse` for remote dirs. |
+| `GET /api/commands` | A session project's commands (`.claude/commands` + npm scripts) for the palette. |
 | `GET /api/sessions` | List sessions. |
 | `POST /api/sessions` | Create a session `{ name, agent, projectDir, mode }`. |
 | `DELETE /api/sessions/:id` | Remove a session (not the default). |

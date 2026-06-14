@@ -25,6 +25,7 @@
     --bg: #0d1117; --panel: #161b22; --panel2: #21262d;
     --border: #21262d; --border2: #30363d; --field: #0d1117;
     --text: #e6edf3; --muted: #8b949e; --accent: #1f6feb; --green: #238636;
+    --chat-fs: 15px;
     color-scheme: dark;
   }
   :root[data-theme="light"] {
@@ -66,11 +67,19 @@
   #jump.show { display: block; }
   .log { position: absolute; inset: 0; overflow-y: auto; padding: 14px; display: none; flex-direction: column; gap: 10px; }
   .log.active { display: flex; }
-  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; font-size: var(--chat-fs); }
   .me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
   .claude { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
   .codewrap { position: relative; margin: 8px 0 2px; }
+  .codewrap.collapsed pre { max-height: 15em; overflow: hidden; }
+  .togglebtn { display: block; margin: 4px 0 2px; background: var(--panel2); border: 1px solid var(--border2); color: var(--accent); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
   .claude pre { margin: 0; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; overflow-x: auto; }
+  .claude h3, .claude h4, .claude h5 { margin: .6em 0 .3em; line-height: 1.3; }
+  .claude h3 { font-size: 1.15em; } .claude h4 { font-size: 1.05em; } .claude h5 { font-size: 1em; color: var(--muted); }
+  .claude ul, .claude ol { margin: .3em 0; padding-left: 1.4em; } .claude li { margin: .15em 0; }
+  .claude blockquote { margin: .4em 0; padding-left: .8em; border-left: 3px solid var(--border2); color: var(--muted); }
+  .claude a { color: #58a6ff; } .claude .mdline { margin: 0; }
+  .claude pre .add { color: #3fb950; } .claude pre .del { color: #f85149; } .claude pre .hunk { color: #58a6ff; }
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
   .copybtn { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); opacity: .85; }
@@ -96,6 +105,7 @@
   #mic.listening { background: #da3633; animation: pulse 1.2s infinite; }
   #mic.thinking { background: #9e6a03; }
   #mic:disabled { opacity: .4; }
+  #mic.na { opacity: .55; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(218,54,51,.6); } 50% { box-shadow: 0 0 0 12px rgba(218,54,51,0); } }
   .opts { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
   .opts select { background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 5px 7px; font-size: 12px; }
@@ -107,27 +117,64 @@
   input:checked + .slider { background: var(--green); }
   input:checked + .slider::before { transform: translateX(16px); }
 
-  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
-  #modal.open { display: flex; }
-  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+  #home { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 15; padding: calc(12px + env(safe-area-inset-top)) 14px 14px; }
+  #home.open { display: flex; }
+  #home .home-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  #home .home-head h2 { margin: 0; font-size: 20px; }
+  #home #homeNew { background: var(--green); border: none; color: #fff; border-radius: 9px; padding: 8px 12px; font-size: 14px; }
+  #homeList { display: flex; flex-direction: column; gap: 9px; overflow-y: auto; }
+  .scard { text-align: left; background: var(--panel); border: 1px solid var(--border2); border-radius: 12px; padding: 13px 14px; display: flex; flex-direction: column; gap: 4px; color: var(--text); }
+  .scard .sc-name { font-size: 16px; font-weight: 600; }
+  .scard .sc-meta { font-size: 12px; color: var(--accent); }
+  .scard .sc-prev { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #backBtn { font-size: 20px; }
+  #talk { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 20; padding: 24px; }
+  #talk.open { display: flex; }
+  #talk #talkExit { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 16px; }
+  #talk .orb { width: 150px; height: 150px; border-radius: 50%; background: var(--green); transition: background .3s; }
+  #talk .orb.listening { background: #3fb950; animation: orbpulse 1.6s infinite; }
+  #talk .orb.thinking { background: #9e6a03; animation: orbpulse 1s infinite; }
+  #talk .orb.speaking { background: var(--accent); animation: orbpulse 1.1s infinite; cursor: pointer; }
+  @keyframes orbpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,.45); transform: scale(1); } 50% { box-shadow: 0 0 0 26px rgba(63,185,80,0); transform: scale(1.04); } }
+  #talkState { font-size: 19px; font-weight: 600; }
+  #talkHeard { font-size: 16px; color: var(--muted); text-align: center; min-height: 44px; max-width: 92%; }
+  #talkHint { font-size: 12px; color: var(--muted); text-align: center; max-width: 80%; }
+  #modal, #settings, #palette { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  #modal.open, #settings.open, #palette.open { display: flex; }
+  #login { position: fixed; inset: 0; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 30; }
+  #login.open { display: flex; }
+  #login .err { color: #f85149; font-size: 13px; min-height: 1em; }
+  #paletteList { display: flex; flex-direction: column; gap: 3px; max-height: 52vh; overflow-y: auto; }
+  #paletteList .pal-g { font-size: 11px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
+  #paletteList button { text-align: left; background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .card { background: var(--panel); border: 1px solid var(--border2); border-radius: 14px; padding: 18px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
   .card h3 { margin: 0; font-size: 16px; }
   .card label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
+  .card label.opt { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+  .card label.opt > select, .card label.opt > input[type=range] { flex: 0 0 auto; width: 150px; }
+  .card .srow { display: flex; align-items: center; justify-content: space-between; }
+  .card .srow button { background: none; border: none; color: var(--muted); font-size: 18px; }
+  .card label.opt > #theme { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card input, .card select { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
-  .card .row { display: flex; gap: 10px; justify-content: flex-end; }
+  #ns-tree { max-height: 190px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  #ns-tree .cur { font-size: 11px; color: var(--muted); padding: 2px 4px; word-break: break-all; }
+  #ns-tree button { text-align: left; background: none; border: none; color: var(--text); padding: 7px 8px; border-radius: 6px; font-size: 14px; }
+  #ns-tree button.up { color: var(--accent); }
+  #ns-browse { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
+  .card .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
   .card .row button { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 14px; }
   .card .row button.primary { background: var(--green); border-color: var(--green); color: #fff; }
 </style>
 </head>
 <body>
   <header>
+    <button id="backBtn" title="Sohbetler" aria-label="Sohbetler">←</button>
     <span class="dot"></span>
     <select id="session" aria-label="Oturum"></select>
     <button id="newSession" title="Yeni oturum">＋</button>
-    <button id="renameSession" title="Yeniden adlandır" aria-label="Yeniden adlandır">✎</button>
-    <button id="delSession" title="Oturumu sil" aria-label="Oturumu sil">🗑</button>
     <span class="spacer"></span>
-    <button id="theme" title="Tema" aria-label="Tema">🌗</button>
-    <button id="reset">Yeni sohbet</button>
+    <button id="talkBtn" title="Konuşma modu" aria-label="Konuşma modu">📞</button>
+    <button id="settingsBtn" title="Ayarlar" aria-label="Ayarlar">⚙</button>
   </header>
 
   <div id="logs">
@@ -139,25 +186,72 @@
     <div class="chips" id="chips"></div>
     <div class="composer">
       <textarea id="composer" rows="1" placeholder="Yaz ya da 🎤 ile konuş…" enterkeyhint="send"></textarea>
+      <button id="cmdBtn" class="iconbtn" aria-label="Komutlar" title="Komutlar">⌘</button>
       <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
     </div>
-    <div class="opts">
-      <label>Mod <select id="mode"></select></label>
-      <label>Dil
+  </footer>
+
+  <div id="login">
+    <div class="card">
+      <h3>🔒 Giriş</h3>
+      <p style="margin:0;color:var(--muted);font-size:13px;">Bu köprü bir erişim token'ı ile korunuyor.</p>
+      <label>Token <input id="loginToken" type="password" autocomplete="current-password" placeholder="Erişim token'ı" /></label>
+      <div class="err" id="loginErr"></div>
+      <button id="loginBtn" type="button">Giriş yap</button>
+    </div>
+  </div>
+
+  <div id="home">
+    <div class="home-head">
+      <h2>Sohbetler</h2>
+      <button id="homeNew" title="Yeni oturum" aria-label="Yeni oturum">＋ Yeni</button>
+    </div>
+    <div id="homeList"></div>
+  </div>
+
+  <div id="talk">
+    <button id="talkExit" aria-label="Bitir">✕</button>
+    <div class="orb" id="talkOrb"></div>
+    <div id="talkState">Hazır</div>
+    <div id="talkHeard"></div>
+    <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler.</div>
+  </div>
+
+  <div id="palette">
+    <div class="card">
+      <div class="srow"><h3>Komutlar</h3><button id="paletteClose" aria-label="Kapat">✕</button></div>
+      <input id="paletteSearch" placeholder="Ara…" autocomplete="off" />
+      <div id="paletteList"></div>
+    </div>
+  </div>
+
+  <div id="settings">
+    <div class="card">
+      <div class="srow"><h3>Ayarlar</h3><button id="settingsClose" aria-label="Kapat">✕</button></div>
+      <label class="opt">Tema <button id="theme" title="Tema" aria-label="Tema">🌗</button></label>
+      <label class="opt">Yazı boyutu <input type="range" id="fontSize" min="13" max="24" step="1" /></label>
+      <label class="opt">Dil
         <select id="lang">
           <option value="tr-TR">Türkçe</option>
           <option value="en-US">English</option>
         </select>
       </label>
-      <label>Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
-      <label>Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
-      <label>Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
-      <label>Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
-      <label>Ses <select id="ttsVoice"></select></label>
-      <label>Hız <input type="range" id="rate" min="0.6" max="1.6" step="0.1" style="width:80px" /></label>
+      <label class="opt">Mod <select id="mode"></select></label>
+      <label class="opt">Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
+      <label class="opt">Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
+      <label class="opt">Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
+      <label class="opt">Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
+      <label class="opt">Ses <select id="ttsVoice"></select></label>
+      <label class="opt">Hız <input type="range" id="rate" min="0.6" max="1.6" step="0.1" /></label>
+      <label class="opt">Sessizlik (otomatik gönder) <input type="range" id="talkSilence" min="0.6" max="2.5" step="0.1" /></label>
+      <div class="row">
+        <button id="renameSession">✎ Adlandır</button>
+        <button id="delSession">🗑 Sil</button>
+        <button id="reset" class="primary">Yeni sohbet</button>
+      </div>
     </div>
-  </footer>
+  </div>
 
   <div id="modal">
     <div class="card">
@@ -169,8 +263,11 @@
       <label>İsim <input id="ns-name" placeholder="ör. Backend refactor" /></label>
       <label>Agent <select id="ns-agent"></select></label>
       <label id="ns-runner-row" style="display:none">Çalışma yeri <select id="ns-runner"></select></label>
+      <label id="ns-omodel-row" style="display:none">Ollama model <select id="ns-omodel"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
-      <label>Proje klasörü <input id="ns-dir" placeholder="/Users/you/project" /></label>
+      <label class="opt">Proje klasörü <button id="ns-browse" type="button">📁 Gözat</button></label>
+      <input id="ns-dir" placeholder="/Users/you/project" />
+      <div id="ns-tree" style="display:none"></div>
       <div class="row">
         <button id="ns-save">★ Kaydet</button>
         <button id="ns-cancel">İptal</button>
@@ -186,7 +283,16 @@
   const logs = $("logs"), statusEl = $("status"), micBtn = $("mic"), sendBtn = $("send");
   const composer = $("composer"), langSel = $("lang"), handsfree = $("handsfree");
   const resetBtn = $("reset"), sessionSel = $("session"), newSessionBtn = $("newSession");
-  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify"), ttsVoiceSel = $("ttsVoice"), rateInput = $("rate"), jumpBtn = $("jump");
+  const modeSel = $("mode"), modal = $("modal"), themeBtn = $("theme"), cuesChk = $("cues"), chipsEl = $("chips"), voiceChk = $("voice"), notifyChk = $("notify"), ttsVoiceSel = $("ttsVoice"), rateInput = $("rate"), talkSilenceInput = $("talkSilence"), jumpBtn = $("jump");
+  const talkSilenceMs = () => Math.round((prefs.talkSilence || 1.3) * 1000); // auto-send pause in talking mode
+  const settingsEl = $("settings"), settingsBtn = $("settingsBtn"), fontSizeInput = $("fontSize");
+  // Settings sheet open/close + backdrop dismiss.
+  settingsBtn.addEventListener("click", () => settingsEl.classList.add("open"));
+  $("settingsClose").addEventListener("click", () => settingsEl.classList.remove("open"));
+  settingsEl.addEventListener("click", (e) => { if (e.target === settingsEl) settingsEl.classList.remove("open"); });
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
+  function applyFontSize() { document.documentElement.style.setProperty("--chat-fs", (prefs.fontSize || 15) + "px"); }
+  fontSizeInput.addEventListener("input", () => { prefs.fontSize = parseInt(fontSizeInput.value, 10) || 15; savePrefs(); applyFontSize(); });
 
   // Auto-scroll only when the user is already near the bottom (don't fight them).
   function nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 80; }
@@ -269,6 +375,12 @@
   }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const STANDALONE = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+  const noVoiceMsg = () => !window.isSecureContext
+    ? "Sesli giriş HTTPS ister — `tailscale serve` ile https:// adresinden aç (http'de mikrofon yok). Yazabilirsin."
+    : STANDALONE
+    ? "Sesli giriş için uygulamayı Safari sekmesinde aç (kurulu uygulamada mikrofon yok). Yine de yazabilirsin."
+    : "Bu tarayıcı sesli girişi desteklemiyor — yazabilirsin (iOS'ta Safari sekmesi).";
   let recognizing = false;
 
   const S = new Map();   // sessionId -> { meta, logEl, turn }
@@ -281,31 +393,120 @@
     if (CONFIG.authRequired && token) h["Authorization"] = "Bearer " + token;
     return h;
   }
-  function ensureToken() {
-    if (CONFIG.authRequired && !token) {
-      token = (prompt("Erişim token'ı:") || "").trim();
-      if (token) localStorage.setItem("vb_token", token);
+  // Validate a token against an authed endpoint (200 ok, 401 wrong).
+  async function tokenValid(t) {
+    try {
+      const r = await fetch("/api/sessions", { headers: { "Authorization": "Bearer " + t } });
+      return r.status !== 401;
+    } catch (_) { return true; } // network error: don't block on a transient failure
+  }
+  // Full-screen login; resolves once a valid token is stored.
+  function showLogin(msg) {
+    const ov = $("login"), inp = $("loginToken"), err = $("loginErr"), btn = $("loginBtn");
+    err.textContent = msg || ""; inp.value = "";
+    ov.classList.add("open"); setTimeout(() => inp.focus(), 50);
+    return new Promise((resolve) => {
+      const submit = async () => {
+        const t = (inp.value || "").trim();
+        if (!t) { err.textContent = "Token gerekli."; return; }
+        btn.disabled = true; err.textContent = "Kontrol ediliyor…";
+        if (await tokenValid(t)) {
+          token = t; localStorage.setItem("vb_token", token);
+          ov.classList.remove("open"); btn.disabled = false;
+          inp.removeEventListener("keydown", onKey); btn.removeEventListener("click", submit);
+          resolve();
+        } else { err.textContent = "Token geçersiz."; btn.disabled = false; }
+      };
+      const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } };
+      btn.addEventListener("click", submit); inp.addEventListener("keydown", onKey);
+    });
+  }
+  // Prompt for login when required and missing/invalid. `force` re-auths on 401.
+  async function ensureToken(force) {
+    if (CONFIG.authRequired && (!token || force)) {
+      if (force) { token = ""; localStorage.removeItem("vb_token"); }
+      await showLogin(force ? "Oturum süresi doldu — tekrar giriş yap." : "");
     }
   }
 
-  // ---------- Render: markdown-ish text → bubble with code blocks ----------
-  // Inline `code` and **bold**, built from DOM nodes (never innerHTML).
+  // ---------- Render: markdown → bubble (DOM nodes only, never innerHTML) ----------
+  // Inline: `code`, **bold**, and [text](http-url) links (http(s) only — safe).
   function appendInline(el, text) {
-    const re = /`([^`]+)`|\*\*([^*]+)\*\*/g;
+    const re = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
     let last = 0, m;
     while ((m = re.exec(text))) {
       if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
       if (m[1] != null) { const c = document.createElement("code"); c.textContent = m[1]; el.appendChild(c); }
-      else { const b = document.createElement("strong"); b.textContent = m[2]; el.appendChild(b); }
+      else if (m[2] != null) { const b = document.createElement("strong"); b.textContent = m[2]; el.appendChild(b); }
+      else {
+        if (/^https?:\/\//i.test(m[4])) {
+          const a = document.createElement("a");
+          a.textContent = m[3]; a.href = m[4]; a.target = "_blank"; a.rel = "noopener noreferrer";
+          el.appendChild(a);
+        } else { el.appendChild(document.createTextNode(m[3] + " (" + m[4] + ")")); }
+      }
       last = re.lastIndex;
     }
     if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
   }
+
+  // Block markdown for non-code text: headings, lists, blockquotes, paragraphs.
+  function appendBlocks(el, text) {
+    let list = null;
+    const flush = () => { if (list) { el.appendChild(list); list = null; } };
+    for (const line of text.split("\n")) {
+      let m;
+      if ((m = line.match(/^(#{1,3})\s+(.*)$/))) {
+        flush(); const h = document.createElement(["h3", "h4", "h5"][m[1].length - 1]);
+        appendInline(h, m[2]); el.appendChild(h);
+      } else if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) {
+        if (!list || list.tagName !== "UL") { flush(); list = document.createElement("ul"); }
+        const li = document.createElement("li"); appendInline(li, m[1]); list.appendChild(li);
+      } else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
+        if (!list || list.tagName !== "OL") { flush(); list = document.createElement("ol"); }
+        const li = document.createElement("li"); appendInline(li, m[1]); list.appendChild(li);
+      } else if ((m = line.match(/^>\s?(.*)$/))) {
+        flush(); const bq = document.createElement("blockquote"); appendInline(bq, m[1]); el.appendChild(bq);
+      } else if (line.trim() === "") {
+        flush();
+      } else {
+        flush(); const div = document.createElement("div"); div.className = "mdline";
+        appendInline(div, line); el.appendChild(div);
+      }
+    }
+    flush();
+  }
+
+  function looksLikeDiff(code) {
+    const lines = code.split("\n");
+    const has = (p) => lines.some((l) => p.test(l));
+    return has(/^\+(?!\+\+)/) && has(/^-(?!--)/);
+  }
+  // A <pre> for a code block; diffs get +/- line coloring.
+  function buildPre(code, lang) {
+    const pre = document.createElement("pre");
+    if (lang === "diff" || looksLikeDiff(code)) {
+      code.replace(/\n$/, "").split("\n").forEach((line, i) => {
+        const span = document.createElement("span");
+        if (/^\+/.test(line)) span.className = "add";
+        else if (/^-/.test(line)) span.className = "del";
+        else if (/^@@/.test(line)) span.className = "hunk";
+        span.textContent = (i ? "\n" : "") + line;
+        pre.appendChild(span);
+      });
+    } else {
+      const codeEl = document.createElement("code"); codeEl.textContent = code; pre.appendChild(codeEl);
+    }
+    return pre;
+  }
+
   function renderInto(el, text) {
     el.textContent = "";
     const parts = text.split(/```/);
     parts.forEach((part, i) => {
       if (i % 2 === 1) {
+        const langMatch = part.match(/^(\w*)\n/);
+        const lang = langMatch ? langMatch[1] : "";
         const code = part.replace(/^\w*\n/, "");
         const wrap = document.createElement("div");
         wrap.className = "codewrap";
@@ -316,40 +517,67 @@
           (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject())
             .then(() => done("Kopyalandı")).catch(() => done("Hata"));
         });
-        const pre = document.createElement("pre");
-        const codeEl = document.createElement("code");
-        codeEl.textContent = code;
-        pre.appendChild(codeEl);
-        wrap.appendChild(btn); wrap.appendChild(pre);
+        wrap.appendChild(btn); wrap.appendChild(buildPre(code, lang));
+        const lines = code.replace(/\n$/, "").split("\n").length;
+        if (lines > 14) { // collapse long output (e.g. npm logs) by default
+          wrap.classList.add("collapsed");
+          const tog = document.createElement("button");
+          tog.className = "togglebtn"; tog.type = "button";
+          const setLabel = () => { tog.textContent = wrap.classList.contains("collapsed") ? ("⌄ tümünü göster (" + lines + " satır)") : "⌃ gizle"; };
+          tog.addEventListener("click", () => { wrap.classList.toggle("collapsed"); setLabel(); });
+          setLabel();
+          wrap.appendChild(tog);
+        }
         el.appendChild(wrap);
       } else if (part) {
-        appendInline(el, part);
+        appendBlocks(el, part);
       }
     });
   }
 
   // ---------- Session DOM ----------
+  function persistHistory(st) {
+    try { localStorage.setItem("vb_hist_" + st.meta.id, JSON.stringify(st.messages.slice(-200))); } catch (_) {}
+  }
+  function renderMsgEl(st, entry) {
+    const div = document.createElement("div");
+    div.className = "msg " + entry.cls;
+    if (entry.cls === "claude") renderInto(div, entry.text || ""); else div.textContent = entry.text || "";
+    div._entry = entry;
+    st.logEl.appendChild(div);
+    return div;
+  }
   function addSessionState(meta) {
     if (S.has(meta.id)) { S.get(meta.id).meta = meta; return S.get(meta.id); }
     const logEl = document.createElement("div");
     logEl.className = "log"; logEl.dataset.session = meta.id;
     logEl.addEventListener("scroll", () => { if (meta.id === activeId) updateJump(); });
     logs.appendChild(logEl);
-    const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false } };
+    const st = { meta, logEl, turn: { busy: false, abort: null, stopped: false }, messages: [] };
     S.set(meta.id, st);
-    const where = meta.runner === "cloud" ? " · ☁️ Bulut" : "";
-    addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nYaz ya da konuş.`, "sys");
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem("vb_hist_" + meta.id) || "[]"); } catch (_) {}
+    if (Array.isArray(saved) && saved.length) {
+      saved.forEach((m) => { st.messages.push(m); renderMsgEl(st, m); });
+    } else {
+      const where = meta.runner === "cloud" ? " · ☁️ Bulut" : "";
+      addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nYaz ya da konuş.`, "sys");
+    }
     return st;
   }
   function addMsg(sessionId, text, cls) {
     const st = S.get(sessionId); if (!st) return null;
     const pinned = nearBottom(st.logEl);
-    const div = document.createElement("div");
-    div.className = "msg " + cls;
-    div.textContent = text || "";
-    st.logEl.appendChild(div);
+    const entry = { cls, text: text || "" };
+    st.messages.push(entry);
+    const div = renderMsgEl(st, entry);
     if (sessionId === activeId) { if (pinned) st.logEl.scrollTop = st.logEl.scrollHeight; updateJump(); }
+    persistHistory(st);
     return div;
+  }
+  function dropMsg(st, el) { // remove a message + its persisted entry (e.g. aborted empty bubble)
+    if (el && el._entry) { const i = st.messages.indexOf(el._entry); if (i >= 0) st.messages.splice(i, 1); persistHistory(st); }
+    if (el) el.remove();
   }
   function modeLabel(agentId, modeId) {
     const a = agentById[agentId]; if (!a) return modeId || "";
@@ -373,6 +601,34 @@
     });
     sel.value = current || a.defaultMode;
   }
+  // ---------- Home: session list landing (mobile Claude Code style) ----------
+  const homeEl = $("home"), homeListEl = $("homeList");
+  function sessionPreview(st) {
+    for (let i = st.messages.length - 1; i >= 0; i--) {
+      const m = st.messages[i];
+      if ((m.cls === "me" || m.cls === "claude") && m.text) return (m.cls === "me" ? "Sen: " : "") + m.text.replace(/\s+/g, " ").slice(0, 90);
+    }
+    return "Henüz mesaj yok";
+  }
+  function renderHome() {
+    homeListEl.innerHTML = "";
+    for (const st of S.values()) {
+      const card = document.createElement("button");
+      card.className = "scard"; card.type = "button";
+      card.innerHTML = '<div class="sc-name"></div><div class="sc-meta"></div><div class="sc-prev"></div>';
+      card.querySelector(".sc-name").textContent = st.meta.name;
+      const where = st.meta.runner === "cloud" ? " · ☁️ Bulut" : "";
+      card.querySelector(".sc-meta").textContent = st.meta.agentLabel + " · " + modeLabel(st.meta.agent, st.meta.mode) + where;
+      card.querySelector(".sc-prev").textContent = sessionPreview(st);
+      card.addEventListener("click", () => openChat(st.meta.id));
+      homeListEl.appendChild(card);
+    }
+  }
+  function showHome() { renderHome(); homeEl.classList.add("open"); }
+  function openChat(id) { homeEl.classList.remove("open"); switchTo(id); }
+  $("backBtn").addEventListener("click", showHome);
+  $("homeNew").addEventListener("click", () => { homeEl.classList.remove("open"); openModal(); });
+
   function switchTo(id) {
     if (!S.has(id)) return;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -466,7 +722,7 @@
         method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice }), signal: st.turn.abort.signal,
       });
-      if (r.status === 401) { localStorage.removeItem("vb_token"); token = ""; throw new Error("Token geçersiz. Sayfayı yenile."); }
+      if (r.status === 401) { ensureToken(true); throw new Error("Token geçersiz — tekrar giriş yap."); }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
       for (;;) {
         const { value, done } = await reader.read();
@@ -489,18 +745,25 @@
           } else if (ev.type === "error") { throw new Error(ev.error || "Sunucu hatası"); }
         }
       }
-      if (full) renderInto(bubble, full); else bubble.textContent = "(boş cevap)";
+      if (full) renderInto(bubble, full); else bubble.textContent = emptyReplyHint(st.meta.agent);
+      bubble._entry.text = full || bubble.textContent; persistHistory(st);
       if (sessionId === activeId) { flushSpeech(); setStatus(""); }
       cue("done");
       if (full) maybeNotify(st.meta.name, full);
     } catch (e) {
-      if (e.name === "AbortError") { if (full) renderInto(bubble, full); else bubble.remove(); }
-      else { bubble.remove(); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); cue("error"); }
+      if (e.name === "AbortError") { if (full) { renderInto(bubble, full); bubble._entry.text = full; persistHistory(st); } else dropMsg(st, bubble); }
+      else { dropMsg(st, bubble); addMsg(sessionId, "⚠️ " + e.message, "sys"); if (sessionId === activeId) setStatus(""); cue("error"); }
     } finally {
       st.turn.busy = false; st.turn.abort = null;
       if (sessionId === activeId) refreshMic();
-      if (!st.turn.stopped && handsfree.checked && CONFIG.sttMode === "browser" && sessionId === activeId) startBrowserSTT();
+      if (!talking && !st.turn.stopped && handsfree.checked && CONFIG.sttMode === "browser" && sessionId === activeId) startBrowserSTT();
     }
+  }
+
+  function emptyReplyHint(agent) {
+    if (agent === "antigravity") return "(boş cevap — agy farklı çağrı isteyebilir; sunucuda AGY_PROMPT_ARG=1 deneyin)";
+    if (agent === "ollama") return "(boş cevap — model çekildi mi? `ollama pull <model>` ve OLLAMA_MODEL'i kontrol edin)";
+    return "(boş cevap)";
   }
 
   // ---------- Text composer ----------
@@ -584,16 +847,121 @@
     ensureAudio();
     const st = active();
     if (st && st.turn.busy) { stopActive(); return; }
+    if (CONFIG.sttMode === "browser" && !SR) { setStatus(noVoiceMsg()); composer.focus(); return; }
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
     ensureToken();
     if (CONFIG.sttMode === "whisper") { if (recognizing) stopWhisper(); else startWhisper(); }
     else { if (recognizing) stopBrowserSTT(); else startBrowserSTT(); }
   });
 
+  // ---------- Talking mode: continuous, hands-free voice conversation ----------
+  const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard");
+  let talking = false, trec = null, talkFinal = "", talkSilence = null;
+  function setTalkState(s, label) { talkOrb.className = "orb " + s; talkStateEl.textContent = label; }
+  function enterTalking() {
+    if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
+    ensureToken(); ensureAudio();
+    talking = true; talkEl.classList.add("open"); talkHeard.textContent = "";
+    startTalkListen();
+  }
+  function exitTalking() {
+    talking = false;
+    clearTimeout(talkSilence);
+    if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    speakQueue.length = 0; speakBuf = ""; speaking = false;
+    talkEl.classList.remove("open");
+  }
+  function startTalkListen() {
+    if (!talking) return;
+    talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = "";
+    trec = new SR();
+    trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
+    trec.onresult = (ev) => {
+      let interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) talkFinal += r[0].transcript; else interim += r[0].transcript;
+      }
+      talkHeard.textContent = (talkFinal + " " + interim).trim();
+      clearTimeout(talkSilence);
+      talkSilence = setTimeout(onTalkSilence, talkSilenceMs());
+    };
+    trec.onerror = () => {}; // ignore no-speech etc.; onend will restart
+    trec.onend = () => { if (talking && talkOrb.classList.contains("listening")) { try { trec.start(); } catch (_) {} } };
+    try { trec.start(); } catch (_) {}
+  }
+  function onTalkSilence() {
+    const text = talkFinal.trim();
+    if (!text) return; // nothing heard yet; keep listening
+    if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; } // pause during the turn (no TTS feedback)
+    talkTurn(text);
+  }
+  async function talkTurn(text) {
+    setTalkState("thinking", "Düşünüyor…"); talkHeard.textContent = text;
+    addMsg(activeId, text, "me");
+    await ask(activeId, text);
+    if (!talking) return;
+    setTalkState("speaking", "Konuşuyor… (kesmek için dokun)");
+    await new Promise((res) => { const t = setInterval(() => { if (!talking || (!speaking && !speakQueue.length)) { clearInterval(t); res(); } }, 200); });
+    if (talking) startTalkListen();
+  }
+  $("talkBtn").addEventListener("click", enterTalking);
+  $("talkExit").addEventListener("click", exitTalking);
+  // Barge-in: tap the orb while it's speaking to cut the reply short. talkTurn
+  // is awaiting the speech queue to drain, so clearing it makes it move on to
+  // listening on its own (no double-start race).
+  talkOrb.addEventListener("click", () => {
+    if (!talking || !talkOrb.classList.contains("speaking")) return;
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    speakQueue.length = 0; speakBuf = ""; speaking = false;
+  });
+
+  // ---------- Command palette: repo's commands (.claude/commands + npm) ----------
+  const paletteEl = $("palette"), paletteListEl = $("paletteList"), paletteSearch = $("paletteSearch");
+  let paletteItems = [];
+  function renderPalette(q) {
+    q = (q || "").toLowerCase();
+    paletteListEl.innerHTML = "";
+    const items = paletteItems.filter((it) => it.label.toLowerCase().includes(q));
+    if (!items.length) { paletteListEl.textContent = paletteItems.length ? "Eşleşme yok." : "Bu projede komut bulunamadı."; return; }
+    let lastG = null;
+    items.forEach((it) => {
+      if (it.group !== lastG) { const h = document.createElement("div"); h.className = "pal-g"; h.textContent = it.group; paletteListEl.appendChild(h); lastG = it.group; }
+      const b = document.createElement("button"); b.type = "button"; b.textContent = it.label;
+      b.addEventListener("click", () => { composer.value = it.value; paletteEl.classList.remove("open"); composer.focus(); composer.dispatchEvent(new Event("input")); });
+      paletteListEl.appendChild(b);
+    });
+  }
+  async function openPalette() {
+    if (!activeId) return;
+    ensureToken();
+    paletteItems = []; paletteListEl.textContent = "Yükleniyor…"; paletteSearch.value = "";
+    paletteEl.classList.add("open");
+    try {
+      const data = await (await fetch("/api/commands?sessionId=" + encodeURIComponent(activeId), { headers: authHeaders() })).json();
+      (data.groups || []).forEach((g) => g.items.forEach((it) => paletteItems.push(Object.assign({ group: g.label }, it))));
+    } catch (_) {}
+    renderPalette("");
+    paletteSearch.focus();
+  }
+  $("cmdBtn").addEventListener("click", openPalette);
+  $("paletteClose").addEventListener("click", () => paletteEl.classList.remove("open"));
+  paletteEl.addEventListener("click", (e) => { if (e.target === paletteEl) paletteEl.classList.remove("open"); });
+  paletteSearch.addEventListener("input", () => renderPalette(paletteSearch.value));
+
+  // Escape closes any open overlay (or exits talking mode).
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (talking) { exitTalking(); return; }
+    [modal, settingsEl, paletteEl].forEach((m) => m.classList.remove("open"));
+  });
+
   resetBtn.addEventListener("click", async () => {
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}
-    const st = active(); if (st) st.logEl.innerHTML = "";
+    const st = active(); if (st) { st.logEl.innerHTML = ""; st.messages = []; persistHistory(st); }
     addMsg(activeId, "Yeni sohbet başladı.", "sys");
+    settingsEl.classList.remove("open"); // reveal the fresh chat
   });
 
   sessionSel.addEventListener("change", () => switchTo(sessionSel.value));
@@ -606,7 +974,7 @@
       const r = await fetch("/api/sessions/" + activeId, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ name }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Olmadı");
-      st.meta = data.session; rebuildSessionSelect();
+      st.meta = data.session; rebuildSessionSelect(); settingsEl.classList.remove("open");
     } catch (e) { alert("⚠️ " + e.message); }
   });
   $("delSession").addEventListener("click", async () => {
@@ -617,14 +985,17 @@
       const r = await fetch("/api/sessions/" + activeId, { method: "DELETE", headers: authHeaders() });
       if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Olmadı"); }
       st.logEl.remove(); S.delete(activeId);
+      try { localStorage.removeItem("vb_hist_" + activeId); } catch (_) {}
       activeId = defaultSessionId && S.has(defaultSessionId) ? defaultSessionId : (S.keys().next().value || null);
-      rebuildSessionSelect(); if (activeId) switchTo(activeId);
+      rebuildSessionSelect(); settingsEl.classList.remove("open");
+      if (activeId) switchTo(activeId); else showHome();
     } catch (e) { alert("⚠️ " + e.message); }
   });
   modeSel.addEventListener("change", () => { const st = active(); if (st) st.meta.mode = modeSel.value; prefs.mode = modeSel.value; savePrefs(); });
   langSel.addEventListener("change", () => { prefs.lang = langSel.value; savePrefs(); populateVoices(); });
   ttsVoiceSel.addEventListener("change", () => { prefs.voices = prefs.voices || {}; prefs.voices[langKey()] = ttsVoiceSel.value; savePrefs(); });
   rateInput.addEventListener("change", () => { prefs.rate = parseFloat(rateInput.value) || 1; savePrefs(); });
+  talkSilenceInput.addEventListener("change", () => { prefs.talkSilence = parseFloat(talkSilenceInput.value) || 1.3; savePrefs(); });
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
@@ -665,17 +1036,53 @@
   const RUNNER_LABEL = { local: "💻 Yerel", cloud: "☁️ Bulut" };
   function openModal() {
     nsAgent.innerHTML = "";
-    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label; nsAgent.appendChild(o); });
+    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label + (a.available === false ? " — bulunamadı" : ""); nsAgent.appendChild(o); });
     const runners = CONFIG.runners || ["local"];
     const nsRunner = $("ns-runner"); nsRunner.innerHTML = "";
     runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
     $("ns-runner-row").style.display = runners.length > 1 ? "flex" : "none";
     $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
+    $("ns-tree").style.display = "none";
     fillModeSelect(nsMode, nsAgent.value);
+    refreshOllamaModels();
     renderFavSelect();
     modal.classList.add("open");
   }
-  nsAgent.addEventListener("change", () => fillModeSelect(nsMode, nsAgent.value));
+  async function refreshOllamaModels() {
+    const row = $("ns-omodel-row"), sel = $("ns-omodel");
+    if (nsAgent.value !== "ollama") { row.style.display = "none"; return; }
+    row.style.display = "flex";
+    sel.innerHTML = '<option value="">(varsayılan)</option>';
+    try {
+      const { models } = await (await fetch("/api/ollama/models", { headers: authHeaders() })).json();
+      (models || []).forEach((m) => { const o = document.createElement("option"); o.value = m; o.textContent = m; sel.appendChild(o); });
+    } catch (_) {}
+  }
+  nsAgent.addEventListener("change", () => { fillModeSelect(nsMode, nsAgent.value); refreshOllamaModels(); });
+
+  // Folder browser for the project directory.
+  const nsTree = $("ns-tree");
+  async function browseTo(p) {
+    try {
+      const u = new URLSearchParams(); if (p) u.set("path", p);
+      if (($("ns-runner").value || "local") === "cloud") u.set("runner", "cloud"); // browse the remote host
+      const data = await (await fetch("/api/browse?" + u.toString(), { headers: authHeaders() })).json();
+      $("ns-dir").value = data.path || "";
+      nsTree.innerHTML = "";
+      const cur = document.createElement("div"); cur.className = "cur"; cur.textContent = data.path || ""; nsTree.appendChild(cur);
+      if (data.parent) { const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.textContent = "⬆ üst"; b.addEventListener("click", () => browseTo(data.parent)); nsTree.appendChild(b); }
+      (data.dirs || []).forEach((d) => {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = "📁 " + d;
+        b.addEventListener("click", () => browseTo((data.path.endsWith("/") ? data.path : data.path + "/") + d));
+        nsTree.appendChild(b);
+      });
+      nsTree.style.display = "flex";
+    } catch (_) {}
+  }
+  $("ns-browse").addEventListener("click", () => {
+    if (nsTree.style.display === "none") browseTo($("ns-dir").value.trim());
+    else nsTree.style.display = "none";
+  });
   nsFav.addEventListener("change", applyFav);
   $("ns-save").addEventListener("click", () => {
     const dir = $("ns-dir").value.trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
@@ -694,11 +1101,12 @@
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {
     const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
+    if (nsAgent.value === "ollama" && $("ns-omodel").value) body.model = $("ns-omodel").value;
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Oluşturulamadı");
-      addSessionState(data.session); rebuildSessionSelect(); modal.classList.remove("open"); switchTo(data.session.id);
+      addSessionState(data.session); rebuildSessionSelect(); modal.classList.remove("open"); openChat(data.session.id);
     } catch (e) { alert("⚠️ " + e.message); }
   });
 
@@ -721,13 +1129,16 @@
   cuesChk.checked = cuesOn();
   notifyChk.checked = !!prefs.notify;
   rateInput.value = prefs.rate || 1;
+  talkSilenceInput.value = prefs.talkSilence || 1.3;
+  fontSizeInput.value = prefs.fontSize || 15;
+  applyFontSize();
   populateVoices();
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
-    if (CONFIG.sttMode === "browser" && !SR) { setStatus("Tarayıcı konuşma tanımayı desteklemiyor — iOS'ta Safari kullan."); micBtn.disabled = true; }
+    if (CONFIG.sttMode === "browser" && !SR) { micBtn.classList.add("na"); setStatus(noVoiceMsg()); }
     if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }
-    ensureToken();
+    await ensureToken();
     let list = { sessions: [], defaultSessionId: null };
     try { list = await (await fetch("/api/sessions", { headers: authHeaders() })).json(); } catch (_) {}
     (list.sessions || []).forEach(addSessionState);
@@ -737,6 +1148,7 @@
     rebuildSessionSelect();
     if (prefs.voice) for (const st of S.values()) st.meta.voice = true;
     if (activeId) switchTo(activeId);
+    showHome(); // land on the session list
     if (prefs.notify) ensurePush();
   })();
 })();

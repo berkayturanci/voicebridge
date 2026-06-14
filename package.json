@@ -1,6 +1,6 @@
 {
   "name": "voicebridge",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "description": "Hands-free, two-way voice for coding agents (Claude Code, Codex, Antigravity) from your phone. Free, open-source, no ElevenLabs. Browser Web Speech (STT/TTS) + a tiny zero-dependency Node bridge that drives the agent CLI on your machine.",
   "license": "MIT",
   "type": "commonjs",

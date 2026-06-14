@@ -186,6 +186,42 @@ test("/api/stt is rejected when whisper is not configured", async () => {
   assert.strictEqual(r.status, 500);
 });
 
+test("/api/browse lists subdirectories with a parent link", async () => {
+  const data = JSON.parse((await request(server, "GET", "/api/browse?path=" + encodeURIComponent(process.cwd()))).data);
+  assert.strictEqual(data.path, process.cwd());
+  assert.ok(Array.isArray(data.dirs) && data.dirs.includes("public") && data.dirs.includes("test"));
+  assert.ok(!data.dirs.includes(".git")); // dotfiles hidden
+  assert.strictEqual(typeof data.parent, "string");
+});
+
+test("/api/commands lists the project's npm scripts for a session", async () => {
+  const { defaultSessionId } = JSON.parse((await request(server, "GET", "/api/sessions")).data);
+  const data = JSON.parse((await request(server, "GET", "/api/commands?sessionId=" + defaultSessionId)).data);
+  const npm = (data.groups || []).find((g) => /npm/.test(g.label));
+  assert.ok(npm && npm.items.some((it) => it.value === "npm run test"));
+});
+
+test("/api/browse?runner=cloud proxies to the cloud runner", async () => {
+  const remote = http.createServer((rq, rs) => {
+    if (rq.method === "GET" && rq.url.split("?")[0] === "/browse") {
+      const p = new URL(rq.url, "http://x").searchParams.get("path");
+      rs.writeHead(200, { "Content-Type": "application/json" });
+      return rs.end(JSON.stringify({ path: p || "/remote", parent: "/", dirs: ["alpha", "beta"] }));
+    }
+    rs.writeHead(404); rs.end();
+  });
+  await new Promise((r) => remote.listen(0, "127.0.0.1", r));
+  process.env.CLOUD_RUNNER_URL = "http://127.0.0.1:" + remote.address().port + "/";
+  try {
+    const data = JSON.parse((await request(server, "GET", "/api/browse?runner=cloud&path=" + encodeURIComponent("/remote/app"))).data);
+    assert.deepStrictEqual(data.dirs, ["alpha", "beta"]);
+    assert.strictEqual(data.path, "/remote/app");
+  } finally {
+    delete process.env.CLOUD_RUNNER_URL;
+    await new Promise((r) => remote.close(r));
+  }
+});
+
 test("unknown method and endpoint", async () => {
   assert.strictEqual((await request(server, "POST", "/")).status, 405);
   assert.strictEqual((await request(server, "GET", "/api/nope")).status, 404);
@@ -221,12 +257,45 @@ process.stdout.write(JSON.stringify({type:"result",subtype:"success"})+"\\n");
   }
 });
 
+test("ollama HTTP backend streams and keeps conversation history", async () => {
+  const ollama = http.createServer((rq, rs) => {
+    if (rq.url === "/api/tags") { rs.writeHead(200); return rs.end(JSON.stringify({ models: [{ name: "llama3.2" }, { name: "qwen" }] })); }
+    if (rq.url === "/api/chat") {
+      let b = ""; rq.on("data", (c) => (b += c)); rq.on("end", () => {
+        const msgs = (JSON.parse(b || "{}").messages) || [];
+        rs.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        rs.write(JSON.stringify({ message: { role: "assistant", content: "msgs=" + msgs.length } }) + "\n");
+        rs.end(JSON.stringify({ done: true }) + "\n");
+      });
+      return;
+    }
+    rs.writeHead(404); rs.end();
+  });
+  await new Promise((r) => ollama.listen(0, "127.0.0.1", r));
+  process.env.OLLAMA_URL = "http://127.0.0.1:" + ollama.address().port;
+  try {
+    const { session } = JSON.parse((await request(server, "POST", "/api/sessions", { agent: "ollama", projectDir: process.cwd() })).data);
+    assert.strictEqual(session.agent, "ollama");
+    let evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.strictEqual(evs.filter((e) => e.type === "delta").map((e) => e.text).join(""), "msgs=1");
+    assert.strictEqual(evs[evs.length - 1].type, "done");
+    evs = ndjson((await request(server, "POST", "/api/ask", { text: "again", sessionId: session.id })).data);
+    assert.strictEqual(evs.filter((e) => e.type === "delta").map((e) => e.text).join(""), "msgs=3"); // user+assistant+user
+    const m = JSON.parse((await request(server, "GET", "/api/ollama/models")).data);
+    assert.deepStrictEqual(m.models, ["llama3.2", "qwen"]);
+  } finally {
+    delete process.env.OLLAMA_URL;
+    await new Promise((r) => ollama.close(r));
+  }
+});
+
 test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {
   // A stub remote runner that speaks our NDJSON protocol.
   const remote = http.createServer((rq, rs) => {
     let body = ""; rq.on("data", (c) => (body += c)); rq.on("end", () => {
       const payload = JSON.parse(body || "{}");
       rs.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      rs.write(JSON.stringify({ type: "activity", text: "Edit x.js" }) + "\n");
       rs.write(JSON.stringify({ type: "delta", text: "cloud:" + payload.text }) + "\n");
       rs.end(JSON.stringify({ type: "done" }) + "\n");
     });
@@ -239,6 +308,7 @@ test("cloud runner: /api/ask proxies to CLOUD_RUNNER_URL", async () => {
     const { session } = JSON.parse(create.data);
     assert.strictEqual(session.runner, "cloud");
     const evs = ndjson((await request(server, "POST", "/api/ask", { text: "hi", sessionId: session.id })).data);
+    assert.ok(evs.some((e) => e.type === "activity" && /Edit x\.js/.test(e.text))); // forwarded unchanged
     assert.ok(evs.some((e) => e.type === "delta" && /cloud:hi/.test(e.text)));
     assert.strictEqual(evs[evs.length - 1].type, "done");
   } finally {

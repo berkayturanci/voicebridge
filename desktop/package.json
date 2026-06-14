@@ -1,0 +1,36 @@
+{
+  "name": "voicebridge-desktop",
+  "version": "0.1.0",
+  "description": "Desktop control app for the voicebridge agent — runs the Node bridge with a small panel and tray. Mac/Windows/Linux.",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node assets/gen-icons.js",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.0"
+  },
+  "build": {
+    "appId": "dev.voicebridge.desktop",
+    "productName": "voicebridge",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "renderer/**", "assets/*.png"],
+    "extraResources": [
+      { "from": "../server.js", "to": "bridge/server.js" },
+      { "from": "../public", "to": "bridge/public" }
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon@512.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "win": { "target": "nsis", "icon": "assets/icon@512.png" },
+    "linux": { "target": "AppImage", "icon": "assets/icon@512.png" }
+  }
+}

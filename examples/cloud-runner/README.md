@@ -28,9 +28,16 @@ npm start
 ```
 
 Now the new-session dialog offers a **☁️ Bulut** runner; turns for those sessions
-are executed on the runner host.
+are executed on the runner host, and the **folder picker** browses the runner
+host (the bridge proxies it).
 
 ## Protocol
+
+The runner also answers `GET /browse?path=<dir>` (same Bearer auth) with
+`{ "path", "parent", "dirs": [...] }`, so the bridge's folder picker can list the
+**remote** host's directories for cloud sessions.
+
+
 
 The bridge POSTs JSON:
 

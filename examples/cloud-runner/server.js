@@ -15,7 +15,7 @@
 const http = require("http");
 const fs = require("fs");
 const { spawn } = require("child_process");
-const { AGENTS, buildPrompt } = require("../../server.js");
+const { AGENTS, buildPrompt, browseDir } = require("../../server.js");
 
 function isDir(p) { try { return fs.statSync(p).isDirectory(); } catch (_) { return false; } }
 
@@ -29,6 +29,13 @@ function authorized(req) {
 }
 
 const server = http.createServer((req, res) => {
+  // GET /browse: list this (remote) host's directories for the folder picker.
+  if (req.method === "GET" && req.url.split("?")[0] === "/browse") {
+    if (!authorized(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: "unauthorized" })); }
+    const p = new URL(req.url, "http://x").searchParams.get("path");
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    return res.end(JSON.stringify(browseDir(p)));
+  }
   if (req.method !== "POST") { res.writeHead(405); return res.end(); }
   if (!authorized(req)) { res.writeHead(401); return res.end(JSON.stringify({ type: "error", error: "unauthorized" }) + "\n"); }
 

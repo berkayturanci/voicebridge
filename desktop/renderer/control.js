@@ -1,0 +1,86 @@
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+function setRunning(running) {
+  const pill = $("pill");
+  pill.textContent = running ? "● Çalışıyor" : "○ Durdu";
+  pill.classList.toggle("on", running);
+  $("toggle").textContent = running ? "Durdur" : "Başlat";
+  $("open").disabled = !running;
+}
+
+function appendLog(line) {
+  const el = $("log");
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  el.textContent += line + "\n";
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+async function refresh() {
+  const s = await window.vb.getStatus();
+  $("port").value = s.settings.port || 8787;
+  $("host").value = s.settings.host || "127.0.0.1";
+  $("token").value = s.settings.token || "";
+  $("url").textContent = s.url;
+  $("log").textContent = (s.logs || []).join("\n") + (s.logs && s.logs.length ? "\n" : "");
+  $("log").scrollTop = $("log").scrollHeight;
+  setRunning(s.running);
+  refreshInfo();
+}
+
+// Agents + active sessions, pulled from the running bridge.
+async function refreshInfo() {
+  const info = await window.vb.info();
+  const ag = $("agents");
+  ag.textContent = "";
+  const agents = info.agents || [];
+  if (!agents.length) { ag.innerHTML = '<span class="tag">—</span>'; }
+  agents.forEach((a) => {
+    const t = document.createElement("span");
+    t.className = "tag" + (a.available ? " on" : "");
+    t.textContent = (a.available ? "● " : "○ ") + (a.label || a.id);
+    ag.appendChild(t);
+  });
+  const se = $("sessions");
+  se.textContent = "";
+  const sessions = info.sessions || [];
+  if (!sessions.length) { se.innerHTML = '<div class="sess">—</div>'; return; }
+  sessions.forEach((x) => {
+    const d = document.createElement("div");
+    d.className = "sess";
+    const bits = [x.agentLabel || x.agent, x.mode].filter(Boolean);
+    if (x.runner === "cloud") bits.push("☁️");
+    d.textContent = "• " + x.name + "  (" + bits.join(" · ") + ")";
+    se.appendChild(d);
+  });
+}
+
+function currentSettings() {
+  return {
+    port: parseInt($("port").value, 10) || 8787,
+    host: $("host").value.trim() || "127.0.0.1",
+    token: $("token").value.trim(),
+  };
+}
+
+$("gen").addEventListener("click", async () => {
+  $("token").value = await window.vb.generateToken();
+});
+$("apply").addEventListener("click", async () => {
+  await window.vb.saveSettings(currentSettings());
+  await window.vb.restart();
+  setTimeout(refresh, 400);
+});
+$("toggle").addEventListener("click", async () => {
+  const s = await window.vb.getStatus();
+  if (s.running) await window.vb.stop();
+  else { await window.vb.saveSettings(currentSettings()); await window.vb.start(); }
+  setTimeout(refresh, 400);
+});
+$("open").addEventListener("click", () => window.vb.openWeb());
+
+window.vb.onLog(appendLog);
+window.vb.onStatus((running) => { setRunning(running); refresh(); });
+
+refresh();
+setInterval(refreshInfo, 4000); // keep the agents/sessions panel live
