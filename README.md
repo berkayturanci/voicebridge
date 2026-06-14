@@ -179,7 +179,11 @@ transcribes). Hands-free loop is browser-mode only.
   while the agent answers or speaks.
 - **Talking mode** (📞): a continuous, hands-free voice conversation — speak, it
   auto-sends on a pause, the reply is read aloud, then it listens again. A minimal
-  voice screen shows *listening / thinking / speaking*. (Needs HTTPS for the mic.)
+  voice screen shows *listening / thinking / speaking*; the orb **grows and glows
+  as it hears you**. Tap the orb while it's speaking to **interrupt** (barge-in),
+  or the **🎙️ (top-left)** to **mute** the mic and pause without leaving — tap
+  again to resume. Backgrounding the tab (e.g. opening the camera) frees the mic
+  automatically. (Needs HTTPS for the mic.)
 - **Command palette** (⌘): pick from the project's own commands — `.claude/commands`
   slash commands (e.g. `/keel:ship`) and `package.json` npm scripts — searchable;
   selecting one prefills the composer.
@@ -285,7 +289,8 @@ CLAUDE_BIN=/tmp/claude npm start   # open the printed URL, type or speak
 | iOS mic doesn't work | Use the Safari **tab**, not an installed PWA (iOS blocks the mic in installed PWAs). |
 | "Could not find 'claude'…" | Set `CLAUDE_BIN` to the agent's path (`which claude`) and make sure it's logged in. |
 | 401 / keeps asking for a token | `ACCESS_TOKEN` is set — enter it once on the phone, or scan the QR (it carries the token). |
-| Replies don't speak | Tap the screen once (browsers need a gesture to start audio); check the voice/rate options. |
+| Replies don't speak | TTS is unlocked on your first tap (mic/send) — interact once, then replies speak. Still silent? Check the voice/rate options and that the device isn't on silent. |
+| Mic indicator stays on when idle | The recognizer is released on pause/mute/exit, when hands-free is off, and when the tab is backgrounded. iOS may show the dot for a second after release; if it persists, turn **Eller serbest** off (it listens between turns by design). |
 | No notifications | Enable **Bildirim** and allow the permission; real push needs VAPID keys (see configuration). |
 
 ## Security checklist
