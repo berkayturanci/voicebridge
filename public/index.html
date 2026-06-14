@@ -91,13 +91,13 @@
   .chips { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
   .chip { flex: none; padding: 6px 11px; border-radius: 16px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 13px; white-space: nowrap; }
   .chip:disabled { opacity: .4; }
-  .composer { display: flex; align-items: flex-end; gap: 8px; }
+  .composer { display: flex; align-items: flex-end; gap: 6px; }
   #composer {
     flex: 1; resize: none; min-height: 44px; max-height: 140px; padding: 11px 12px;
     background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 12px;
     font: inherit; font-size: 16px; line-height: 1.3;
   }
-  .iconbtn { flex: none; width: 46px; height: 46px; border-radius: 50%; border: none; font-size: 21px; color: #fff; }
+  .iconbtn { flex: none; width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 20px; color: #fff; }
   #send { background: var(--accent); }
   #send:disabled { opacity: .4; }
   #mic { background: var(--green); transition: transform .1s, background .2s; }
@@ -131,10 +131,13 @@
   #talk { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 20; padding: 24px; }
   #talk.open { display: flex; }
   #talk #talkExit { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 16px; }
+  #talk #talkMute { position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 17px; }
+  #talk #talkMute.on { background: #da3633; border-color: #da3633; color: #fff; }
   #talk .orb { width: 150px; height: 150px; border-radius: 50%; background: var(--green); transition: background .3s; }
   #talk .orb.listening { background: #3fb950; animation: orbpulse 1.6s infinite; }
   #talk .orb.thinking { background: #9e6a03; animation: orbpulse 1s infinite; }
   #talk .orb.speaking { background: var(--accent); animation: orbpulse 1.1s infinite; cursor: pointer; }
+  #talk .orb.muted { background: var(--muted); animation: none; box-shadow: none; cursor: pointer; opacity: .8; }
   @keyframes orbpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,.45); transform: scale(1); } 50% { box-shadow: 0 0 0 26px rgba(63,185,80,0); transform: scale(1.04); } }
   #talkState { font-size: 19px; font-weight: 600; }
   #talkHeard { font-size: 16px; color: var(--muted); text-align: center; min-height: 44px; max-width: 92%; }
@@ -185,7 +188,7 @@
     <div id="status"></div>
     <div class="chips" id="chips"></div>
     <div class="composer">
-      <textarea id="composer" rows="1" placeholder="Yaz ya da 🎤 ile konuş…" enterkeyhint="send"></textarea>
+      <textarea id="composer" rows="1" placeholder="Yaz ya da konuş…" enterkeyhint="send"></textarea>
       <button id="cmdBtn" class="iconbtn" aria-label="Komutlar" title="Komutlar">⌘</button>
       <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
       <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
@@ -212,10 +215,11 @@
 
   <div id="talk">
     <button id="talkExit" aria-label="Bitir">✕</button>
+    <button id="talkMute" aria-label="Mikrofonu sessize al">🎙️</button>
     <div class="orb" id="talkOrb"></div>
     <div id="talkState">Hazır</div>
     <div id="talkHeard"></div>
-    <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler.</div>
+    <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler. Sol üstteki 🎙️ ile mikrofonu geçici sessize alabilirsin.</div>
   </div>
 
   <div id="palette">
@@ -855,17 +859,18 @@
   });
 
   // ---------- Talking mode: continuous, hands-free voice conversation ----------
-  const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard");
-  let talking = false, trec = null, talkFinal = "", talkSilence = null;
+  const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard"), muteBtn = $("talkMute");
+  let talking = false, trec = null, talkFinal = "", talkSilence = null, talkMuted = false;
   function setTalkState(s, label) { talkOrb.className = "orb " + s; talkStateEl.textContent = label; }
   function enterTalking() {
     if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
     ensureToken(); ensureAudio();
     talking = true; talkEl.classList.add("open"); talkHeard.textContent = "";
+    talkMuted = false; muteBtn.classList.remove("on"); muteBtn.textContent = "🎙️"; muteBtn.setAttribute("aria-label", "Mikrofonu sessize al");
     startTalkListen();
   }
   function exitTalking() {
-    talking = false;
+    talking = false; talkMuted = false;
     clearTimeout(talkSilence);
     if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -874,6 +879,7 @@
   }
   function startTalkListen() {
     if (!talking) return;
+    if (talkMuted) { setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)"); talkHeard.textContent = ""; return; }
     talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = "";
     trec = new SR();
     trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
@@ -912,10 +918,27 @@
   // is awaiting the speech queue to drain, so clearing it makes it move on to
   // listening on its own (no double-start race).
   talkOrb.addEventListener("click", () => {
-    if (!talking || !talkOrb.classList.contains("speaking")) return;
+    if (!talking) return;
+    if (talkMuted) { setTalkMuted(false); return; } // tap the muted orb to resume listening
+    if (!talkOrb.classList.contains("speaking")) return;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
   });
+  // Mute: pause listening in talking mode without ending the session (resume to continue).
+  function setTalkMuted(m) {
+    talkMuted = m;
+    muteBtn.classList.toggle("on", m);
+    muteBtn.textContent = m ? "🔇" : "🎙️";
+    muteBtn.setAttribute("aria-label", m ? "Mikrofonu aç" : "Mikrofonu sessize al");
+    if (m) {
+      clearTimeout(talkSilence);
+      if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
+      if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)");
+    } else if (talking && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
+      startTalkListen();
+    }
+  }
+  muteBtn.addEventListener("click", () => setTalkMuted(!talkMuted));
 
   // ---------- Command palette: repo's commands (.claude/commands + npm) ----------
   const paletteEl = $("palette"), paletteListEl = $("paletteList"), paletteSearch = $("paletteSearch");
