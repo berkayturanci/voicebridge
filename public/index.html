@@ -134,7 +134,7 @@
   #talk #talkMute { position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 16px; background: var(--panel2); color: var(--text); border: 1px solid var(--border2); border-radius: 50%; width: 42px; height: 42px; font-size: 17px; }
   #talk #talkMute.on { background: #da3633; border-color: #da3633; color: #fff; }
   #talk .orb { width: 150px; height: 150px; border-radius: 50%; background: var(--green); transition: background .3s; }
-  #talk .orb.listening { background: #3fb950; animation: orbpulse 1.6s infinite; }
+  #talk .orb.listening { background: #3fb950; will-change: transform, box-shadow; }
   #talk .orb.thinking { background: #9e6a03; animation: orbpulse 1s infinite; }
   #talk .orb.speaking { background: var(--accent); animation: orbpulse 1.1s infinite; cursor: pointer; }
   #talk .orb.muted { background: var(--muted); animation: none; box-shadow: none; cursor: pointer; opacity: .8; }
@@ -322,11 +322,15 @@
 
   // ---------- Eyes-free audio cues (WebAudio earcons) ----------
   const cuesOn = () => prefs.cues !== false; // default on
-  let actx = null;
+  let actx = null, ttsPrimed = false;
   function ensureAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!actx && AC) actx = new AC();
     if (actx && actx.state === "suspended") actx.resume();
+    // iOS/Safari block speechSynthesis until it's first kicked off inside a user gesture.
+    if (!ttsPrimed && "speechSynthesis" in window) {
+      try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); ttsPrimed = true; } catch (_) {}
+    }
   }
   function tone(freq, startAt, dur, gain) {
     if (!actx) return;
@@ -862,6 +866,19 @@
   const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard"), muteBtn = $("talkMute");
   let talking = false, trec = null, talkFinal = "", talkSilence = null, talkMuted = false;
   function setTalkState(s, label) { talkOrb.className = "orb " + s; talkStateEl.textContent = label; }
+  // Voice-reactive orb: grows + glows as your speech is picked up; gentle idle breathing otherwise.
+  let orbLevel = 0, orbRAF = 0;
+  function orbTick(ts) {
+    orbRAF = requestAnimationFrame(orbTick);
+    orbLevel *= 0.86;
+    const idle = 0.5 + 0.5 * Math.sin((ts || 0) / 700);
+    const lvl = Math.max(orbLevel, idle * 0.12);
+    talkOrb.style.transform = "scale(" + (1 + lvl * 0.22).toFixed(3) + ")";
+    talkOrb.style.boxShadow = "0 0 " + Math.round(14 + lvl * 52) + "px rgba(63,185,80," + (0.18 + lvl * 0.32).toFixed(2) + ")";
+  }
+  function orbMeterStart() { if (!orbRAF) orbRAF = requestAnimationFrame(orbTick); }
+  function orbMeterStop() { if (orbRAF) cancelAnimationFrame(orbRAF); orbRAF = 0; orbLevel = 0; talkOrb.style.transform = ""; talkOrb.style.boxShadow = ""; }
+  function orbBump() { orbLevel = Math.min(1, orbLevel + 0.55); }
   function enterTalking() {
     if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
     ensureToken(); ensureAudio();
@@ -871,7 +888,7 @@
   }
   function exitTalking() {
     talking = false; talkMuted = false;
-    clearTimeout(talkSilence);
+    clearTimeout(talkSilence); orbMeterStop();
     if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
@@ -880,7 +897,7 @@
   function startTalkListen() {
     if (!talking) return;
     if (talkMuted) { setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)"); talkHeard.textContent = ""; return; }
-    talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = "";
+    talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = ""; orbMeterStart();
     trec = new SR();
     trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
     trec.onresult = (ev) => {
@@ -889,7 +906,7 @@
         const r = ev.results[i];
         if (r.isFinal) talkFinal += r[0].transcript; else interim += r[0].transcript;
       }
-      talkHeard.textContent = (talkFinal + " " + interim).trim();
+      talkHeard.textContent = (talkFinal + " " + interim).trim(); orbBump();
       clearTimeout(talkSilence);
       talkSilence = setTimeout(onTalkSilence, talkSilenceMs());
     };
@@ -901,6 +918,7 @@
     const text = talkFinal.trim();
     if (!text) return; // nothing heard yet; keep listening
     if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; } // pause during the turn (no TTS feedback)
+    orbMeterStop();
     talkTurn(text);
   }
   async function talkTurn(text) {
@@ -931,7 +949,7 @@
     muteBtn.textContent = m ? "🔇" : "🎙️";
     muteBtn.setAttribute("aria-label", m ? "Mikrofonu aç" : "Mikrofonu sessize al");
     if (m) {
-      clearTimeout(talkSilence);
+      clearTimeout(talkSilence); orbMeterStop();
       if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
       if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)");
     } else if (talking && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
