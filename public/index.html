@@ -821,12 +821,12 @@
     rec = new SR();
     rec.lang = langSel.value; rec.interimResults = false; rec.maxAlternatives = 1;
     rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Dinliyorum…"); cue("listen"); };
-    rec.onerror = (e) => { recognizing = false; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
-    rec.onend = () => { recognizing = false; refreshMic(); };
+    rec.onerror = (e) => { recognizing = false; rec = null; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
+    rec.onend = () => { recognizing = false; rec = null; refreshMic(); }; // drop the recognizer so iOS releases the mic
     rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) { addMsg(activeId, t, "me"); ask(activeId, t); } };
     try { rec.start(); } catch (_) {}
   }
-  function stopBrowserSTT() { if (rec && recognizing) rec.stop(); }
+  function stopBrowserSTT() { if (rec) { try { rec.onend = null; rec.onresult = null; rec.abort(); } catch (_) {} rec = null; } recognizing = false; refreshMic(); }
 
   // ---------- Whisper recording ----------
   let mediaRec = null, chunks = [];
@@ -935,7 +935,12 @@
   $("talkExit").addEventListener("click", exitTalking);
   // Free the mic if the tab is backgrounded mid-conversation (e.g. you switch to the camera),
   // so it never lingers "in use". Tap the orb / 🎙️ to resume when you come back.
-  document.addEventListener("visibilitychange", () => { if (talking && document.hidden && !talkMuted) setTalkMuted(true); });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) return;
+    if (talking && !talkMuted) setTalkMuted(true); // talking mode: release the recognizer
+    stopBrowserSTT();                              // regular STT: release the mic
+    try { stopWhisper(); } catch (_) {}            // whisper recorder: release the mic
+  });
   // Barge-in: tap the orb while it's speaking to cut the reply short. talkTurn
   // is awaiting the speech queue to drain, so clearing it makes it move on to
   // listening on its own (no double-start race).
@@ -1042,7 +1047,7 @@
   ttsVoiceSel.addEventListener("change", () => { prefs.voices = prefs.voices || {}; prefs.voices[langKey()] = ttsVoiceSel.value; savePrefs(); });
   rateInput.addEventListener("change", () => { prefs.rate = parseFloat(rateInput.value) || 1; savePrefs(); });
   talkSilenceInput.addEventListener("change", () => { prefs.talkSilence = parseFloat(talkSilenceInput.value) || 1.3; savePrefs(); });
-  handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); });
+  handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); if (!handsfree.checked && !talking) stopBrowserSTT(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
   notifyChk.addEventListener("change", () => {
