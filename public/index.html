@@ -1081,7 +1081,7 @@
     const f = allFavs()[i]; if (!f) return;
     if (f.agent && agentById[f.agent]) nsAgent.value = f.agent;
     $("ns-name").value = f.name || "";
-    $("ns-dir").value = f.projectDir || "";
+    $("ns-dir").value = f.projectDir || ""; fitNsDir();
     fillModeSelect(nsMode, nsAgent.value, f.mode);
   }
   const RUNNER_LABEL = { local: "💻 Yerel", cloud: "☁️ Bulut" };
@@ -1115,6 +1115,8 @@
   const nsTree = $("ns-tree");
   function fitNsDir() { const t = $("ns-dir"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 132) + "px"; }
   $("ns-dir").addEventListener("input", fitNsDir);
+  // It's a textarea (so long paths wrap) but holds a single-line path: Enter submits, never inserts a newline.
+  $("ns-dir").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ns-create").click(); } });
   async function browseTo(p) {
     try {
       const u = new URLSearchParams(); if (p) u.set("path", p);
@@ -1138,7 +1140,7 @@
   });
   nsFav.addEventListener("change", applyFav);
   $("ns-save").addEventListener("click", () => {
-    const dir = $("ns-dir").value.trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
+    const dir = $("ns-dir").value.replace(/[\r\n]+/g, "").trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
     const fav = { name: $("ns-name").value.trim() || dir, agent: nsAgent.value, mode: nsMode.value, projectDir: dir };
     const lf = localFavs();
     const existing = lf.findIndex((f) => f.projectDir === dir && f.agent === fav.agent);
@@ -1153,7 +1155,7 @@
   newSessionBtn.addEventListener("click", openModal);
   $("ns-cancel").addEventListener("click", () => modal.classList.remove("open"));
   $("ns-create").addEventListener("click", async () => {
-    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
+    const body = { name: $("ns-name").value.trim(), agent: nsAgent.value, mode: nsMode.value, projectDir: $("ns-dir").value.replace(/[\r\n]+/g, "").trim(), voice: !!prefs.voice, runner: $("ns-runner").value || "local" };
     if (nsAgent.value === "ollama" && $("ns-omodel").value) body.model = $("ns-omodel").value;
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
