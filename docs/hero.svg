@@ -15,6 +15,15 @@
     <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
       <circle cx="2" cy="2" r="1.4" fill="#21262d"/>
     </pattern>
+    <linearGradient id="ibg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2533"/><stop offset="1" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="ibub" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#56d364"/><stop offset="1" stop-color="#2ea043"/>
+    </linearGradient>
+    <radialGradient id="iglow" cx="50%" cy="44%" r="55%">
+      <stop offset="0" stop-color="#3fb950" stop-opacity="0.30"/><stop offset="1" stop-color="#3fb950" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
   <!-- background -->
@@ -25,16 +34,19 @@
   <rect x="16" y="16" width="1168" height="598" rx="26" fill="none" stroke="#21262d"/>
 
   <!-- ===== Left: brand + copy ===== -->
-  <!-- logo badge (the app icon mark) -->
-  <rect x="72" y="60" width="96" height="96" rx="22" fill="#161b22" stroke="#30363d"/>
-  <g transform="translate(53.4,43.5) scale(0.26)">
-    <g fill="none" stroke="#3fb950" stroke-width="20" stroke-linecap="round">
-      <path d="M196 250 a60 60 0 0 0 120 0"/>
-      <path d="M150 230 a106 106 0 0 0 212 0" opacity="0.5"/>
+  <!-- logo badge (the app icon: voice bubble) -->
+  <g transform="translate(72,60) scale(0.1875)">
+    <rect width="512" height="512" rx="112" fill="url(#ibg)"/>
+    <circle cx="256" cy="236" r="176" fill="url(#iglow)"/>
+    <path d="M160 334 L138 400 L222 338 Z" fill="url(#ibub)"/>
+    <rect x="116" y="128" width="280" height="212" rx="48" fill="url(#ibub)"/>
+    <g fill="#0d1117">
+      <rect x="174" y="204" width="20" height="60"  rx="10"/>
+      <rect x="210" y="184" width="20" height="100" rx="10"/>
+      <rect x="246" y="166" width="20" height="136" rx="10"/>
+      <rect x="282" y="184" width="20" height="100" rx="10"/>
+      <rect x="318" y="204" width="20" height="60"  rx="10"/>
     </g>
-    <rect x="226" y="120" width="60" height="150" rx="30" fill="#238636"/>
-    <rect x="248" y="318" width="16" height="46" rx="8" fill="#3fb950"/>
-    <rect x="214" y="360" width="84" height="16" rx="8" fill="#3fb950"/>
   </g>
 
   <text x="190" y="118" fill="#e6edf3" font-size="62" font-weight="800" letter-spacing="-1.5">voicebridge</text>
