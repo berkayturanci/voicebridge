@@ -158,7 +158,8 @@
   .card .srow { display: flex; align-items: center; justify-content: space-between; }
   .card .srow button { background: none; border: none; color: var(--muted); font-size: 18px; }
   .card label.opt > #theme { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
-  .card input, .card select { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
+  .card input, .card select, .card textarea { background: var(--field); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 9px; font-size: 15px; }
+  #ns-dir { width: 100%; resize: none; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.45; word-break: break-all; overflow-y: auto; max-height: 132px; }
   #ns-tree { max-height: 190px; overflow-y: auto; border: 1px solid var(--border2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
   #ns-tree .cur { font-size: 11px; color: var(--muted); padding: 2px 4px; word-break: break-all; }
   #ns-tree button { text-align: left; background: none; border: none; color: var(--text); padding: 7px 8px; border-radius: 6px; font-size: 14px; }
@@ -270,7 +271,7 @@
       <label id="ns-omodel-row" style="display:none">Ollama model <select id="ns-omodel"></select></label>
       <label>Mod <select id="ns-mode"></select></label>
       <label class="opt">Proje klasörü <button id="ns-browse" type="button">📁 Gözat</button></label>
-      <input id="ns-dir" placeholder="/Users/you/project" />
+      <textarea id="ns-dir" rows="2" placeholder="/Users/you/project"></textarea>
       <div id="ns-tree" style="display:none"></div>
       <div class="row">
         <button id="ns-save">★ Kaydet</button>
@@ -889,7 +890,7 @@
   function exitTalking() {
     talking = false; talkMuted = false;
     clearTimeout(talkSilence); orbMeterStop();
-    if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
+    if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
     talkEl.classList.remove("open");
@@ -932,6 +933,9 @@
   }
   $("talkBtn").addEventListener("click", enterTalking);
   $("talkExit").addEventListener("click", exitTalking);
+  // Free the mic if the tab is backgrounded mid-conversation (e.g. you switch to the camera),
+  // so it never lingers "in use". Tap the orb / 🎙️ to resume when you come back.
+  document.addEventListener("visibilitychange", () => { if (talking && document.hidden && !talkMuted) setTalkMuted(true); });
   // Barge-in: tap the orb while it's speaking to cut the reply short. talkTurn
   // is awaiting the speech queue to drain, so clearing it makes it move on to
   // listening on its own (no double-start race).
@@ -950,7 +954,8 @@
     muteBtn.setAttribute("aria-label", m ? "Mikrofonu aç" : "Mikrofonu sessize al");
     if (m) {
       clearTimeout(talkSilence); orbMeterStop();
-      if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; }
+      // abort() (not stop()) so iOS releases the mic immediately — no lingering "in use" state.
+      if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
       if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)");
     } else if (talking && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
       startTalkListen();
@@ -1082,7 +1087,7 @@
     const nsRunner = $("ns-runner"); nsRunner.innerHTML = "";
     runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
     $("ns-runner-row").style.display = runners.length > 1 ? "flex" : "none";
-    $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || "";
+    $("ns-name").value = ""; $("ns-dir").value = CONFIG.defaultProjectDir || ""; fitNsDir();
     $("ns-tree").style.display = "none";
     fillModeSelect(nsMode, nsAgent.value);
     refreshOllamaModels();
@@ -1103,12 +1108,14 @@
 
   // Folder browser for the project directory.
   const nsTree = $("ns-tree");
+  function fitNsDir() { const t = $("ns-dir"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 132) + "px"; }
+  $("ns-dir").addEventListener("input", fitNsDir);
   async function browseTo(p) {
     try {
       const u = new URLSearchParams(); if (p) u.set("path", p);
       if (($("ns-runner").value || "local") === "cloud") u.set("runner", "cloud"); // browse the remote host
       const data = await (await fetch("/api/browse?" + u.toString(), { headers: authHeaders() })).json();
-      $("ns-dir").value = data.path || "";
+      $("ns-dir").value = data.path || ""; fitNsDir();
       nsTree.innerHTML = "";
       const cur = document.createElement("div"); cur.className = "cur"; cur.textContent = data.path || ""; nsTree.appendChild(cur);
       if (data.parent) { const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.textContent = "⬆ üst"; b.addEventListener("click", () => browseTo(data.parent)); nsTree.appendChild(b); }
