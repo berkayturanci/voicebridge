@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 // Minimal, explicit bridge between the control UI and the main process.
 contextBridge.exposeInMainWorld("vb", {
   getStatus: () => ipcRenderer.invoke("bridge:status"),
+  info: () => ipcRenderer.invoke("bridge:info"),
   saveSettings: (partial) => ipcRenderer.invoke("settings:save", partial),
   start: () => ipcRenderer.invoke("bridge:start"),
   stop: () => ipcRenderer.invoke("bridge:stop"),
