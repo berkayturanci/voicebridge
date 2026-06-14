@@ -97,10 +97,13 @@ The app runs on the desktop from the same code. Caveats:
 2. "Test et & Kaydet" verifies it can reach `/api/config`.
 3. You land on the session list — open one and talk.
 
-## Notes / not yet in stage 1
+## Notes
 
-- Transcripts aren't persisted on-device yet (the list and live chat are; history
-  across app restarts is a stage-2 item).
-- Folder browser / command palette from the web UI aren't ported yet.
+- **Transcripts persist** on-device per session (`shared_preferences`), restored
+  when you reopen a chat.
+- **Command palette** (⚡ in the chat app bar) lists the project's
+  `.claude/commands` + npm scripts and prefills the composer.
+- **Folder browser** — the new-session sheet has a "Proje klasörü" picker backed
+  by `/api/browse`.
 - Code is written against the bridge API but **hasn't been compiled in this
   repo's CI** (no Flutter toolchain here) — run `flutter analyze` locally.

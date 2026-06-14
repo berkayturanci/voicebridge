@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../api.dart';
@@ -32,11 +35,42 @@ class _ChatScreenState extends State<ChatScreen> {
 
   static const _locale = 'tr-TR';
 
+  String get _histKey => 'vb_hist_${widget.session.id}';
+
   @override
   void initState() {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
+    _loadHistory();
+  }
+
+  // ---- History (persisted per session, like the web client) ----
+  Future<void> _loadHistory() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString(_histKey);
+      if (raw == null) return;
+      final list = (jsonDecode(raw) as List)
+          .map((e) => Message.fromJson(e as Map<String, dynamic>))
+          .toList();
+      if (mounted && list.isNotEmpty) {
+        setState(() => _messages
+          ..clear()
+          ..addAll(list));
+        _toBottom();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final tail = _messages.length > 200
+          ? _messages.sublist(_messages.length - 200)
+          : _messages;
+      await p.setString(_histKey, jsonEncode(tail.map((m) => m.toJson()).toList()));
+    } catch (_) {}
   }
 
   @override
@@ -155,6 +189,27 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_talking) _toggleTalking();
     } finally {
       if (mounted) setState(() => _busy = false);
+      _persist();
+    }
+  }
+
+  // ---- Command palette: the project's slash commands + npm scripts ----
+  Future<void> _openPalette() async {
+    final groups = await _api.commands(widget.session.id);
+    if (!mounted) return;
+    if (groups.isEmpty) {
+      _toast('Bu oturumda komut bulunamadı (cloud oturum olabilir).');
+      return;
+    }
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _CommandSheet(groups: groups),
+    );
+    if (picked != null) {
+      _input.text = picked;
+      _input.selection =
+          TextSelection.collapsed(offset: picked.length);
     }
   }
 
@@ -175,6 +230,11 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Komutlar',
+            onPressed: _busy ? null : _openPalette,
+            icon: const Icon(Icons.bolt),
+          ),
           IconButton(
             tooltip: _talking ? 'Konuşmayı durdur' : 'Konuşma modu',
             onPressed: _toggleTalking,
@@ -275,6 +335,76 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (t.isNotEmpty) _send(t);
                     },
               icon: const Icon(Icons.send),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Searchable list of the project's commands; returns the chosen item's value.
+class _CommandSheet extends StatefulWidget {
+  final List<Map<String, dynamic>> groups;
+  const _CommandSheet({required this.groups});
+
+  @override
+  State<_CommandSheet> createState() => _CommandSheetState();
+}
+
+class _CommandSheetState extends State<_CommandSheet> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _q.toLowerCase();
+    final tiles = <Widget>[];
+    for (final g in widget.groups) {
+      final items = ((g['items'] as List?) ?? const [])
+          .map((e) => e as Map<String, dynamic>)
+          .where((it) {
+        final label = (it['label'] ?? '').toString().toLowerCase();
+        final value = (it['value'] ?? '').toString().toLowerCase();
+        return q.isEmpty || label.contains(q) || value.contains(q);
+      }).toList();
+      if (items.isEmpty) continue;
+      tiles.add(Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: Text('${g['label']}',
+            style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ));
+      for (final it in items) {
+        tiles.add(ListTile(
+          dense: true,
+          title: Text('${it['label']}'),
+          subtitle: it['hint'] != null ? Text('${it['hint']}') : null,
+          onTap: () =>
+              Navigator.pop(context, (it['value'] ?? it['label']).toString()),
+        ));
+      }
+    }
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextField(
+                autofocus: true,
+                onChanged: (v) => setState(() => _q = v),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Komut ara…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            Expanded(
+              child: tiles.isEmpty
+                  ? const Center(child: Text('Eşleşme yok'))
+                  : ListView(children: tiles),
             ),
           ],
         ),

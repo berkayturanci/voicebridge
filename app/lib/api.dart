@@ -63,6 +63,34 @@ class Api {
     return Session.fromJson(data['session'] as Map<String, dynamic>);
   }
 
+  /// GET /api/commands?sessionId= — the project's slash commands + npm scripts.
+  /// Returns groups: [{label, items:[{label, value, hint?}]}].
+  Future<List<Map<String, dynamic>>> commands(String sessionId) async {
+    try {
+      final uri = _u('/api/commands').replace(queryParameters: {'sessionId': sessionId});
+      final r = await http.get(uri, headers: _headers());
+      if (r.statusCode != 200) return [];
+      final data = jsonDecode(r.body) as Map<String, dynamic>;
+      return ((data['groups'] as List?) ?? const [])
+          .map((e) => (e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// GET /api/browse — list subdirectories of [path] for the folder picker.
+  /// Returns {path, parent, dirs:[...]}.
+  Future<Map<String, dynamic>> browse(String? path, {String runner = 'local'}) async {
+    final q = <String, String>{};
+    if (path != null && path.isNotEmpty) q['path'] = path;
+    if (runner == 'cloud') q['runner'] = 'cloud';
+    final uri = _u('/api/browse').replace(queryParameters: q.isEmpty ? null : q);
+    final r = await http.get(uri, headers: _headers());
+    if (r.statusCode != 200) throw Exception('Gözatılamadı (${r.statusCode})');
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   /// DELETE /api/sessions/:id
   Future<void> deleteSession(String id) async {
     final r = await http.delete(_u('/api/sessions/$id'), headers: _headers());

@@ -45,4 +45,8 @@ class Message {
   final String role;
   String text;
   Message(this.role, this.text);
+
+  Map<String, dynamic> toJson() => {'role': role, 'text': text};
+  factory Message.fromJson(Map<String, dynamic> j) =>
+      Message((j['role'] ?? 'sys') as String, (j['text'] ?? '') as String);
 }
