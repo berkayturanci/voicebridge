@@ -1,0 +1,21 @@
+name: voicebridge_app
+description: Native iOS/Android client for the voicebridge agent — talk to Claude Code from your phone.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.0
+  speech_to_text: ^6.6.0
+  flutter_tts: ^3.8.5
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
