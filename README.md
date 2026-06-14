@@ -196,8 +196,11 @@ transcribes). Hands-free loop is browser-mode only.
   the microphone there.)
 - **Native app (Flutter)**: an optional iOS/Android client lives in
   [`app/`](app/) — same bridge backend, but **native mic + TTS** so voice works
-  even as an installed app (no Safari-tab caveat). The PWA stays the
-  zero-install option.
+  even as an installed app (no Safari-tab caveat). The same code also runs as a
+  **desktop client** (macOS/Windows/Linux). The PWA stays the zero-install option.
+- **Desktop app (Electron)**: [`desktop/`](desktop/) packages the bridge itself
+  into a **Mac `.dmg` / Windows / Linux** app with a control panel + tray —
+  run the server with no terminal.
 
 ### Modes (autonomy)
 

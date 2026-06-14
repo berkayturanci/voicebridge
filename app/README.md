@@ -36,10 +36,15 @@ platform projects, fetch packages, then run:
 
 ```bash
 cd app
-flutter create .            # generates ios/ and android/ (keeps lib/ + pubspec)
+flutter create .            # generates ios/ android/ macos/ windows/ linux/ (keeps lib/ + pubspec)
 flutter pub get
 flutter run                 # on a connected device/simulator
+flutter run -d macos        # …or a desktop target: macos | windows | linux
 ```
+
+The same codebase is a **desktop client** too (macOS / Windows / Linux) — a
+"connect-from" app for your laptop. Chat + streaming work everywhere; voice
+support depends on the platform plugins (see Desktop notes below).
 
 ### iOS permissions (required for voice)
 
@@ -64,6 +69,27 @@ Minimum iOS deployment target **12.0+** (set in `ios/Podfile` /
 ```xml
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
+
+### Desktop (macOS / Windows / Linux)
+
+The app runs on the desktop from the same code. Caveats:
+
+- **macOS networking** — the macOS app is sandboxed, so it **can't reach the
+  bridge** until you add the network-client entitlement. In
+  `macos/Runner/DebugProfile.entitlements` **and** `Release.entitlements` add:
+
+  ```xml
+  <key>com.apple.security.network.client</key>
+  <true/>
+  ```
+
+  For the mic, also add `com.apple.security.device.audio-input` and an
+  `NSMicrophoneUsageDescription` to `macos/Runner/Info.plist`.
+- **Voice support** — `flutter_tts` (read replies aloud) works on macOS, Windows
+  and Linux. Native speech-to-text (`speech_to_text`) is solid on macOS but
+  **limited/absent on Windows & Linux**; there the app degrades to a text client
+  (the mic button just shows a "not available" toast). Talking mode is best on
+  mobile + macOS.
 
 ## First launch
 
