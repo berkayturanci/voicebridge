@@ -527,6 +527,7 @@ function proxyCloudBrowse(p, res) {
   if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
   const r = lib.get(url, { headers }, (up) => {
     let data = "";
+    up.setEncoding("utf8");
     up.on("data", (d) => (data += d));
     up.on("end", () => { try { sendJson(res, 200, JSON.parse(data)); } catch (_) { fail("cloud browse failed"); } });
   });
@@ -561,6 +562,7 @@ function streamOllama(session, prompt, res, emit) {
   });
   let buf = "", reply = "", errored = false;
   const upReq = lib.request(url, { method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } }, (r) => {
+    r.setEncoding("utf8"); // carry UTF-8 across chunk boundaries (no split → no ��)
     r.on("data", (d) => {
       buf += d.toString();
       let i;
@@ -609,6 +611,7 @@ function streamCloud(session, prompt, res, emit) {
   let pbuf = "", reply = "";
   const scan = (line) => { try { const ev = JSON.parse(line); if (ev.type === "delta" && ev.text) reply += ev.text; } catch (_) {} };
   const up = lib.request(url, { method: "POST", headers }, (r) => {
+    r.setEncoding("utf8");
     r.on("data", (d) => {
       try { res.write(d); } catch (_) {}
       pbuf += d.toString();
@@ -661,6 +664,10 @@ function streamLocal(session, prompt, res, emit) {
     }
   };
 
+  // Decode stdout/stderr as UTF-8 with carry-over across chunk boundaries, so a
+  // multi-byte char (ı, ş, ç, …) split between two chunks isn't mangled into ��.
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
   child.stdout.on("data", (d) => {
     const s = d.toString();
     if (agent.stream === "ndjson") {

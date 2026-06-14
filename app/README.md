@@ -38,6 +38,7 @@ platform projects, fetch packages, then run:
 cd app
 flutter create .            # generates ios/ android/ macos/ windows/ linux/ (keeps lib/ + pubspec)
 flutter pub get
+dart run flutter_launcher_icons   # apply the voicebridge app icon (from assets/icon/)
 flutter run                 # on a connected device/simulator
 flutter run -d macos        # …or a desktop target: macos | windows | linux
 ```
