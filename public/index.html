@@ -72,6 +72,12 @@
   .codewrap.collapsed pre { max-height: 15em; overflow: hidden; }
   .togglebtn { display: block; margin: 4px 0 2px; background: var(--panel2); border: 1px solid var(--border2); color: var(--accent); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
   .claude pre { margin: 0; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; overflow-x: auto; }
+  .claude h3, .claude h4, .claude h5 { margin: .6em 0 .3em; line-height: 1.3; }
+  .claude h3 { font-size: 1.15em; } .claude h4 { font-size: 1.05em; } .claude h5 { font-size: 1em; color: var(--muted); }
+  .claude ul, .claude ol { margin: .3em 0; padding-left: 1.4em; } .claude li { margin: .15em 0; }
+  .claude blockquote { margin: .4em 0; padding-left: .8em; border-left: 3px solid var(--border2); color: var(--muted); }
+  .claude a { color: #58a6ff; } .claude .mdline { margin: 0; }
+  .claude pre .add { color: #3fb950; } .claude pre .del { color: #f85149; } .claude pre .hunk { color: #58a6ff; }
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
   .copybtn { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); opacity: .85; }
@@ -419,24 +425,84 @@
     }
   }
 
-  // ---------- Render: markdown-ish text → bubble with code blocks ----------
-  // Inline `code` and **bold**, built from DOM nodes (never innerHTML).
+  // ---------- Render: markdown → bubble (DOM nodes only, never innerHTML) ----------
+  // Inline: `code`, **bold**, and [text](http-url) links (http(s) only — safe).
   function appendInline(el, text) {
-    const re = /`([^`]+)`|\*\*([^*]+)\*\*/g;
+    const re = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
     let last = 0, m;
     while ((m = re.exec(text))) {
       if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
       if (m[1] != null) { const c = document.createElement("code"); c.textContent = m[1]; el.appendChild(c); }
-      else { const b = document.createElement("strong"); b.textContent = m[2]; el.appendChild(b); }
+      else if (m[2] != null) { const b = document.createElement("strong"); b.textContent = m[2]; el.appendChild(b); }
+      else {
+        if (/^https?:\/\//i.test(m[4])) {
+          const a = document.createElement("a");
+          a.textContent = m[3]; a.href = m[4]; a.target = "_blank"; a.rel = "noopener noreferrer";
+          el.appendChild(a);
+        } else { el.appendChild(document.createTextNode(m[3] + " (" + m[4] + ")")); }
+      }
       last = re.lastIndex;
     }
     if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
   }
+
+  // Block markdown for non-code text: headings, lists, blockquotes, paragraphs.
+  function appendBlocks(el, text) {
+    let list = null;
+    const flush = () => { if (list) { el.appendChild(list); list = null; } };
+    for (const line of text.split("\n")) {
+      let m;
+      if ((m = line.match(/^(#{1,3})\s+(.*)$/))) {
+        flush(); const h = document.createElement(["h3", "h4", "h5"][m[1].length - 1]);
+        appendInline(h, m[2]); el.appendChild(h);
+      } else if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) {
+        if (!list || list.tagName !== "UL") { flush(); list = document.createElement("ul"); }
+        const li = document.createElement("li"); appendInline(li, m[1]); list.appendChild(li);
+      } else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) {
+        if (!list || list.tagName !== "OL") { flush(); list = document.createElement("ol"); }
+        const li = document.createElement("li"); appendInline(li, m[1]); list.appendChild(li);
+      } else if ((m = line.match(/^>\s?(.*)$/))) {
+        flush(); const bq = document.createElement("blockquote"); appendInline(bq, m[1]); el.appendChild(bq);
+      } else if (line.trim() === "") {
+        flush();
+      } else {
+        flush(); const div = document.createElement("div"); div.className = "mdline";
+        appendInline(div, line); el.appendChild(div);
+      }
+    }
+    flush();
+  }
+
+  function looksLikeDiff(code) {
+    const lines = code.split("\n");
+    const has = (p) => lines.some((l) => p.test(l));
+    return has(/^\+(?!\+\+)/) && has(/^-(?!--)/);
+  }
+  // A <pre> for a code block; diffs get +/- line coloring.
+  function buildPre(code, lang) {
+    const pre = document.createElement("pre");
+    if (lang === "diff" || looksLikeDiff(code)) {
+      code.replace(/\n$/, "").split("\n").forEach((line, i) => {
+        const span = document.createElement("span");
+        if (/^\+/.test(line)) span.className = "add";
+        else if (/^-/.test(line)) span.className = "del";
+        else if (/^@@/.test(line)) span.className = "hunk";
+        span.textContent = (i ? "\n" : "") + line;
+        pre.appendChild(span);
+      });
+    } else {
+      const codeEl = document.createElement("code"); codeEl.textContent = code; pre.appendChild(codeEl);
+    }
+    return pre;
+  }
+
   function renderInto(el, text) {
     el.textContent = "";
     const parts = text.split(/```/);
     parts.forEach((part, i) => {
       if (i % 2 === 1) {
+        const langMatch = part.match(/^(\w*)\n/);
+        const lang = langMatch ? langMatch[1] : "";
         const code = part.replace(/^\w*\n/, "");
         const wrap = document.createElement("div");
         wrap.className = "codewrap";
@@ -447,11 +513,7 @@
           (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject())
             .then(() => done("Kopyalandı")).catch(() => done("Hata"));
         });
-        const pre = document.createElement("pre");
-        const codeEl = document.createElement("code");
-        codeEl.textContent = code;
-        pre.appendChild(codeEl);
-        wrap.appendChild(btn); wrap.appendChild(pre);
+        wrap.appendChild(btn); wrap.appendChild(buildPre(code, lang));
         const lines = code.replace(/\n$/, "").split("\n").length;
         if (lines > 14) { // collapse long output (e.g. npm logs) by default
           wrap.classList.add("collapsed");
@@ -464,7 +526,7 @@
         }
         el.appendChild(wrap);
       } else if (part) {
-        appendInline(el, part);
+        appendBlocks(el, part);
       }
     });
   }
