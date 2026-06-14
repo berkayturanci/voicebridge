@@ -8,6 +8,7 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage } = require("electron");
 const { fork } = require("child_process");
 const crypto = require("crypto");
+const http = require("http");
 const path = require("path");
 const fs = require("fs");
 
@@ -130,8 +131,35 @@ function createTray() {
   }
 }
 
+// Query the local bridge (main process has no CSP) for the dashboard.
+function fetchJson(p) {
+  return new Promise((resolve) => {
+    const req = http.get(
+      {
+        host: "127.0.0.1",
+        port: settings.port || 8787,
+        path: p,
+        headers: settings.token ? { Authorization: "Bearer " + settings.token } : {},
+      },
+      (res) => {
+        let d = "";
+        res.on("data", (c) => (d += c));
+        res.on("end", () => { try { resolve(JSON.parse(d)); } catch (_) { resolve(null); } });
+      }
+    );
+    req.on("error", () => resolve(null));
+    req.setTimeout(2000, () => { req.destroy(); resolve(null); });
+  });
+}
+
 // ---- IPC ----
 ipcMain.handle("settings:get", () => settings);
+ipcMain.handle("bridge:info", async () => {
+  if (!running()) return { agents: [], sessions: [] };
+  const cfg = await fetchJson("/api/config");
+  const ses = await fetchJson("/api/sessions");
+  return { agents: (cfg && cfg.agents) || [], sessions: (ses && ses.sessions) || [] };
+});
 ipcMain.handle("settings:save", (_e, partial) => {
   settings = { ...settings, ...partial };
   saveSettings(settings);

@@ -21,6 +21,10 @@
   button.primary { background:var(--green); color:#06210f; border-color:var(--green); font-weight:600; }
   button:disabled { opacity:.5; cursor:default; }
   .url { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--green); word-break:break-all; }
+  .pills { display:flex; gap:6px; flex-wrap:wrap; }
+  .tag { font-size:11px; padding:3px 8px; border-radius:999px; background:#30363d; color:var(--muted); }
+  .tag.on { background:rgba(63,185,80,.18); color:var(--green); }
+  .sess { font-size:12px; color:#cdd6e0; padding:2px 0; }
   .log { background:#010409; border:1px solid var(--border); border-radius:8px; padding:10px; height:220px; overflow:auto; font-family:ui-monospace,Menlo,monospace; font-size:11px; white-space:pre-wrap; color:#9da7b3; }
   .hint { font-size:11px; color:var(--muted); }
 </style>
@@ -53,6 +57,14 @@
       <div class="hint">Telefon adresi:</div>
       <div class="url" id="url">—</div>
       <div class="hint">Telefondan bağlanmak için QR kod aşağıdaki günlükte görünür (köprü başlarken basar). HTTPS için: <code>tailscale serve --bg PORT</code></div>
+    </div>
+    <div>
+      <div class="hint">Agentlar:</div>
+      <div class="pills" id="agents"><span class="tag">—</span></div>
+    </div>
+    <div>
+      <div class="hint">Aktif oturumlar:</div>
+      <div id="sessions"><div class="sess">—</div></div>
     </div>
     <div class="log" id="log"></div>
   </main>

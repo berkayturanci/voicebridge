@@ -5,8 +5,9 @@ bridge for you — no terminal needed — with a control panel and a tray icon.
 
 It's a thin shell: the bridge (`../server.js`) runs as a child process, and the
 app gives it a UI to **start/stop**, set the **port / host / access token**,
-**open the web UI** in your browser, and watch the **live log** (the phone QR
-code the bridge prints shows up there too).
+**open the web UI** in your browser, watch the **live log** (the phone QR code
+the bridge prints shows up there too), and see a small **dashboard** of the
+agents (with availability) and the active sessions, refreshed live.
 
 ## Run in development
 
