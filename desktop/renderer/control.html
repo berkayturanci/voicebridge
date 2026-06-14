@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline';" />
+<title>voicebridge</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --green:#3fb950; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
+  header h1 { font-size:16px; margin:0; }
+  .pill { margin-left:auto; padding:4px 10px; border-radius:999px; font-size:12px; background:#30363d; }
+  .pill.on { background:rgba(63,185,80,.2); color:var(--green); }
+  main { padding:16px; display:flex; flex-direction:column; gap:14px; }
+  .row { display:flex; gap:10px; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); flex:1; }
+  input { background:#0d1117; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font-size:14px; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  button { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 12px; cursor:pointer; font-size:13px; }
+  button.primary { background:var(--green); color:#06210f; border-color:var(--green); font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  .url { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--green); word-break:break-all; }
+  .log { background:#010409; border:1px solid var(--border); border-radius:8px; padding:10px; height:220px; overflow:auto; font-family:ui-monospace,Menlo,monospace; font-size:11px; white-space:pre-wrap; color:#9da7b3; }
+  .hint { font-size:11px; color:var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>🎙️ voicebridge</h1>
+    <span class="pill" id="pill">—</span>
+  </header>
+  <main>
+    <div class="row">
+      <label>Port <input id="port" type="number" /></label>
+      <label>Host
+        <input id="host" list="hosts" />
+        <datalist id="hosts"><option value="127.0.0.1"><option value="0.0.0.0"></datalist>
+      </label>
+    </div>
+    <label>Erişim token (opsiyonel)
+      <span style="display:flex;gap:8px;">
+        <input id="token" style="flex:1" placeholder="boş = korumasız" />
+        <button id="gen" type="button">Üret</button>
+      </span>
+    </label>
+    <div class="btns">
+      <button id="apply" type="button">Kaydet & yeniden başlat</button>
+      <button id="toggle" class="primary" type="button">Başlat</button>
+      <button id="open" type="button">Tarayıcıda aç</button>
+    </div>
+    <div>
+      <div class="hint">Telefon adresi:</div>
+      <div class="url" id="url">—</div>
+      <div class="hint">Telefondan bağlanmak için QR kod aşağıdaki günlükte görünür (köprü başlarken basar). HTTPS için: <code>tailscale serve --bg PORT</code></div>
+    </div>
+    <div class="log" id="log"></div>
+  </main>
+  <script src="control.js"></script>
+</body>
+</html>
