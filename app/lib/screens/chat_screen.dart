@@ -57,6 +57,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
+    // Upgrade off the default *compact* system voice (the robotic sound) to the
+    // best installed neural voice for the locale. Runs async; see _configureBestVoice.
+    _configureBestVoice();
     // Track real TTS audio state so the orb shows "Konuşuyor" only while audio is
     // actually playing (not inferred), and so the "Sesli oku" button flips back.
     // These are independent of awaitSpeakCompletion (which resolves speak() via the
@@ -98,6 +101,39 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _loadHistory();
     _loadModes();
+  }
+
+  // Pick the highest-quality installed voice for the locale. flutter_tts otherwise
+  // falls back to the default *compact* system voice — that's the robotic sound.
+  // Enhanced/premium neural voices ship with iOS/Android and run fully offline
+  // (the user downloads them once in Settings → Accessibility → Spoken Content →
+  // Voices), so this keeps the hands-free car/CarPlay path network-free.
+  Future<void> _configureBestVoice() async {
+    // Slightly slower than the racy plugin default; steadier for long replies.
+    await _tts.setSpeechRate(0.5);
+    await _tts.setPitch(1.0);
+    try {
+      final raw = await _tts.getVoices;
+      if (raw is! List) return;
+      final voices = raw
+          .whereType<Map>()
+          .map((e) => e.map((k, v) => MapEntry('$k', '$v')))
+          .where((v) => (v['locale'] ?? '').toLowerCase().startsWith('tr'))
+          .toList();
+      if (voices.isEmpty) return; // no localized voice installed → keep default
+      int rank(Map<String, String> v) {
+        final q = (v['quality'] ?? '').toLowerCase();
+        if (q.contains('premium')) return 3; // iOS Premium / neural
+        if (q.contains('enhanced')) return 2; // iOS Enhanced
+        return 1; // compact / default
+      }
+      voices.sort((a, b) => rank(b).compareTo(rank(a)));
+      final best = voices.first;
+      await _tts.setVoice({'name': best['name']!, 'locale': best['locale']!});
+      debugPrint('TTS voice → ${best['name']} (${best['quality']})');
+    } catch (e) {
+      debugPrint('TTS voice setup failed: $e'); // keep default voice on any error
+    }
   }
 
   // The autonomy modes this agent supports (label + id), for the settings sheet.
