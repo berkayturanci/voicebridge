@@ -5,3 +5,6 @@ node_modules/
 
 # keel runtime state (run ledger, checkpoints) — not source config
 .keel/state/
+
+# Claude Code agent worktrees (transient)
+.claude/worktrees/
