@@ -456,6 +456,7 @@ function publicSession(s) {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
     projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
     claudeSessionId: s.claudeSessionId || null,
+    handoff: s.handoff || null, // "pc" while handed off to the terminal (#123)
   };
 }
 
@@ -778,6 +779,10 @@ function getOrSpawnLive(session) {
   if (existing && !existing.child.killed) return existing;
   const modeArgs = (AGENTS.claude.modes[session.mode] || AGENTS.claude.modes[AGENTS.claude.defaultMode]).args;
   const argv = [...modeArgs, "--print", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"];
+  // Resume the bound Claude session if we have one — on the first run after an
+  // idle-kill or when reclaiming from a PC handoff, this restores history that
+  // would otherwise be lost when the process was killed (#123).
+  if (session.claudeSessionId) argv.push("--resume", session.claudeSessionId);
   const child = spawn(AGENTS.claude.bin(), argv, { cwd: session.projectDir, env: process.env });
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
@@ -793,6 +798,12 @@ function getOrSpawnLive(session) {
 // Anthropic Messages NDJSON line, stream assistant/tool events back until this
 // turn's `result` line, then resolve. The process survives for the next turn.
 function streamLive(session, prompt, res, emit) {
+  // Single-writer: while handed off to the PC, the phone must not write the same
+  // session (concurrent .jsonl writers corrupt it). Reclaim via /api/handoff (#123).
+  if (session.handoff === "pc") {
+    emit({ type: "error", error: "Bu oturum PC'ye devredildi. Telefonda sürdürmek için önce devralma (reclaim) yap." });
+    return res.end();
+  }
   const p = getOrSpawnLive(session);
   if (p.busy) { emit({ type: "error", error: "Bu oturum şu an meşgul (önceki tur sürüyor)." }); return res.end(); }
   p.busy = true;
@@ -832,6 +843,9 @@ function streamLive(session, prompt, res, emit) {
   };
   const onLine = (line) => {
     let obj; try { obj = JSON.parse(line); } catch (_) { return; }
+    // Bind/refresh the Claude session id so handoff can surface `claude --resume`
+    // and a respawn can restore history (#123).
+    if (obj.session_id && session.claudeSessionId !== obj.session_id) { session.claudeSessionId = obj.session_id; saveSessions(); }
     if (!finished) { // after barge-in we keep draining but stop emitting
       for (const ev of parseClaudeEvents(line)) { if (ev.type === "delta") replyText += ev.text; emit(ev); }
     }
@@ -1163,6 +1177,33 @@ function handleRequest(req, res) {
         const session = resolveSession(data.sessionId);
         if (session) { session.started = false; session.history = []; } // also clears Ollama context
         return sendJson(res, 200, { ok: true });
+      });
+    }
+
+    // PC handoff (#123). direction:"pc" pauses the phone's live session and
+    // returns a `claude --resume <id>` for the terminal — the live process is
+    // killed first so the phone and the PC never write the same .jsonl at once
+    // (single-writer). direction:"phone" reclaims it; the next phone turn
+    // respawns and --resume's the (possibly PC-advanced) history.
+    if (req.method === "POST" && urlPath === "/api/handoff") {
+      return readBody(req, 16 * 1024, (e, body) => {
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        const session = resolveSession(data.sessionId);
+        if (!session) return sendJson(res, 404, { error: "Unknown session" });
+        if (data.direction === "phone") {
+          session.handoff = null;
+          saveSessions();
+          return sendJson(res, 200, { ok: true, direction: "phone" });
+        }
+        const id = session.claudeSessionId || null;
+        killLive(session.id); // release the writer before the PC resumes it
+        session.handoff = "pc";
+        saveSessions();
+        return sendJson(res, 200, {
+          ok: true, direction: "pc", claudeSessionId: id, projectDir: session.projectDir,
+          resumeCmd: id ? ("claude --resume " + id) : null,
+          note: id ? null : "Bu oturum henüz bir tur çalıştırmadı; devredilecek bir Claude oturumu yok.",
+        });
       });
     }
 
