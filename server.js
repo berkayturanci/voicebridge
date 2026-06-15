@@ -152,9 +152,10 @@ const AGENTS = {
       full: { label: "Tam otonom", args: ["--dangerously-skip-permissions"] },
     },
     // Prompt is passed positionally after -p (claude also accepts it on stdin).
-    command(prompt, { cont, modeArgs } = {}) {
+    command(prompt, { cont, resume, modeArgs } = {}) {
       const argv = [...(modeArgs || [])];
-      if (cont) argv.push("--continue");
+      if (resume) argv.push("--resume", resume); // attach to an existing Claude session
+      else if (cont) argv.push("--continue");
       argv.push("--output-format", "stream-json", "--verbose", "-p", prompt);
       return { argv, stdin: null };
     },
@@ -352,9 +353,54 @@ function listNpmScripts(baseDir) {
   } catch (_) { return []; }
 }
 
+// --- Resume an existing Claude Code session --------------------------------
+// Claude Code stores each session as ~/.claude/projects/<encoded-path>/<id>.jsonl
+// (project path with non-alphanumerics turned into "-"). We list those so a
+// voicebridge session can attach to one and continue it by voice (claude
+// -p --resume <id>). Lets you pick up a session you started in the CLI/desktop.
+function encodeProjectPath(p) { return String(p || "").replace(/[^a-zA-Z0-9]/g, "-"); }
+
+function firstUserText(file) {
+  let fd;
+  try { fd = fs.openSync(file, "r"); } catch (_) { return ""; }
+  try {
+    const buf = Buffer.alloc(65536); // first user line is near the top; don't read whole file
+    const n = fs.readSync(fd, buf, 0, buf.length, 0);
+    for (const line of buf.slice(0, n).toString("utf8").split("\n")) {
+      if (!line.trim()) continue;
+      let o; try { o = JSON.parse(line); } catch (_) { continue; }
+      if (o.type !== "user" || !o.message) continue;
+      const c = o.message.content;
+      let text = "";
+      if (typeof c === "string") text = c;
+      else if (Array.isArray(c)) {
+        text = c.filter((b) => b && b.type === "text" && typeof b.text === "string").map((b) => b.text).join(" ");
+      }
+      text = text.trim();
+      if (text && !text.startsWith("<") && !text.startsWith("Caveat:")) return text.slice(0, 140);
+    }
+  } catch (_) {} finally { try { fs.closeSync(fd); } catch (_) {} }
+  return "";
+}
+
+function listClaudeSessions(projectDir, limit = 40) {
+  const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(projectDir));
+  let files;
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")); } catch (_) { return []; }
+  const out = [];
+  for (const f of files) {
+    const full = path.join(dir, f);
+    let st; try { st = fs.statSync(full); } catch (_) { continue; }
+    if (!st.size) continue;
+    out.push({ id: f.slice(0, -6), mtime: st.mtimeMs, title: firstUserText(full) });
+  }
+  out.sort((a, b) => b.mtime - a.mtime);
+  return out.slice(0, limit);
+}
+
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
-function createSession({ name, agent, projectDir, mode, voice, runner, model } = {}) {
+function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId } = {}) {
   if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
@@ -373,6 +419,9 @@ function createSession({ name, agent, projectDir, mode, voice, runner, model } =
     voice: !!voice,
     runner: run,
     model: (model && String(model).trim()) || undefined, // ollama model override
+    // When set, the FIRST turn resumes this existing Claude Code session
+    // (claude -p --resume <id>) instead of starting fresh.
+    claudeSessionId: (claudeSessionId && String(claudeSessionId).trim()) || undefined,
     started: false,
   };
   sessions.set(id, s);
@@ -383,6 +432,7 @@ function publicSession(s) {
   return {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
     projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
+    claudeSessionId: s.claudeSessionId || null,
   };
 }
 
@@ -394,9 +444,16 @@ function resolveSession(id) {
   return null;
 }
 
-// Optional disk persistence so sessions survive a bridge restart. Off unless
-// SESSIONS_FILE is set (or a file is passed explicitly, e.g. in tests).
-function sessionsFile() { return process.env.SESSIONS_FILE || ""; }
+// Disk persistence so sessions survive a bridge restart — otherwise a restart
+// mints brand-new session IDs and the phone's saved per-session history no
+// longer matches, so conversations look "reset". The real server defaults this
+// to ~/.voicebridge/sessions.json in start(); tests leave it unset (no-op).
+// Set SESSIONS_FILE to "off" to disable persistence.
+function sessionsFile() {
+  const v = process.env.SESSIONS_FILE;
+  if (v === "off" || v === "0" || v === "false") return "";
+  return v || "";
+}
 function saveSessions(file) {
   file = file || sessionsFile();
   if (!file) return;
@@ -406,7 +463,7 @@ function saveSessions(file) {
       seq: sessionSeq,
       defaultId: defaultSessionId,
       sessions: Array.from(sessions.values()).map((s) => ({
-        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model,
+        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model, claudeSessionId: s.claudeSessionId,
       })),
     };
     fs.writeFileSync(file, JSON.stringify(data));
@@ -424,7 +481,9 @@ function loadSessions(file) {
       id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir,
       mode: AGENTS[s.agent].modes[s.mode] ? s.mode : AGENTS[s.agent].defaultMode,
       voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local",
-      model: (s.model && String(s.model).trim()) || undefined, started: false,
+      model: (s.model && String(s.model).trim()) || undefined,
+      claudeSessionId: (s.claudeSessionId && String(s.claudeSessionId).trim()) || undefined,
+      started: false,
     });
   }
   if (typeof data.seq === "number") sessionSeq = Math.max(sessionSeq, data.seq);
@@ -669,8 +728,11 @@ function streamCloud(session, prompt, res, emit) {
 function streamLocal(session, prompt, res, emit) {
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
+  // First turn of an attached session resumes that Claude session id; afterwards
+  // --continue keeps it going (it's now the most-recent conversation).
+  const resume = (!session.started && session.claudeSessionId) ? session.claudeSessionId : null;
   const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
-  const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, modeArgs });
+  const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, resume, modeArgs });
 
   let child;
   try {
@@ -842,6 +904,18 @@ function handleRequest(req, res) {
       return sendJson(res, 200, { groups });
     }
 
+    // Existing Claude Code sessions for a project dir (to attach & resume by voice).
+    if (req.method === "GET" && urlPath === "/api/claude-sessions") {
+      const q = new URL(req.url, "http://x").searchParams;
+      let projectDir = q.get("projectDir");
+      if (!projectDir) {
+        const s = resolveSession(q.get("sessionId"));
+        if (s) projectDir = s.projectDir;
+      }
+      if (!projectDir) return sendJson(res, 400, { error: "projectDir required" });
+      return sendJson(res, 200, { sessions: listClaudeSessions(projectDir) });
+    }
+
     if (req.method === "GET" && urlPath === "/api/browse") {
       const q = new URL(req.url, "http://x").searchParams;
       // A cloud session's directories live on the remote host: proxy to the runner.
@@ -887,6 +961,12 @@ function handleRequest(req, res) {
         if (typeof data.name === "string" && data.name.trim()) s.name = data.name.trim();
         if (data.mode && AGENTS[s.agent].modes[data.mode]) s.mode = data.mode;
         if (typeof data.voice === "boolean") s.voice = data.voice;
+        // Attach to (or detach from) an existing Claude Code session. Reset
+        // `started` so the next turn resumes it via --resume.
+        if (typeof data.claudeSessionId === "string") {
+          s.claudeSessionId = data.claudeSessionId.trim() || undefined;
+          s.started = false;
+        }
         saveSessions();
         return sendJson(res, 200, { session: publicSession(s) });
       });
@@ -1003,7 +1083,12 @@ function printPhoneQr(url) {
 }
 
 function start() {
-  loadSessions(); // restore persisted sessions when SESSIONS_FILE is set
+  // Persist sessions by default (real server only — tests never call start()),
+  // so a restart keeps the same session IDs and the phone's history still matches.
+  if (process.env.SESSIONS_FILE == null) {
+    process.env.SESSIONS_FILE = path.join(os.homedir(), ".voicebridge", "sessions.json");
+  }
+  loadSessions(); // restore persisted sessions
   if (!defaultSessionId || !sessions.has(defaultSessionId)) {
     const boot = createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR });
     defaultSessionId = boot.id;
