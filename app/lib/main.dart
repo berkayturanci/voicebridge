@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'settings.dart';
+import 'theme.dart';
 import 'screens/sessions_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -14,11 +15,9 @@ class VoiceBridgeApp extends StatelessWidget {
     return MaterialApp(
       title: 'voicebridge',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorSchemeSeed: const Color(0xFF3fb950),
-        useMaterial3: true,
-      ),
+      theme: VbTheme.dark(),
+      darkTheme: VbTheme.dark(),
+      themeMode: ThemeMode.dark,
       home: const _Bootstrap(),
     );
   }
@@ -46,7 +45,50 @@ class _BootstrapState extends State<_Bootstrap> {
   Widget build(BuildContext context) {
     final s = _settings;
     if (s == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: VbColors.bg,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [VbColors.accentBright, VbColors.accentDim],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: VbColors.accent.withValues(alpha: 0.35),
+                      blurRadius: 28,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.graphic_eq_rounded,
+                    color: Color(0xFF06210C), size: 40),
+              ),
+              const SizedBox(height: 22),
+              const Text('voicebridge',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: VbColors.textPrimary)),
+              const SizedBox(height: 20),
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     if (!s.isConfigured) return SettingsScreen(settings: s);
     return SessionsScreen(settings: s);
