@@ -37,6 +37,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _listening = false;
   bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
+  Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
 
   // Autonomy mode — starts from the session's, but changeable from settings.
   // Sent with every turn (the bridge also updates the stored session mode).
@@ -52,6 +53,12 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
+    // Reflect when a per-message "Sesli oku" readout ends so its button can flip
+    // back from "Durdur". These are independent of awaitSpeakCompletion (which
+    // resolves the speak() future via the native result), so they don't affect it.
+    _tts.setCompletionHandler(() { if (mounted) setState(() => _ttsMsg = null); });
+    _tts.setCancelHandler(() { if (mounted) setState(() => _ttsMsg = null); });
+    _tts.setErrorHandler((msg) { if (mounted) setState(() => _ttsMsg = null); });
     // iOS audio session — configured ONCE here (not before every utterance).
     // Re-applying the category per reply churns the live AVAudioSession route
     // mid-stream, which is what made speech choppy ("kesik kesik").
@@ -241,6 +248,22 @@ class _ChatScreenState extends State<ChatScreen> {
     // replies audible happens once on the handoff in _send.)
     try { await _stt.stop(); } catch (_) {}
     await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
+  }
+
+  // Per-message "Sesli oku" toggle (the bubble button). _ttsMsg tracks which
+  // message is playing so the button shows "Durdur" and a second tap stops it.
+  Future<void> _readAloud(Message m) async {
+    await _tts.stop(); // halt any current readout first (also lets you switch messages)
+    if (!mounted) return;
+    setState(() => _ttsMsg = m);
+    await _speak(m.text);
+    // Safety net: if the text was empty, no completion handler fires — clear here.
+    if (mounted && _ttsMsg == m) setState(() => _ttsMsg = null);
+  }
+
+  Future<void> _stopSpeak() async {
+    await _tts.stop();
+    if (mounted) setState(() => _ttsMsg = null);
   }
 
   void _toggleTalking() async {
@@ -664,21 +687,34 @@ class _ChatScreenState extends State<ChatScreen> {
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: InkWell(
-                        onTap: () => _speak(m.text),
+                        onTap: () =>
+                            _ttsMsg == m ? _stopSpeak() : _readAloud(m),
                         borderRadius: BorderRadius.circular(VbRadius.chip),
-                        child: const Padding(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.volume_up_rounded,
-                                  size: 16, color: VbColors.textMuted),
-                              SizedBox(width: 4),
-                              Text('Sesli oku',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: VbColors.textMuted)),
+                              Icon(
+                                _ttsMsg == m
+                                    ? Icons.stop_rounded
+                                    : Icons.volume_up_rounded,
+                                size: 16,
+                                color: _ttsMsg == m
+                                    ? VbColors.danger
+                                    : VbColors.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _ttsMsg == m ? 'Durdur' : 'Sesli oku',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _ttsMsg == m
+                                      ? VbColors.danger
+                                      : VbColors.textMuted,
+                                ),
+                              ),
                             ],
                           ),
                         ),
