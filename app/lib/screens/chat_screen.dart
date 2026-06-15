@@ -158,6 +158,19 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _speak(String text) async {
     final clean = _forSpeech(text);
     if (clean.isEmpty) return;
+    // iOS: the mic (speech_to_text) leaves the audio session in record mode, which
+    // silences later TTS. Fully release it and re-assert playback before EACH
+    // utterance, with a short settle delay — otherwise only the first reply speaks.
+    try { await _stt.cancel(); } catch (_) {}
+    await _tts.stop();
+    await _tts.setIosAudioCategory(
+      IosTextToSpeechAudioCategory.playback,
+      [
+        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+        IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+      ],
+    );
+    await Future.delayed(const Duration(milliseconds: 300));
     await _tts.speak(clean);
   }
 
@@ -517,7 +530,37 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         child: m.text.isEmpty
             ? const _TypingDots()
-            : _MessageBody(text: m.text, isMe: isMe),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MessageBody(text: m.text, isMe: isMe),
+                  if (!isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: InkWell(
+                        onTap: () => _speak(m.text),
+                        borderRadius: BorderRadius.circular(VbRadius.chip),
+                        child: const Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.volume_up_rounded,
+                                  size: 16, color: VbColors.textMuted),
+                              SizedBox(width: 4),
+                              Text('Sesli oku',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: VbColors.textMuted)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }
