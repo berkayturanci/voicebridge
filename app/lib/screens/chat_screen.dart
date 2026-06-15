@@ -34,6 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _busy = false;
   bool _talking = false; // continuous voice loop
   bool _listening = false;
+  bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
 
   static const _locale = 'tr-TR';
@@ -45,6 +46,17 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
+    // iOS: keep TTS audible (on the speaker) even after the mic (speech_to_text)
+    // has held the audio session — otherwise replies go silent after the first
+    // talking-mode turn.
+    _tts.setSharedInstance(true);
+    _tts.setIosAudioCategory(
+      IosTextToSpeechAudioCategory.playback,
+      [
+        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+        IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+      ],
+    );
     _input.addListener(() {
       final can = _input.text.trim().isNotEmpty;
       if (can != _canSend) setState(() => _canSend = can);
@@ -118,6 +130,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- Voice ----
   Future<void> _listen() async {
+    if (_talkMuted) return;
     if (!await _ensureStt()) return;
     setState(() => _listening = true);
     await _stt.listen(
@@ -148,15 +161,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _toggleTalking() async {
     if (_talking) {
-      setState(() => _talking = false);
+      setState(() { _talking = false; _talkMuted = false; });
       await _stt.stop();
       await _tts.stop();
       setState(() => _listening = false);
       return;
     }
     if (!await _ensureStt()) return;
-    setState(() => _talking = true);
+    setState(() { _talking = true; _talkMuted = false; });
     _listen();
+  }
+
+  // Pause/resume the mic inside talking mode (without leaving). Tap the orb.
+  void _toggleMute() async {
+    if (!_talking) return;
+    if (_talkMuted) {
+      setState(() => _talkMuted = false);
+      if (!_busy) _listen(); // resume listening
+    } else {
+      setState(() {
+        _talkMuted = true;
+        _listening = false;
+      });
+      await _stt.stop(); // pause the mic (TTS keeps playing)
+    }
   }
 
   // ---- Send + stream ----
@@ -187,8 +215,9 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (full.trim().isEmpty) setState(() => reply.text = '(boş cevap)');
       if (_talking && full.trim().isNotEmpty) {
+        await _stt.stop(); // release the mic's audio session before TTS speaks
         await _speak(full);
-        if (_talking) _listen();
+        if (_talking && !_talkMuted) _listen();
       }
     } catch (e) {
       setState(() => _messages
@@ -376,26 +405,35 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
       child: Column(
         children: [
-          _VoiceOrb(state: st),
+          GestureDetector(
+            onTap: _toggleMute,
+            behavior: HitTestBehavior.opaque,
+            child: Opacity(
+              opacity: _talkMuted ? 0.4 : 1,
+              child: _VoiceOrb(state: st),
+            ),
+          ),
           const SizedBox(height: 16),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: Text(
-              st.label,
-              key: ValueKey(st),
+              _talkMuted ? 'Sessiz' : st.label,
+              key: ValueKey(_talkMuted ? 'muted' : st.label),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
-                color: st.color,
+                color: _talkMuted ? VbColors.textMuted : st.color,
               ),
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Konuşma modu açık · durdurmak için telefon simgesine dokun',
+          Text(
+            _talkMuted
+                ? 'Mikrofon sessiz · devam için daireye dokun'
+                : 'Daireye dokun: mikrofonu duraklat · telefon simgesi: bitir',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, color: VbColors.textMuted),
+            style: const TextStyle(fontSize: 11.5, color: VbColors.textMuted),
           ),
         ],
       ),
