@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -94,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     _stt.cancel();
     _tts.stop();
     _input.dispose();
@@ -162,6 +164,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _toggleTalking() async {
     if (_talking) {
       setState(() { _talking = false; _talkMuted = false; });
+      WakelockPlus.disable();
       await _stt.stop();
       await _tts.stop();
       setState(() => _listening = false);
@@ -169,6 +172,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (!await _ensureStt()) return;
     setState(() { _talking = true; _talkMuted = false; });
+    WakelockPlus.enable(); // keep the screen on so the bridge connection doesn't drop
     _listen();
   }
 
@@ -427,13 +431,30 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _talkMuted
-                ? 'Mikrofon sessiz · devam için daireye dokun'
-                : 'Daireye dokun: mikrofonu duraklat · telefon simgesi: bitir',
+          const SizedBox(height: 14),
+          // Clear mic on/off — mutes the mic WITHOUT ending the conversation.
+          OutlinedButton.icon(
+            onPressed: _toggleMute,
+            icon: Icon(
+              _talkMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+              size: 18,
+              color: _talkMuted ? VbColors.danger : VbColors.accent,
+            ),
+            label: Text(_talkMuted ? 'Mikrofonu aç' : 'Mikrofonu kapat'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor:
+                  _talkMuted ? VbColors.danger : VbColors.textPrimary,
+              side: BorderSide(
+                  color: _talkMuted ? VbColors.danger : VbColors.border),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(VbRadius.chip)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Mikrofonu kapatınca konuşma kapanmaz · bitirmek için üstteki telefon simgesi',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11.5, color: VbColors.textMuted),
+            style: TextStyle(fontSize: 11.5, color: VbColors.textMuted),
           ),
         ],
       ),
