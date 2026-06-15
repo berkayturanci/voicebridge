@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // SystemSound + HapticFeedback (earcons)
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _listening = false;
   bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
+  bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
 
   // Autonomy mode — starts from the session's, but changeable from settings.
@@ -55,12 +57,20 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
-    // Reflect when a per-message "Sesli oku" readout ends so its button can flip
-    // back from "Durdur". These are independent of awaitSpeakCompletion (which
-    // resolves the speak() future via the native result), so they don't affect it.
-    _tts.setCompletionHandler(() { if (mounted) setState(() => _ttsMsg = null); });
-    _tts.setCancelHandler(() { if (mounted) setState(() => _ttsMsg = null); });
-    _tts.setErrorHandler((msg) { if (mounted) setState(() => _ttsMsg = null); });
+    // Track real TTS audio state so the orb shows "Konuşuyor" only while audio is
+    // actually playing (not inferred), and so the "Sesli oku" button flips back.
+    // These are independent of awaitSpeakCompletion (which resolves speak() via the
+    // native result), so they don't affect the talking-loop await.
+    _tts.setStartHandler(() { if (mounted) setState(() => _ttsSpeaking = true); });
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+    });
+    _tts.setCancelHandler(() {
+      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+    });
+    _tts.setErrorHandler((msg) {
+      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+    });
     // iOS audio session — configured ONCE here (not before every utterance).
     // Re-applying the category per reply churns the live AVAudioSession route
     // mid-stream, which is what made speech choppy ("kesik kesik").
@@ -191,6 +201,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  // Earcon: a short eyes-free cue (audible over AirPods/CarPlay + a haptic) for
+  // state changes, so you don't have to look at the orb while driving. Uses only
+  // built-in system sounds/haptics — no extra audio dependency.
+  void _cue(String kind) {
+    switch (kind) {
+      case 'listen': // mic opened — your turn
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.selectionClick();
+        break;
+      case 'sent': // captured what you said
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+      case 'error':
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        break;
+    }
+  }
+
   // ---- Voice ----
   Future<void> _listen() async {
     if (_talkMuted) return;
@@ -198,6 +228,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_stt.isListening) return; // guard against a double-start after the TTS handoff
 
     setState(() => _listening = true);
+    if (_talking) _cue('listen'); // audible "your turn" cue in talking mode
 
     // Start with a generous pause so the COLD first-turn recognizer warm-up can't
     // trip the pause watchdog before the user has even started speaking (the cause
@@ -228,7 +259,10 @@ class _ChatScreenState extends State<ChatScreen> {
         if (r.finalResult) {
           final t = r.recognizedWords.trim();
           setState(() => _listening = false);
-          if (t.isNotEmpty) _send(t);
+          if (t.isNotEmpty) {
+            if (_talking) _cue('sent');
+            _send(t);
+          }
         }
       },
     );
@@ -283,9 +317,17 @@ class _ChatScreenState extends State<ChatScreen> {
     _listen();
   }
 
-  // Pause/resume the mic inside talking mode (without leaving). Tap the orb.
+  // Tap the orb: barge-in while it's speaking (cut the readout short and listen),
+  // otherwise pause/resume the mic — all without leaving talking mode.
   void _toggleMute() async {
     if (!_talking) return;
+    // Barge-in: a tap during playback stops TTS and hands the turn back to you.
+    if (_ttsSpeaking) {
+      await _tts.stop();
+      setState(() { _ttsSpeaking = false; _talkMuted = false; });
+      _listen();
+      return;
+    }
     if (_talkMuted) {
       setState(() => _talkMuted = false);
       if (!_busy) _listen(); // resume listening
@@ -344,6 +386,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (_talking && !_talkMuted) _listen();
       }
     } catch (e) {
+      if (_talking) _cue('error');
       setState(() => _messages
           .add(Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
       // Eyes-free recovery: a transient error shouldn't silently drop talking mode —
@@ -623,11 +666,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- Talking mode panel: the breathing orb + state ----
   Widget _talkPanel() {
-    final _OrbState st = _busy && !_listening
-        ? _OrbState.thinking
-        : _listening
-            ? _OrbState.listening
-            : _OrbState.speaking;
+    // Real state: speaking while TTS audio plays, else thinking while a turn is
+    // in flight, else listening (the resting state in talking mode).
+    final _OrbState st = _ttsSpeaking
+        ? _OrbState.speaking
+        : _busy
+            ? _OrbState.thinking
+            : _OrbState.listening;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -680,7 +725,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Mikrofonu kapatınca konuşma kapanmaz · bitirmek için üstteki telefon simgesi',
+            _ttsSpeaking
+                ? 'Konuşurken orb’a dokun → kes ve hemen konuş'
+                : 'Orb’a dokun → mikrofonu aç/kapat · bitirmek için üstteki telefon simgesi',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, color: VbColors.textMuted),
           ),
