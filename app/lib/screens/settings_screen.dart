@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../settings.dart';
+import '../theme.dart';
 import 'sessions_screen.dart';
 
 /// Where the bridge is. The app talks to your machine's voicebridge over the
@@ -21,7 +22,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _token =
       TextEditingController(text: widget.settings.token);
   bool _busy = false;
+  bool _obscure = true;
   String? _error;
+
+  bool get _isFirstRun => !Navigator.canPop(context);
 
   Future<void> _saveAndTest() async {
     setState(() {
@@ -59,53 +63,207 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final firstRun = _isFirstRun;
     return Scaffold(
-      appBar: AppBar(title: const Text('Köprü ayarları')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('Bilgisayarındaki voicebridge köprüsünün adresi:'),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _url,
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            decoration: const InputDecoration(
-              labelText: 'Köprü URL',
-              hintText: 'https://mac.tail-xxxx.ts.net',
-              border: OutlineInputBorder(),
+      appBar: firstRun
+          ? null
+          : AppBar(title: const Text('Köprü ayarları')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
+          children: [
+            if (firstRun) ...[
+              const SizedBox(height: 28),
+              Center(child: _logo()),
+              const SizedBox(height: 22),
+              const Text(
+                'voicebridge',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: VbColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Telefonundan Claude Code ile yaz ve konuş.\n'
+                'Başlamak için köprünün adresini gir.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: VbColors.textMuted, height: 1.5),
+              ),
+              const SizedBox(height: 34),
+            ] else
+              const SizedBox(height: 12),
+            _label('Köprü URL'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _url,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.link_rounded),
+                hintText: 'https://mac.tail-xxxx.ts.net',
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _token,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Erişim token (opsiyonel)',
-              border: OutlineInputBorder(),
+            const SizedBox(height: 20),
+            _label('Erişim token'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _token,
+              obscureText: _obscure,
+              autocorrect: false,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.key_rounded),
+                hintText: 'opsiyonel',
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon: Icon(_obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
+                ),
+              ),
             ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Text('⚠️ $_error',
-                style: const TextStyle(color: Colors.redAccent)),
+            if (_error != null) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: VbColors.danger.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(VbRadius.field),
+                  border: Border.all(
+                      color: VbColors.danger.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        size: 19, color: VbColors.danger),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(
+                            color: VbColors.danger,
+                            fontSize: 13.5,
+                            height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 26),
+            FilledButton.icon(
+              onPressed: _busy ? null : _saveAndTest,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.2, color: Color(0xFF06210C)))
+                  : const Icon(Icons.arrow_forward_rounded),
+              label: Text(_busy
+                  ? 'Bağlanıyor…'
+                  : firstRun
+                      ? 'Bağlan'
+                      : 'Test et & Kaydet'),
+            ),
+            const SizedBox(height: 22),
+            _hint(),
           ],
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _busy ? null : _saveAndTest,
-            icon: _busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.check),
-            label: Text(_busy ? 'Bağlanıyor…' : 'Test et & Kaydet'),
+        ),
+      ),
+    );
+  }
+
+  Widget _logo() {
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [VbColors.accentBright, VbColors.accentDim],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: VbColors.accent.withValues(alpha: 0.38),
+            blurRadius: 34,
+            spreadRadius: 2,
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'İpucu: bilgisayarda köprüyü Tailscale ile HTTPS yayınla:\n'
-            '  tailscale serve --bg 8787',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+        ],
+      ),
+      child: const Icon(Icons.graphic_eq_rounded,
+          color: Color(0xFF06210C), size: 46),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: VbColors.textPrimary,
+          ),
+        ),
+      );
+
+  Widget _hint() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: VbColors.surface,
+        borderRadius: BorderRadius.circular(VbRadius.card),
+        border: Border.all(color: VbColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lightbulb_outline_rounded,
+              size: 18, color: VbColors.warning),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'İpucu',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: VbColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Bilgisayarda köprüyü Tailscale ile HTTPS yayınla:',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      color: VbColors.textMuted,
+                      height: 1.45),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: VbColors.bg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: VbColors.border),
+                  ),
+                  child: Text(
+                    'tailscale serve --bg 8787',
+                    style: VbTheme.mono(size: 12, color: VbColors.accentBright),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
