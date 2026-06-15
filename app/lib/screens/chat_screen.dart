@@ -43,6 +43,8 @@ class _ChatScreenState extends State<ChatScreen> {
   // Sent with every turn (the bridge also updates the stored session mode).
   late String _mode = widget.session.mode;
   List<Map<String, dynamic>> _modes = const []; // [{id, label}] for this agent
+  // Display name — editable from settings (the Session model's is immutable).
+  late String _name = widget.session.name;
 
   static const _locale = 'tr-TR';
 
@@ -378,27 +380,43 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ---- Session settings: mode (autonomy) selector ----
+  // ---- Session settings: rename + mode (autonomy) selector ----
   Future<void> _openSessionSettings() async {
-    final picked = await showModalBottomSheet<String>(
+    final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _SessionSettingsSheet(
-        session: widget.session,
+        currentName: _name,
         modes: _modes,
         currentMode: _mode,
       ),
     );
-    if (picked == null || picked == _mode) return;
-    final prev = _mode;
-    setState(() => _mode = picked);
+    if (result == null) return;
+    final newName = result['name'];
+    final newMode = result['mode'];
+    final nameChanged = newName != null && newName != _name;
+    final modeChanged = newMode != null && newMode != _mode;
+    if (!nameChanged && !modeChanged) return;
+    final prevName = _name, prevMode = _mode;
+    setState(() {
+      if (nameChanged) _name = newName;
+      if (modeChanged) _mode = newMode;
+    });
     try {
-      await _api.updateSession(widget.session.id, mode: picked);
-      _toast('Mod değişti: ${_modeLabel(picked)}');
+      await _api.updateSession(
+        widget.session.id,
+        name: nameChanged ? newName : null,
+        mode: modeChanged ? newMode : null,
+      );
+      _toast(nameChanged && modeChanged
+          ? 'İsim ve mod güncellendi'
+          : nameChanged
+              ? 'İsim güncellendi'
+              : 'Mod: ${_modeLabel(newMode!)}');
     } catch (e) {
-      if (mounted) setState(() => _mode = prev); // revert on failure
-      _toast('Mod değiştirilemedi: ${e.toString().replaceFirst('Exception: ', '')}');
+      if (mounted) setState(() { _name = prevName; _mode = prevMode; });
+      _toast('Güncellenemedi: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
 
@@ -408,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final color =
-        VbColors.seededFor(widget.session.name.isEmpty ? widget.session.agent : widget.session.name);
+        VbColors.seededFor(_name.isEmpty ? widget.session.agent : _name);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 8,
@@ -430,8 +448,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               alignment: Alignment.center,
               child: Text(
-                (widget.session.name.isEmpty ? '?' : widget.session.name.trim()[0])
-                    .toUpperCase(),
+                (_name.isEmpty ? '?' : _name.trim()[0]).toUpperCase(),
                 style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -445,9 +462,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.session.name.isEmpty
-                        ? 'İsimsiz oturum'
-                        : widget.session.name,
+                    _name.isEmpty ? 'İsimsiz oturum' : _name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -501,12 +516,20 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _messages.isEmpty
                 ? _emptyChat()
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, i) => _bubble(_messages[i]),
-                  ),
+                : Builder(builder: (_) {
+                    final rows = _rows();
+                    return ListView.builder(
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                      itemCount: rows.length,
+                      itemBuilder: (_, i) {
+                        final r = rows[i];
+                        return r is List<Message>
+                            ? _ActivityGroup(items: r)
+                            : _bubble(r as Message);
+                      },
+                    );
+                  }),
           ),
           _composer(),
         ],
@@ -620,6 +643,24 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  // Fold runs of consecutive '⚙︎' activity lines into one collapsible group so
+  // the tool/bash chatter doesn't bury the conversation (like the web client).
+  // A non-activity message is kept as-is; a run becomes a List<Message>.
+  List<Object> _rows() {
+    final rows = <Object>[];
+    List<Message>? run;
+    for (final m in _messages) {
+      if (m.role == 'activity') {
+        (run ??= <Message>[]).add(m);
+      } else {
+        if (run != null) { rows.add(run); run = null; }
+        rows.add(m);
+      }
+    }
+    if (run != null) rows.add(run);
+    return rows;
   }
 
   Widget _bubble(Message m) {
@@ -991,6 +1032,100 @@ class _VoiceOrbState extends State<_VoiceOrb>
   }
 }
 
+/// A folded run of '⚙︎' tool/activity lines. Collapsed by default (shows a count
+/// and the latest action); tap to expand the full list. Keeps the transcript
+/// clean for voice/eyes-free use.
+class _ActivityGroup extends StatefulWidget {
+  final List<Message> items;
+  const _ActivityGroup({required this.items});
+
+  @override
+  State<_ActivityGroup> createState() => _ActivityGroupState();
+}
+
+class _ActivityGroupState extends State<_ActivityGroup> {
+  bool _open = false;
+
+  String _clean(String s) => s.replaceFirst('⚙︎ ', '').trim();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final last = items.isEmpty ? '' : _clean(items.last.text);
+    final header = items.length == 1
+        ? last
+        : (_open ? '${items.length} işlem' : '${items.length} işlem · $last');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.9),
+          child: Material(
+            color: VbColors.surfaceHigh,
+            borderRadius: BorderRadius.circular(VbRadius.chip),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(VbRadius.chip),
+              onTap: () => setState(() => _open = !_open),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _open
+                              ? Icons.keyboard_arrow_down_rounded
+                              : Icons.keyboard_arrow_right_rounded,
+                          size: 16,
+                          color: VbColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            header,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: VbTheme.mono(
+                                size: 11.5, color: VbColors.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_open)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final m in items)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 1.5),
+                                child: Text(
+                                  _clean(m.text),
+                                  style: VbTheme.mono(
+                                      size: 11.5, color: VbColors.textMuted),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Animated three-dot indicator shown while a reply streams in empty.
 class _TypingDots extends StatefulWidget {
   const _TypingDots();
@@ -1273,7 +1408,7 @@ class _CommandSheetState extends State<_CommandSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
               child: TextField(
-                autofocus: true,
+                autofocus: false, // don't pop the keyboard on open (shrinks the list, hard to dismiss)
                 onChanged: (v) => setState(() => _q = v),
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
@@ -1299,15 +1434,35 @@ class _CommandSheetState extends State<_CommandSheet> {
 
 /// Session settings: pick how autonomous the agent is (the "mode").
 /// Tapping a mode selects it and closes the sheet (returns the mode id).
-class _SessionSettingsSheet extends StatelessWidget {
-  final Session session;
+class _SessionSettingsSheet extends StatefulWidget {
+  final String currentName;
   final List<Map<String, dynamic>> modes;
   final String currentMode;
   const _SessionSettingsSheet({
-    required this.session,
+    required this.currentName,
     required this.modes,
     required this.currentMode,
   });
+
+  @override
+  State<_SessionSettingsSheet> createState() => _SessionSettingsSheetState();
+}
+
+class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
+  late final TextEditingController _nameCtl =
+      TextEditingController(text: widget.currentName);
+  late String _mode = widget.currentMode;
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    super.dispose();
+  }
+
+  void _save() => Navigator.pop(context, <String, String>{
+        'name': _nameCtl.text.trim(),
+        'mode': _mode,
+      });
 
   IconData _icon(String id) {
     switch (id) {
@@ -1349,94 +1504,107 @@ class _SessionSettingsSheet extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Center(child: _Grabber()),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: VbColors.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: const Icon(Icons.tune_rounded,
-                        size: 20, color: VbColors.accent),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Oturum ayarları',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.2)),
-                        Text(
-                          session.name.isEmpty ? 'İsimsiz oturum' : session.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12.5, color: VbColors.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Padding(
-                padding: EdgeInsets.only(left: 4, bottom: 4),
-                child: Text('OTONOMİ MODU',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                        color: VbColors.textMuted)),
-              ),
-              if (modes.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 18),
-                  child: Text('Bu oturum için mod bilgisi yüklenemedi.',
-                      style: TextStyle(color: VbColors.textMuted)),
-                )
-              else
-                for (final m in modes)
-                  _modeTile(context, (m['id'] ?? '').toString(),
-                      (m['label'] ?? m['id'] ?? '').toString()),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: VbColors.surfaceHigh,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: VbColors.border),
-                ),
-                child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          padding: EdgeInsets.fromLTRB(
+              16, 0, 16, MediaQuery.of(context).viewInsets.bottom + 18),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(child: _Grabber()),
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    Icon(Icons.info_outline_rounded,
-                        size: 16, color: VbColors.textMuted),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Telefondan izin penceresi açılamaz; kesintisiz çalışmak için "tam yetki" modu en uygunudur.',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: VbColors.textMuted,
-                            height: 1.4),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: VbColors.accent.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(11),
                       ),
+                      child: const Icon(Icons.tune_rounded,
+                          size: 20, color: VbColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text('Oturum ayarları',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2)),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text('İSİM',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: VbColors.textMuted)),
+                ),
+                TextField(
+                  controller: _nameCtl,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _save(),
+                  decoration: const InputDecoration(hintText: 'Oturum adı'),
+                ),
+                const SizedBox(height: 18),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 4),
+                  child: Text('OTONOMİ MODU',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: VbColors.textMuted)),
+                ),
+                if (widget.modes.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Text('Bu oturum için mod bilgisi yüklenemedi.',
+                        style: TextStyle(color: VbColors.textMuted)),
+                  )
+                else
+                  for (final m in widget.modes)
+                    _modeTile(context, (m['id'] ?? '').toString(),
+                        (m['label'] ?? m['id'] ?? '').toString()),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: VbColors.border),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 16, color: VbColors.textMuted),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Telefondan izin penceresi açılamaz; kesintisiz çalışmak için "tam yetki" modu en uygunudur.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: VbColors.textMuted,
+                              height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Kaydet'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1444,7 +1612,7 @@ class _SessionSettingsSheet extends StatelessWidget {
   }
 
   Widget _modeTile(BuildContext context, String id, String label) {
-    final selected = id == currentMode;
+    final selected = id == _mode;
     final hint = _hint(id);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -1455,7 +1623,7 @@ class _SessionSettingsSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.pop(context, id),
+          onTap: () => setState(() => _mode = id),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
