@@ -108,32 +108,120 @@ class _ChatScreenState extends State<ChatScreen> {
   // Enhanced/premium neural voices ship with iOS/Android and run fully offline
   // (the user downloads them once in Settings → Accessibility → Spoken Content →
   // Voices), so this keeps the hands-free car/CarPlay path network-free.
-  Future<void> _configureBestVoice() async {
-    // Slightly slower than the racy plugin default; steadier for long replies.
-    await _tts.setSpeechRate(0.5);
-    await _tts.setPitch(1.0);
+  // Persisted TTS voice name chosen in the picker (#125).
+  static const _voiceKey = 'vb_tts_voice';
+
+  // Installed tr-TR voices, best-quality first (premium > enhanced > compact).
+  Future<List<Map<String, String>>> _turkishVoices() async {
     try {
       final raw = await _tts.getVoices;
-      if (raw is! List) return;
+      if (raw is! List) return const [];
       final voices = raw
           .whereType<Map>()
           .map((e) => e.map((k, v) => MapEntry('$k', '$v')))
           .where((v) => (v['locale'] ?? '').toLowerCase().startsWith('tr'))
           .toList();
-      if (voices.isEmpty) return; // no localized voice installed → keep default
       int rank(Map<String, String> v) {
         final q = (v['quality'] ?? '').toLowerCase();
-        if (q.contains('premium')) return 3; // iOS Premium / neural
-        if (q.contains('enhanced')) return 2; // iOS Enhanced
-        return 1; // compact / default
+        if (q.contains('premium')) return 3;
+        if (q.contains('enhanced')) return 2;
+        return 1;
       }
       voices.sort((a, b) => rank(b).compareTo(rank(a)));
-      final best = voices.first;
-      await _tts.setVoice({'name': best['name']!, 'locale': best['locale']!});
-      debugPrint('TTS voice → ${best['name']} (${best['quality']})');
-    } catch (e) {
-      debugPrint('TTS voice setup failed: $e'); // keep default voice on any error
+      return voices;
+    } catch (_) {
+      return const [];
     }
+  }
+
+  String _voiceQualityLabel(String? q) {
+    final s = (q ?? '').toLowerCase();
+    if (s.contains('premium')) return 'Premium (nöral)';
+    if (s.contains('enhanced')) return 'Enhanced';
+    return 'Standart';
+  }
+
+  Future<void> _configureBestVoice() async {
+    // Slightly slower than the racy plugin default; steadier for long replies.
+    await _tts.setSpeechRate(0.5);
+    await _tts.setPitch(1.0);
+    final voices = await _turkishVoices();
+    if (voices.isEmpty) return; // no localized voice installed → keep default
+    // Prefer the user's saved pick if it's still installed (#125); else best.
+    final p = await SharedPreferences.getInstance();
+    final savedName = p.getString(_voiceKey);
+    final chosen = (savedName != null)
+        ? voices.firstWhere((v) => v['name'] == savedName, orElse: () => voices.first)
+        : voices.first;
+    try {
+      await _tts.setVoice({'name': chosen['name']!, 'locale': chosen['locale']!});
+      debugPrint('TTS voice → ${chosen['name']} (${chosen['quality']})');
+    } catch (e) {
+      debugPrint('TTS setVoice failed: $e');
+    }
+  }
+
+  // In-app voice picker (#125): list the installed tr-TR voices, persist the
+  // choice, apply it, and speak a sample so it's heard immediately. iOS 26
+  // ignores the system-selected voice, so picking explicitly here is the fix.
+  Future<void> _pickVoice() async {
+    final voices = await _turkishVoices();
+    if (!mounted) return;
+    if (voices.isEmpty) {
+      _toast('Yüklü Türkçe ses yok. Ayarlar → Erişilebilirlik → Sözlü İçerik → Sesler\'den indir.');
+      return;
+    }
+    final p = await SharedPreferences.getInstance();
+    final savedName = p.getString(_voiceKey);
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: VbColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            children: [
+              const Center(child: _Grabber()),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: Text('Ses seç',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: VbColors.textPrimary)),
+              ),
+              for (final v in voices)
+                ListTile(
+                  title: Text(v['name'] ?? '',
+                      style: TextStyle(color: VbColors.textPrimary)),
+                  subtitle: Text(_voiceQualityLabel(v['quality']),
+                      style: TextStyle(color: VbColors.textMuted)),
+                  trailing: v['name'] == savedName
+                      ? Icon(Icons.check_rounded, color: VbColors.accent)
+                      : null,
+                  onTap: () => Navigator.pop(context, v),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    await p.setString(_voiceKey, picked['name']!);
+    try {
+      await _tts.setVoice({'name': picked['name']!, 'locale': picked['locale']!});
+      await _speak('Merhaba, artık bu sesle konuşacağım.'); // hear it right away
+    } catch (_) {}
+    if (mounted) _toast('Ses seçildi: ${picked['name']}');
   }
 
   // The autonomy modes this agent supports (label + id), for the settings sheet.
@@ -496,6 +584,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (result == null) return;
     if (result['action'] == 'attach') {
       await _attachClaudeSession();
+      return;
+    }
+    if (result['action'] == 'voice') {
+      await _pickVoice();
       return;
     }
     final newName = result['name'];
@@ -1793,6 +1885,49 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     ),
                   ),
                 ],
+                SizedBox(height: 18),
+                Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text('SES',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: VbColors.textMuted)),
+                ),
+                Material(
+                  color: VbColors.surfaceHigh,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => Navigator.pop(
+                        context, <String, String>{'action': 'voice'}),
+                    child: Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: VbColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.record_voice_over_rounded,
+                              size: 22, color: VbColors.accent),
+                          SizedBox(width: 13),
+                          Expanded(
+                            child: Text('Konuşma sesini seç',
+                                style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: VbColors.textPrimary)),
+                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              color: VbColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: _save,
