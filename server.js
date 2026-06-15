@@ -116,9 +116,18 @@ function parseClaudeLine(line) {
 
 // A short, human label for a tool_use block, e.g. "Edit server.js" / "Bash npm test".
 function toolLabel(b) {
-  const v = b.input && (b.input.file_path || b.input.path || b.input.pattern || b.input.command || b.input.url);
-  const detail = v ? " " + String(v).split("/").slice(-1)[0].slice(0, 40) : "";
-  return (b.name || "tool") + detail;
+  const inp = b.input || {};
+  // File-ish args read better as a basename (Edit/Read show the filename). A
+  // shell command must NOT be basenamed — "cat /dev/null" would show as "null".
+  const file = inp.file_path || inp.path || inp.url;
+  if (typeof file === "string" && file) {
+    return (b.name || "tool") + " " + file.split("/").slice(-1)[0].slice(0, 40);
+  }
+  const text = inp.command || inp.pattern || inp.description;
+  if (typeof text === "string" && text.trim()) {
+    return (b.name || "tool") + " " + text.replace(/\s+/g, " ").trim().slice(0, 40);
+  }
+  return b.name || "tool";
 }
 
 // Parse one Claude `stream-json` line into events: assistant text -> delta,
