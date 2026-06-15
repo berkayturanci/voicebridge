@@ -772,17 +772,24 @@ function streamLive(session, prompt, res, emit) {
   let finished = false;
   let stderr = "";
 
-  const detach = () => {
+  let released = false;   // process turn fully drained to its `result` (busy freed)
+
+  // Free the process for the next turn. Only safe once this turn's `result` has
+  // been consumed — otherwise leftover stdout corrupts the next turn's framing.
+  const release = () => {
+    if (released) return;
+    released = true;
     p.child.stdout.removeListener("data", onData);
     p.child.stderr.removeListener("data", onErr);
     p.child.removeListener("exit", onExit);
     p.busy = false;
     if (LIVE_IDLE_MS > 0) p.idleTimer = setTimeout(() => killLive(session.id), LIVE_IDLE_MS);
   };
-  const finish = (errMsg) => {
+  // Settle the HTTP response (emit done/error once). Independent of release: on
+  // barge-in the response settles immediately while the process keeps draining.
+  const endHttp = (errMsg) => {
     if (finished) return;
     finished = true;
-    detach();
     if (errMsg) emit({ type: "error", error: errMsg });
     else {
       session.started = true;
@@ -791,12 +798,17 @@ function streamLive(session, prompt, res, emit) {
         sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: replyText.trim().slice(-160), sessionId: session.id });
       }
     }
-    res.end();
+    try { res.end(); } catch (_) {}
   };
   const onLine = (line) => {
     let obj; try { obj = JSON.parse(line); } catch (_) { return; }
-    for (const ev of parseClaudeEvents(line)) { if (ev.type === "delta") replyText += ev.text; emit(ev); }
-    if (obj.type === "result") finish(obj.is_error ? (obj.result || "Live turn failed.") : null);
+    if (!finished) { // after barge-in we keep draining but stop emitting
+      for (const ev of parseClaudeEvents(line)) { if (ev.type === "delta") replyText += ev.text; emit(ev); }
+    }
+    if (obj.type === "result") { // this turn is fully consumed → safe to free
+      endHttp(obj.is_error ? (obj.result || "Live turn failed.") : null);
+      release();
+    }
   };
   const onData = (d) => {
     p.buf += d;
@@ -808,15 +820,17 @@ function streamLive(session, prompt, res, emit) {
     }
   };
   const onErr = (d) => { stderr += d; };
-  const onExit = (code) => finish(stderr.trim() || ("Live session exited (code " + code + ")."));
+  const onExit = (code) => { endHttp(stderr.trim() || ("Live session exited (code " + code + ").")); release(); };
 
   p.child.stdout.on("data", onData);
   p.child.stderr.on("data", onErr);
   p.child.on("exit", onExit);
-  // Barge-in: if the HTTP response closes mid-turn we DON'T kill the persistent
-  // process (it must survive for the next turn) — we only detach this turn's
-  // listeners. True mid-turn interrupt is tracked in #119.
-  res.on("close", () => { if (!finished) { finished = true; detach(); } });
+  // Barge-in: HTTP response closed mid-turn. We must NOT kill the persistent
+  // process (in-memory history must survive) and must NOT free it until this
+  // turn's `result` arrives — so we stop emitting now and keep draining (onLine
+  // → release on result). The model finishes server-side in a few seconds; the
+  // phone already silenced its TTS. Snappy mid-turn interrupt is a follow-up.
+  res.on("close", () => { finished = true; });
 
   const userLine = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: buildPrompt(session.voice, prompt) }] } }) + "\n";
   try { p.child.stdin.write(userLine); } catch (e) { finish(e.message); }
