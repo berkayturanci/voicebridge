@@ -290,7 +290,7 @@ function browseDir(p) {
 
 // Project slash commands under .claude/commands/**.md → "/name" (nested dirs
 // namespace with ":", e.g. .claude/commands/keel/ship.md → /keel:ship).
-function listSlashCommands(baseDir) {
+function scanCommandsDir(commandsDir) {
   const out = [];
   const walk = (d, prefix) => {
     if (out.length > 200) return;
@@ -304,8 +304,44 @@ function listSlashCommands(baseDir) {
       }
     }
   };
-  walk(path.join(baseDir, ".claude", "commands"), []);
+  walk(commandsDir, []);
   return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function listSlashCommands(baseDir) {
+  return scanCommandsDir(path.join(baseDir, ".claude", "commands"));
+}
+
+// The user's global commands (~/.claude/commands) — available in every session,
+// like in the Claude Code CLI.
+function listGlobalCommands() {
+  return scanCommandsDir(path.join(os.homedir(), ".claude", "commands"));
+}
+
+// Commands shipped by installed plugins. Each plugin's commands live in
+// <installPath>/commands and are invoked as /name, same as project commands.
+// Returns one group per plugin that actually ships commands (deduped by path).
+// Note: built-in Claude Code app commands (e.g. /clear, /remote-control) are not
+// file-based and run only in the interactive CLI, so they can't be surfaced here.
+function listPluginCommandGroups() {
+  const groups = [];
+  let cfg;
+  try {
+    cfg = JSON.parse(fs.readFileSync(
+      path.join(os.homedir(), ".claude", "plugins", "installed_plugins.json"), "utf8"));
+  } catch (_) { return groups; }
+  const seen = new Set();
+  for (const [key, records] of Object.entries(cfg.plugins || {})) {
+    const name = String(key).split("@")[0];
+    for (const rec of (records || [])) {
+      const ip = rec && rec.installPath;
+      if (!ip || seen.has(ip)) continue;
+      seen.add(ip);
+      const items = scanCommandsDir(path.join(ip, "commands"));
+      if (items.length) groups.push({ label: "Plugin: " + name, items });
+    }
+  }
+  return groups;
 }
 
 // package.json scripts → "npm run <name>".
@@ -797,7 +833,10 @@ function handleRequest(req, res) {
       if (session.runner === "cloud") return sendJson(res, 200, { groups: [] }); // remote dir; see #89
       const groups = [];
       const cmds = listSlashCommands(session.projectDir);
-      if (cmds.length) groups.push({ label: "Komutlar (.claude/commands)", items: cmds });
+      if (cmds.length) groups.push({ label: "Komutlar (proje)", items: cmds });
+      const globalCmds = listGlobalCommands();
+      if (globalCmds.length) groups.push({ label: "Komutlar (global)", items: globalCmds });
+      for (const g of listPluginCommandGroups()) groups.push(g);
       const npm = listNpmScripts(session.projectDir);
       if (npm.length) groups.push({ label: "npm scripts", items: npm });
       return sendJson(res, 200, { groups });
