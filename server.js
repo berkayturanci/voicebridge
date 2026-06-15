@@ -628,7 +628,14 @@ function readBody(req, limitBytes, cb) {
 const VOICE_PREAMBLE =
   "Answer concisely, optimized for being read aloud by text-to-speech: avoid long " +
   "code blocks unless explicitly asked, and finish with a one-sentence spoken summary.";
+// A slash command must be the very first thing in the message for Claude Code to
+// recognize it, so we never prepend the voice preamble to one (#122) — otherwise
+// a hands-free command like "/keel:ship" would be sent as plain prose and ignored.
+function isSlashCommand(text) {
+  return /^\s*\/[a-zA-Z]/.test(text);
+}
 function buildPrompt(voice, text) {
+  if (isSlashCommand(text)) return text.trim();
   return voice ? VOICE_PREAMBLE + "\n\n" + text : text;
 }
 
