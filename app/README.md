@@ -36,12 +36,16 @@ platform projects, fetch packages, then run:
 
 ```bash
 cd app
-flutter create .            # generates ios/ android/ macos/ windows/ linux/ (keeps lib/ + pubspec)
-flutter pub get
+bash tool/setup.sh                # generates ios/ android/ + injects mic/speech permissions + pub get
 dart run flutter_launcher_icons   # apply the voicebridge app icon (from assets/icon/)
-flutter run                 # on a connected device/simulator
+flutter run                       # on a connected device/simulator
 flutter run -d macos        # …or a desktop target: macos | windows | linux
 ```
+
+`tool/setup.sh` runs `flutter create .` (which scaffolds `ios/ android/ …` —
+these are generated, version-specific, and not committed) and then adds the
+native permission keys for you, idempotently. Prefer doing it by hand? The
+manual equivalents are below.
 
 The same codebase is a **desktop client** too (macOS / Windows / Linux) — a
 "connect-from" app for your laptop. Chat + streaming work everywhere; voice
