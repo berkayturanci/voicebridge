@@ -102,7 +102,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
               height: 30,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(9),
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [VbColors.accentBright, VbColors.accentDim],
@@ -190,7 +190,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 22),
-        child: const Icon(Icons.delete_outline, color: VbColors.danger),
+        child: Icon(Icons.delete_outline, color: VbColors.danger),
       ),
       confirmDismiss: (_) async {
         await _delete(s);
@@ -243,7 +243,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                         s.name.isEmpty ? 'İsimsiz oturum' : s.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: VbColors.textPrimary,
@@ -270,7 +270,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: VbColors.textMuted),
+                Icon(Icons.chevron_right, color: VbColors.textMuted),
               ],
             ),
           ),
@@ -364,7 +364,7 @@ class _StateView extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: VbColors.textPrimary,
@@ -374,7 +374,7 @@ class _StateView extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: VbColors.textMuted, height: 1.4),
+          style: TextStyle(fontSize: 14, color: VbColors.textMuted, height: 1.4),
         ),
         const SizedBox(height: 24),
         Center(
@@ -448,7 +448,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VbColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -474,7 +474,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                     color: VbColors.accent.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Icon(Icons.add_comment_outlined,
+                  child: Icon(Icons.add_comment_outlined,
                       size: 20, color: VbColors.accent),
                 ),
                 const SizedBox(width: 12),
@@ -572,7 +572,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         padding: const EdgeInsets.only(left: 4),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: VbColors.textPrimary,
@@ -671,12 +671,12 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline_rounded,
+                        Icon(Icons.error_outline_rounded,
                             size: 40, color: VbColors.danger),
                         const SizedBox(height: 14),
                         Text(_error!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: VbColors.textMuted)),
+                            style: TextStyle(color: VbColors.textMuted)),
                       ],
                     ),
                   ),
@@ -698,18 +698,18 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                                   horizontal: 12, vertical: 13),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.folder_rounded,
+                                  Icon(Icons.folder_rounded,
                                       size: 22, color: VbColors.accent),
                                   const SizedBox(width: 13),
                                   Expanded(
                                     child: Text(d,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontSize: 15,
                                             color: VbColors.textPrimary)),
                                   ),
-                                  const Icon(Icons.chevron_right_rounded,
+                                  Icon(Icons.chevron_right_rounded,
                                       color: VbColors.textMuted),
                                 ],
                               ),
@@ -718,7 +718,7 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                         ),
                       ),
                     if (_dirs.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(40),
                         child: Center(
                           child: Text('Alt klasör yok',

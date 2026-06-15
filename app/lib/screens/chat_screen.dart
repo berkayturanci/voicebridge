@@ -523,14 +523,14 @@ class _ChatScreenState extends State<ChatScreen> {
                           _subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w500,
                             color: VbColors.textMuted,
                           ),
                         ),
                       ),
-                      const Icon(Icons.expand_more_rounded,
+                      Icon(Icons.expand_more_rounded,
                           size: 15, color: VbColors.textMuted),
                     ],
                   ),
@@ -597,11 +597,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 border:
                     Border.all(color: VbColors.accent.withValues(alpha: 0.25)),
               ),
-              child: const Icon(Icons.auto_awesome_outlined,
+              child: Icon(Icons.auto_awesome_outlined,
                   size: 32, color: VbColors.accent),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Sohbete başla',
               style: TextStyle(
                   fontSize: 17,
@@ -609,7 +609,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: VbColors.textPrimary),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Bir mesaj yaz, mikrofona dokun ya da konuşma modunu aç.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -632,7 +632,7 @@ class _ChatScreenState extends State<ChatScreen> {
       width: double.infinity,
       decoration: BoxDecoration(
         color: VbColors.surface,
-        border: const Border(bottom: BorderSide(color: VbColors.border)),
+        border: Border(bottom: BorderSide(color: VbColors.border)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
       child: Column(
@@ -679,7 +679,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Mikrofonu kapatınca konuşma kapanmaz · bitirmek için üstteki telefon simgesi',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, color: VbColors.textMuted),
@@ -813,7 +813,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _composer() {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VbColors.bg,
         border: Border(top: BorderSide(color: VbColors.border)),
       ),
@@ -891,7 +891,7 @@ class _MessageBody extends StatelessWidget {
     if (segments.length == 1 && !segments.first.isCode) {
       return SelectableText(
         text,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 15, height: 1.45, color: VbColors.textPrimary),
       );
     }
@@ -905,7 +905,7 @@ class _MessageBody extends StatelessWidget {
                 ? _codeBlock(segments[i].text)
                 : SelectableText(
                     segments[i].text,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 15,
                         height: 1.45,
                         color: VbColors.textPrimary),
@@ -1365,7 +1365,7 @@ class _CommandSheetState extends State<_CommandSheet> {
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
         child: Text(
           '${g['label']}'.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,
@@ -1389,7 +1389,7 @@ class _CommandSheetState extends State<_CommandSheet> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   child: Row(
                     children: [
-                      const Icon(Icons.chevron_right_rounded,
+                      Icon(Icons.chevron_right_rounded,
                           size: 18, color: VbColors.accent),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1398,7 +1398,7 @@ class _CommandSheetState extends State<_CommandSheet> {
                           children: [
                             Text(
                               '${it['label']}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w600,
                                   color: VbColors.textPrimary),
@@ -1427,7 +1427,7 @@ class _CommandSheetState extends State<_CommandSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: VbColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
@@ -1439,7 +1439,7 @@ class _CommandSheetState extends State<_CommandSheet> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.bolt_outlined, color: VbColors.accent),
+                  Icon(Icons.bolt_outlined, color: VbColors.accent),
                   const SizedBox(width: 8),
                   const Text(
                     'Komutlar',
@@ -1462,7 +1462,7 @@ class _CommandSheetState extends State<_CommandSheet> {
             ),
             Expanded(
               child: tiles.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text('Eşleşme yok',
                           style: TextStyle(color: VbColors.textMuted)))
                   : ListView(
@@ -1543,7 +1543,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VbColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -1568,7 +1568,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                         color: VbColors.accent.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(11),
                       ),
-                      child: const Icon(Icons.tune_rounded,
+                      child: Icon(Icons.tune_rounded,
                           size: 20, color: VbColors.accent),
                     ),
                     const SizedBox(width: 12),
@@ -1582,7 +1582,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   ],
                 ),
                 const SizedBox(height: 18),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 6),
                   child: Text('İSİM',
                       style: TextStyle(
@@ -1598,7 +1598,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   decoration: const InputDecoration(hintText: 'Oturum adı'),
                 ),
                 const SizedBox(height: 18),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 4),
                   child: Text('OTONOMİ MODU',
                       style: TextStyle(
@@ -1608,7 +1608,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                           color: VbColors.textMuted)),
                 ),
                 if (widget.modes.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(vertical: 18),
                     child: Text('Bu oturum için mod bilgisi yüklenemedi.',
                         style: TextStyle(color: VbColors.textMuted)),
@@ -1625,7 +1625,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: VbColors.border),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(Icons.info_outline_rounded,
@@ -1644,8 +1644,8 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   ),
                 ),
                 if (widget.canAttach) ...[
-                  const SizedBox(height: 18),
-                  const Padding(
+                  SizedBox(height: 18),
+                  Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 6),
                     child: Text('CLAUDE OTURUMU',
                         style: TextStyle(
@@ -1662,14 +1662,14 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                       onTap: () => Navigator.pop(
                           context, <String, String>{'action': 'attach'}),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                             horizontal: 14, vertical: 13),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: VbColors.border),
                         ),
                         child: Row(
-                          children: const [
+                          children: [
                             Icon(Icons.history_rounded,
                                 size: 22, color: VbColors.accent),
                             SizedBox(width: 13),
@@ -1738,7 +1738,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(label,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: VbColors.textPrimary)),
@@ -1746,14 +1746,14 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(hint,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 12, color: VbColors.textMuted)),
                         ),
                     ],
                   ),
                 ),
                 if (selected)
-                  const Icon(Icons.check_circle_rounded,
+                  Icon(Icons.check_circle_rounded,
                       size: 20, color: VbColors.accent),
               ],
             ),
@@ -1782,7 +1782,7 @@ class _ClaudeSessionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VbColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -1790,7 +1790,7 @@ class _ClaudeSessionsSheet extends StatelessWidget {
       child: Column(
         children: [
           const _Grabber(),
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
             child: Row(
               children: [
@@ -1835,7 +1835,7 @@ class _ClaudeSessionsSheet extends StatelessWidget {
                               title.isEmpty ? '(başlıksız oturum)' : title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 14.5,
                                   color: VbColors.textPrimary,
                                   height: 1.3),

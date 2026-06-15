@@ -76,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 28),
               Center(child: _logo()),
               const SizedBox(height: 22),
-              const Text(
+              Text(
                 'voicebridge',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -87,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Telefonundan Claude Code ile yaz ve konuş.\n'
                 'Başlamak için köprünün adresini gir.',
                 textAlign: TextAlign.center,
@@ -139,13 +139,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.error_outline_rounded,
+                    Icon(Icons.error_outline_rounded,
                         size: 19, color: VbColors.danger),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _error!,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: VbColors.danger,
                             fontSize: 13.5,
                             height: 1.4),
@@ -171,8 +171,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? 'Bağlan'
                       : 'Test et & Kaydet'),
             ),
+            const SizedBox(height: 24),
+            _label('Görünüm'),
+            const SizedBox(height: 8),
+            _themeToggle(),
             const SizedBox(height: 22),
             _hint(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _themeToggle() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: VbThemeController.isDark,
+      builder: (_, dark, __) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        decoration: BoxDecoration(
+          color: VbColors.surface,
+          borderRadius: BorderRadius.circular(VbRadius.card),
+          border: Border.all(color: VbColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                size: 20, color: VbColors.accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(dark ? 'Koyu tema' : 'Açık tema',
+                  style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: VbColors.textPrimary)),
+            ),
+            Switch(value: dark, onChanged: (v) => VbThemeController.set(v)),
           ],
         ),
       ),
@@ -185,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       height: 88,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [VbColors.accentBright, VbColors.accentDim],
@@ -207,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.only(left: 4),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: VbColors.textPrimary,
@@ -226,14 +259,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb_outline_rounded,
+          Icon(Icons.lightbulb_outline_rounded,
               size: 18, color: VbColors.warning),
           const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'İpucu',
                   style: TextStyle(
                       fontSize: 12.5,
@@ -241,7 +274,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: VbColors.textPrimary),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Bilgisayarda köprüyü Tailscale ile HTTPS yayınla:',
                   style: TextStyle(
                       fontSize: 12.5,

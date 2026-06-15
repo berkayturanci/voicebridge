@@ -5,20 +5,28 @@ import 'theme.dart';
 import 'screens/sessions_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() => runApp(const VoiceBridgeApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await VbThemeController.load();
+  runApp(const VoiceBridgeApp());
+}
 
 class VoiceBridgeApp extends StatelessWidget {
   const VoiceBridgeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'voicebridge',
-      debugShowCheckedModeBanner: false,
-      theme: VbTheme.dark(),
-      darkTheme: VbTheme.dark(),
-      themeMode: ThemeMode.dark,
-      home: const _Bootstrap(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: VbThemeController.isDark,
+      builder: (_, dark, __) {
+        VbColors.setPalette(dark ? VbPalette.dark : VbPalette.light);
+        return MaterialApp(
+          title: 'voicebridge',
+          debugShowCheckedModeBanner: false,
+          theme: VbTheme.themed(),
+          home: const _Bootstrap(),
+        );
+      },
     );
   }
 }
@@ -56,7 +64,7 @@ class _BootstrapState extends State<_Bootstrap> {
                 height: 76,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [VbColors.accentBright, VbColors.accentDim],
@@ -73,7 +81,7 @@ class _BootstrapState extends State<_Bootstrap> {
                     color: Color(0xFF06210C), size: 40),
               ),
               const SizedBox(height: 22),
-              const Text('voicebridge',
+              Text('voicebridge',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
