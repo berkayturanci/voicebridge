@@ -38,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _listening = false;
   bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
+  bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
 
@@ -101,6 +102,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _loadHistory();
     _loadModes();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
+    });
+  }
+
+  Future<void> _toggleHideActivity() async {
+    setState(() => _hideActivity = !_hideActivity);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('vb_hide_activity', _hideActivity);
   }
 
   // Pick the highest-quality installed voice for the locale. flutter_tts otherwise
@@ -733,6 +743,13 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: _hideActivity ? 'Aktiviteyi göster' : 'Aktiviteyi gizle',
+            onPressed: _toggleHideActivity,
+            icon: Icon(_hideActivity
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined),
+          ),
+          IconButton(
             tooltip: 'Komutlar',
             onPressed: _busy ? null : _openPalette,
             icon: const Icon(Icons.bolt_outlined),
@@ -892,6 +909,7 @@ class _ChatScreenState extends State<ChatScreen> {
     List<Message>? run;
     for (final m in _messages) {
       if (m.role == 'activity') {
+        if (_hideActivity) continue; // toggle: drop tool/bash chatter entirely
         (run ??= <Message>[]).add(m);
       } else {
         if (run != null) { rows.add(run); run = null; }
