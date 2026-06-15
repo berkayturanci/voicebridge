@@ -63,6 +63,30 @@ class Api {
     return Session.fromJson(data['session'] as Map<String, dynamic>);
   }
 
+  /// POST /api/sessions/:id — update a session's name / mode / voice.
+  /// Returns the refreshed session.
+  Future<Session> updateSession(
+    String id, {
+    String? name,
+    String? mode,
+    bool? voice,
+  }) async {
+    final r = await http.post(
+      _u('/api/sessions/$id'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({
+        if (name != null) 'name': name,
+        if (mode != null) 'mode': mode,
+        if (voice != null) 'voice': voice,
+      }),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Güncellenemedi (${r.statusCode})');
+    }
+    final data = jsonDecode(r.body) as Map<String, dynamic>;
+    return Session.fromJson(data['session'] as Map<String, dynamic>);
+  }
+
   /// GET /api/commands?sessionId= — the project's slash commands + npm scripts.
   /// Returns groups: [{label, items:[{label, value, hint?}]}].
   Future<List<Map<String, dynamic>>> commands(String sessionId) async {
