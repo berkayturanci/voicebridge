@@ -145,6 +145,7 @@ const AGENTS = {
     bin: () => process.env.CLAUDE_BIN || "claude",
     supportsContinue: true,
     stream: "ndjson",
+    live: true, // supports the persistent --input-format stream-json live path (Tat X)
     defaultMode: "ask",
     modes: {
       ask: { label: "Onay iste", args: [] },
@@ -838,8 +839,10 @@ function streamLive(session, prompt, res, emit) {
 
 // Local runner: spawn the agent CLI on this machine.
 function streamLocal(session, prompt, res, emit) {
-  // Tat X: when enabled, Claude sessions run through the persistent live process.
-  if (LIVE_ENABLED && session.agent === "claude") return streamLive(session, prompt, res, emit);
+  // Tat X: when enabled, agents that declare `live` run through the persistent
+  // process; the rest (codex, antigravity — no streaming-input mode) fall back
+  // to the per-turn path below.
+  if (LIVE_ENABLED && AGENTS[session.agent] && AGENTS[session.agent].live) return streamLive(session, prompt, res, emit);
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
   // First turn of an attached session resumes that Claude session id; afterwards
