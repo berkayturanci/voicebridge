@@ -724,8 +724,108 @@ function streamCloud(session, prompt, res, emit) {
   res.on("close", () => { try { up.destroy(); } catch (_) {} });
 }
 
+// ---------------------------------------------------------------------------
+// Tat X — persistent live sessions (behind PERSISTENT_SESSIONS=1)
+// One long-lived `claude --print --input-format stream-json` process per session
+// keeps conversation history IN-MEMORY across turns (no per-turn --resume reload)
+// and lets slash commands run. Proven by probe; see docs/tat-x-plan.md. The
+// per-turn streamLocal path below stays as the fallback when the flag is off.
+// ---------------------------------------------------------------------------
+const LIVE_ENABLED = process.env.PERSISTENT_SESSIONS === "1";
+const LIVE_IDLE_MS = Number(process.env.LIVE_IDLE_MS ?? 30 * 60 * 1000) || 0;
+const liveProcs = new Map(); // sessionId -> { child, buf, busy, idleTimer }
+
+function killLive(sessionId) {
+  const p = liveProcs.get(sessionId);
+  if (!p) return;
+  liveProcs.delete(sessionId);
+  try { p.child.stdin.end(); } catch (_) {}
+  try { p.child.kill("SIGTERM"); } catch (_) {}
+}
+
+function getOrSpawnLive(session) {
+  const existing = liveProcs.get(session.id);
+  if (existing && !existing.child.killed) return existing;
+  const modeArgs = (AGENTS.claude.modes[session.mode] || AGENTS.claude.modes[AGENTS.claude.defaultMode]).args;
+  const argv = [...modeArgs, "--print", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"];
+  const child = spawn(AGENTS.claude.bin(), argv, { cwd: session.projectDir, env: process.env });
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  const p = { child, buf: "", busy: false, idleTimer: null };
+  liveProcs.set(session.id, p);
+  const drop = () => { if (liveProcs.get(session.id) === p) liveProcs.delete(session.id); };
+  child.on("exit", drop);
+  child.on("error", drop);
+  return p;
+}
+
+// Drive one turn through the persistent process: write the user message as an
+// Anthropic Messages NDJSON line, stream assistant/tool events back until this
+// turn's `result` line, then resolve. The process survives for the next turn.
+function streamLive(session, prompt, res, emit) {
+  const p = getOrSpawnLive(session);
+  if (p.busy) { emit({ type: "error", error: "Bu oturum şu an meşgul (önceki tur sürüyor)." }); return res.end(); }
+  p.busy = true;
+  if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
+
+  let replyText = "";
+  let finished = false;
+  let stderr = "";
+
+  const detach = () => {
+    p.child.stdout.removeListener("data", onData);
+    p.child.stderr.removeListener("data", onErr);
+    p.child.removeListener("exit", onExit);
+    p.busy = false;
+    if (LIVE_IDLE_MS > 0) p.idleTimer = setTimeout(() => killLive(session.id), LIVE_IDLE_MS);
+  };
+  const finish = (errMsg) => {
+    if (finished) return;
+    finished = true;
+    detach();
+    if (errMsg) emit({ type: "error", error: errMsg });
+    else {
+      session.started = true;
+      emit({ type: "done" });
+      if (looksLikeQuestion(replyText)) {
+        sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: replyText.trim().slice(-160), sessionId: session.id });
+      }
+    }
+    res.end();
+  };
+  const onLine = (line) => {
+    let obj; try { obj = JSON.parse(line); } catch (_) { return; }
+    for (const ev of parseClaudeEvents(line)) { if (ev.type === "delta") replyText += ev.text; emit(ev); }
+    if (obj.type === "result") finish(obj.is_error ? (obj.result || "Live turn failed.") : null);
+  };
+  const onData = (d) => {
+    p.buf += d;
+    let i;
+    while ((i = p.buf.indexOf("\n")) >= 0) {
+      const line = p.buf.slice(0, i).trim();
+      p.buf = p.buf.slice(i + 1);
+      if (line) onLine(line);
+    }
+  };
+  const onErr = (d) => { stderr += d; };
+  const onExit = (code) => finish(stderr.trim() || ("Live session exited (code " + code + ")."));
+
+  p.child.stdout.on("data", onData);
+  p.child.stderr.on("data", onErr);
+  p.child.on("exit", onExit);
+  // Barge-in: if the HTTP response closes mid-turn we DON'T kill the persistent
+  // process (it must survive for the next turn) — we only detach this turn's
+  // listeners. True mid-turn interrupt is tracked in #119.
+  res.on("close", () => { if (!finished) { finished = true; detach(); } });
+
+  const userLine = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: buildPrompt(session.voice, prompt) }] } }) + "\n";
+  try { p.child.stdin.write(userLine); } catch (e) { finish(e.message); }
+}
+
 // Local runner: spawn the agent CLI on this machine.
 function streamLocal(session, prompt, res, emit) {
+  // Tat X: when enabled, Claude sessions run through the persistent live process.
+  if (LIVE_ENABLED && session.agent === "claude") return streamLive(session, prompt, res, emit);
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
   // First turn of an attached session resumes that Claude session id; afterwards
