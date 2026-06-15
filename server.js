@@ -354,6 +354,28 @@ function listNpmScripts(baseDir) {
   } catch (_) { return []; }
 }
 
+// Per-agent command palette (#121). Slash commands are agent-specific: Claude's
+// live in .claude/commands (+ global + plugins); Codex's are prompts in
+// ~/.codex/prompts; Antigravity has no file-based commands. npm scripts are
+// shell-level, so they're offered for every agent. This stops e.g. an
+// Antigravity session from listing Claude-only commands it can't run.
+function commandGroupsForAgent(agentId, projectDir) {
+  const groups = [];
+  if (agentId === "claude") {
+    const proj = listSlashCommands(projectDir);
+    if (proj.length) groups.push({ label: "Komutlar (proje)", items: proj });
+    const glob = listGlobalCommands();
+    if (glob.length) groups.push({ label: "Komutlar (global)", items: glob });
+    for (const g of listPluginCommandGroups()) groups.push(g);
+  } else if (agentId === "codex") {
+    const cx = scanCommandsDir(path.join(os.homedir(), ".codex", "prompts"));
+    if (cx.length) groups.push({ label: "Codex prompts", items: cx });
+  }
+  const npm = listNpmScripts(projectDir);
+  if (npm.length) groups.push({ label: "npm scripts", items: npm });
+  return groups;
+}
+
 // --- Resume an existing Claude Code session --------------------------------
 // Claude Code stores each session as ~/.claude/projects/<encoded-path>/<id>.jsonl
 // (project path with non-alphanumerics turned into "-"). We list those so a
@@ -1006,19 +1028,14 @@ function handleRequest(req, res) {
     // Browse local directories (for the project-folder picker).
     // Commands available in a session's project (slash commands + npm scripts).
     if (req.method === "GET" && urlPath === "/api/commands") {
-      const sid = new URL(req.url, "http://x").searchParams.get("sessionId");
-      const session = resolveSession(sid);
+      const q = new URL(req.url, "http://x").searchParams;
+      const session = resolveSession(q.get("sessionId"));
       if (!session) return sendJson(res, 404, { error: "unknown session" });
       if (session.runner === "cloud") return sendJson(res, 200, { groups: [] }); // remote dir; see #89
-      const groups = [];
-      const cmds = listSlashCommands(session.projectDir);
-      if (cmds.length) groups.push({ label: "Komutlar (proje)", items: cmds });
-      const globalCmds = listGlobalCommands();
-      if (globalCmds.length) groups.push({ label: "Komutlar (global)", items: globalCmds });
-      for (const g of listPluginCommandGroups()) groups.push(g);
-      const npm = listNpmScripts(session.projectDir);
-      if (npm.length) groups.push({ label: "npm scripts", items: npm });
-      return sendJson(res, 200, { groups });
+      // Per-agent palette: explicit ?agent= wins (lets the app preview another
+      // agent's commands), else the session's own agent.
+      const agentId = q.get("agent") || session.agent;
+      return sendJson(res, 200, { groups: commandGroupsForAgent(agentId, session.projectDir) });
     }
 
     // Existing Claude Code sessions for a project dir (to attach & resume by voice).
