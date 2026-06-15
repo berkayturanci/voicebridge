@@ -304,14 +304,34 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  String _forSpeech(String text) {
-    // Drop fenced code blocks and inline backticks so TTS isn't reading code.
-    final noFences = text.replaceAll(RegExp(r'```[\s\S]*?```'), ' (kod) ');
-    return noFences.replaceAll('`', '').trim();
+  // Longest auto-read (talking loop) before we shorten to the lead (#124).
+  static const int _speakMaxChars = 600;
+
+  // Clean text for TTS: drop code/markdown so it isn't read as symbols. When
+  // [summarize] (hands-free talking loop), a long reply is shortened to its lead
+  // sentences plus an "on screen" cue — the explicit "Sesli oku" button passes
+  // summarize:false to read the whole thing. Pure client-side, works offline.
+  String _forSpeech(String text, {bool summarize = false}) {
+    var s = text
+        .replaceAll(RegExp(r'```[\s\S]*?```'), ' (kod) ') // fenced code → marker
+        .replaceAll('`', ''); // inline code ticks
+    s = s.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), ''); // headings
+    s = s.replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), ''); // list bullets
+    s = s.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m[1]!); // bold → text
+    s = s.replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]+\)'), (m) => m[1]!); // links → text
+    s = s.replaceAll(RegExp(r'\(kod\)(?:\s*\(kod\))+'), '(kod)'); // collapse repeats
+    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (!summarize || s.length <= _speakMaxChars) return s;
+    final head = s.substring(0, _speakMaxChars);
+    // End on a whole sentence; (?<!\d) skips a period that just follows a number
+    // (e.g. "36.") so we don't cut mid-sentence.
+    final stop = head.lastIndexOf(RegExp(r'(?<!\d)[.!?…]'));
+    final lead = (stop > 200 ? head.substring(0, stop + 1) : head).trim();
+    return '$lead … (uzun cevap, tamamı ekranda)';
   }
 
-  Future<void> _speak(String text) async {
-    final clean = _forSpeech(text);
+  Future<void> _speak(String text, {bool summarize = false}) async {
+    final clean = _forSpeech(text, summarize: summarize);
     if (clean.isEmpty) return;
     // The audio session is configured ONCE in initState and kept alive by
     // mixWithOthers, so we do NOT stop()/re-assert the category/sleep before every
@@ -418,7 +438,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
           IosTextToSpeechAudioMode.voicePrompt,
         );
-        await _speak(full);
+        await _speak(full, summarize: true); // hands-free: read the lead, not 200 lines
         if (_talking && !_talkMuted) _listen();
       }
     } catch (e) {
