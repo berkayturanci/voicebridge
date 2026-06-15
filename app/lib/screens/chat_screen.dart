@@ -52,16 +52,26 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
-    // iOS: keep TTS audible (on the speaker) even after the mic (speech_to_text)
-    // has held the audio session — otherwise replies go silent after the first
-    // talking-mode turn.
+    // iOS audio session — configured ONCE here (not before every utterance).
+    // Re-applying the category per reply churns the live AVAudioSession route
+    // mid-stream, which is what made speech choppy ("kesik kesik").
+    //
+    // Routing for hands-free use (car / AirPods): .playback implicitly reaches
+    // Bluetooth A2DP / CarPlay / AirPlay; allowBluetoothA2DP + allowAirPlay make
+    // that explicit. We must NOT set defaultToSpeaker — it force-routes to the
+    // built-in speaker and is exactly why CarPlay/AirPods were silent. voicePrompt
+    // mode routes correctly to CarPlay/external devices. mixWithOthers is kept on
+    // purpose: it stops flutter_tts from deactivating the shared session between
+    // turns (the original "silent after the first reply" fix).
     _tts.setSharedInstance(true);
     _tts.setIosAudioCategory(
       IosTextToSpeechAudioCategory.playback,
       [
         IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-        IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+        IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP, // stereo BT / CarPlay
+        IosTextToSpeechAudioCategoryOptions.allowAirPlay,
       ],
+      IosTextToSpeechAudioMode.voicePrompt,
     );
     _input.addListener(() {
       final can = _input.text.trim().isNotEmpty;
@@ -144,6 +154,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<bool> _ensureStt() async {
     if (_sttReady) return true;
     _sttReady = await _stt.initialize(
+      // Small fallback: promote the last partial to a final if iOS ends listening
+      // without emitting its own — enough that the hands-free loop never stalls,
+      // but well below the old 2000ms window that caused premature first-turn submits.
+      finalTimeout: const Duration(milliseconds: 800),
       onStatus: (s) {
         if (s == 'done' || s == 'notListening') {
           if (mounted) setState(() => _listening = false);
@@ -172,12 +186,36 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _listen() async {
     if (_talkMuted) return;
     if (!await _ensureStt()) return;
+    if (_stt.isListening) return; // guard against a double-start after the TTS handoff
+
     setState(() => _listening = true);
+
+    // Start with a generous pause so the COLD first-turn recognizer warm-up can't
+    // trip the pause watchdog before the user has even started speaking (the cause
+    // of the first sentence being cut off). Once a real partial lands, tighten it so
+    // the turn still auto-submits promptly when the user genuinely stops.
+    const longPause = Duration(seconds: 6);
+    const shortPause = Duration(milliseconds: 2000);
+    var tightened = false;
+
     await _stt.listen(
       localeId: _locale,
       listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
+      pauseFor: longPause,
+      listenOptions: SpeechListenOptions(
+        listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
+        partialResults: true,
+        onDevice: false, // tr-TR uses server recognition
+        autoPunctuation: true,
+        cancelOnError: false,
+      ),
       onResult: (r) {
+        if (!tightened && r.recognizedWords.trim().isNotEmpty) {
+          tightened = true;
+          try {
+            if (_stt.isListening) _stt.changePauseFor(shortPause);
+          } catch (_) {/* listen already ended between the partial and this callback */}
+        }
         if (r.finalResult) {
           final t = r.recognizedWords.trim();
           setState(() => _listening = false);
@@ -196,20 +234,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _speak(String text) async {
     final clean = _forSpeech(text);
     if (clean.isEmpty) return;
-    // iOS: the mic (speech_to_text) leaves the audio session in record mode, which
-    // silences later TTS. Fully release it and re-assert playback before EACH
-    // utterance, with a short settle delay — otherwise only the first reply speaks.
-    try { await _stt.cancel(); } catch (_) {}
-    await _tts.stop();
-    await _tts.setIosAudioCategory(
-      IosTextToSpeechAudioCategory.playback,
-      [
-        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-        IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
-      ],
-    );
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _tts.speak(clean);
+    // The audio session is configured ONCE in initState and kept alive by
+    // mixWithOthers, so we do NOT stop()/re-assert the category/sleep before every
+    // utterance — that churn is what made speech choppy. Just release the mic so it
+    // isn't holding the input route. (The mic→TTS session re-assert that keeps
+    // replies audible happens once on the handoff in _send.)
+    try { await _stt.stop(); } catch (_) {}
+    await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
   }
 
   void _toggleTalking() async {
@@ -271,13 +302,32 @@ class _ChatScreenState extends State<ChatScreen> {
       if (full.trim().isEmpty) setState(() => reply.text = '(boş cevap)');
       if (_talking && full.trim().isNotEmpty) {
         await _stt.stop(); // release the mic's audio session before TTS speaks
+        // The mic just left the shared session in record/.playAndRecord state.
+        // Re-claim the route-friendly playback category ONCE here (not per
+        // utterance) so the reply reaches CarPlay/AirPods instead of being silenced
+        // or mis-routed.
+        await _tts.setIosAudioCategory(
+          IosTextToSpeechAudioCategory.playback,
+          [
+            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+            IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+            IosTextToSpeechAudioCategoryOptions.allowAirPlay,
+          ],
+          IosTextToSpeechAudioMode.voicePrompt,
+        );
         await _speak(full);
         if (_talking && !_talkMuted) _listen();
       }
     } catch (e) {
       setState(() => _messages
           .add(Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
-      if (_talking) _toggleTalking();
+      // Eyes-free recovery: a transient error shouldn't silently drop talking mode —
+      // keep listening so the user can retry by voice (e.g. while driving).
+      if (_talking && !_talkMuted) {
+        _listen();
+      } else if (_talking) {
+        _toggleTalking();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
       _persist();
