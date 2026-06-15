@@ -390,9 +390,15 @@ class _ChatScreenState extends State<ChatScreen> {
         currentName: _name,
         modes: _modes,
         currentMode: _mode,
+        canAttach:
+            widget.session.agent == 'claude' && widget.session.runner == 'local',
       ),
     );
     if (result == null) return;
+    if (result['action'] == 'attach') {
+      await _attachClaudeSession();
+      return;
+    }
     final newName = result['name'];
     final newMode = result['mode'];
     final nameChanged = newName != null && newName != _name;
@@ -417,6 +423,44 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       if (mounted) setState(() { _name = prevName; _mode = prevMode; });
       _toast('Güncellenemedi: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+
+  // Attach this session to an existing Claude Code session and resume it by voice.
+  Future<void> _attachClaudeSession() async {
+    List<Map<String, dynamic>> list;
+    try {
+      list = await _api.claudeSessions(widget.session.id);
+    } catch (e) {
+      _toast('Claude oturumları alınamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      return;
+    }
+    if (!mounted) return;
+    if (list.isEmpty) {
+      _toast('Bu proje için kayıtlı Claude oturumu yok.');
+      return;
+    }
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ClaudeSessionsSheet(sessions: list),
+    );
+    if (picked == null) return;
+    try {
+      await _api.updateSession(widget.session.id, claudeSessionId: picked);
+      // The agent resumes that conversation; start the visible transcript fresh.
+      setState(() {
+        _messages
+          ..clear()
+          ..add(Message('activity',
+              '🔗 Claude oturumuna bağlanıldı — agent önceki konuşmayı hatırlayacak'));
+      });
+      _persist();
+      _toBottom();
+      _toast('Bağlandı — sıradaki mesajda bu oturum devam edecek.');
+    } catch (e) {
+      _toast('Bağlanamadı: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
 
@@ -1438,10 +1482,12 @@ class _SessionSettingsSheet extends StatefulWidget {
   final String currentName;
   final List<Map<String, dynamic>> modes;
   final String currentMode;
+  final bool canAttach;
   const _SessionSettingsSheet({
     required this.currentName,
     required this.modes,
     required this.currentMode,
+    this.canAttach = false,
   });
 
   @override
@@ -1597,6 +1643,53 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     ],
                   ),
                 ),
+                if (widget.canAttach) ...[
+                  const SizedBox(height: 18),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    child: Text('CLAUDE OTURUMU',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: VbColors.textMuted)),
+                  ),
+                  Material(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(
+                          context, <String, String>{'action': 'attach'}),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: VbColors.border),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.history_rounded,
+                                size: 22, color: VbColors.accent),
+                            SizedBox(width: 13),
+                            Expanded(
+                              child: Text(
+                                'CLI/masaüstü oturumuna bağlan & sesle devam et',
+                                style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: VbColors.textPrimary),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                color: VbColors.textMuted),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: _save,
@@ -1666,6 +1759,101 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Picker for an existing Claude Code session to attach & resume by voice.
+class _ClaudeSessionsSheet extends StatelessWidget {
+  final List<Map<String, dynamic>> sessions;
+  const _ClaudeSessionsSheet({required this.sessions});
+
+  String _ago(int ms) {
+    if (ms <= 0) return '';
+    final d =
+        DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ms));
+    if (d.inMinutes < 1) return 'az önce';
+    if (d.inMinutes < 60) return '${d.inMinutes} dk önce';
+    if (d.inHours < 24) return '${d.inHours} sa önce';
+    return '${d.inDays} gün önce';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: VbColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      height: MediaQuery.of(context).size.height * 0.7,
+      child: Column(
+        children: [
+          const _Grabber(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, color: VbColors.accent),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Claude oturumları',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              itemCount: sessions.length,
+              itemBuilder: (_, i) {
+                final s = sessions[i];
+                final title = (s['title'] ?? '').toString().trim();
+                final ms = (s['mtime'] is num) ? (s['mtime'] as num).toInt() : 0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Material(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () =>
+                          Navigator.pop(context, (s['id'] ?? '').toString()),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: VbColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title.isEmpty ? '(başlıksız oturum)' : title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 14.5,
+                                  color: VbColors.textPrimary,
+                                  height: 1.3),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(_ago(ms),
+                                style: VbTheme.mono(
+                                    size: 11, color: VbColors.textMuted)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

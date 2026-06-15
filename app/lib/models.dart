@@ -9,6 +9,7 @@ class Session {
   final String mode;
   final String runner;
   final String? model;
+  final String? claudeSessionId; // attached external Claude Code session, if any
 
   Session({
     required this.id,
@@ -19,6 +20,7 @@ class Session {
     required this.mode,
     required this.runner,
     this.model,
+    this.claudeSessionId,
   });
 
   factory Session.fromJson(Map<String, dynamic> j) => Session(
@@ -30,6 +32,7 @@ class Session {
         mode: (j['mode'] ?? '') as String,
         runner: (j['runner'] ?? 'local') as String,
         model: j['model'] as String?,
+        claudeSessionId: j['claudeSessionId'] as String?,
       );
 
   String get subtitle {

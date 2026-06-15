@@ -70,6 +70,7 @@ class Api {
     String? name,
     String? mode,
     bool? voice,
+    String? claudeSessionId, // "" detaches, a uuid attaches & resumes that session
   }) async {
     final r = await http.post(
       _u('/api/sessions/$id'),
@@ -78,6 +79,7 @@ class Api {
         if (name != null) 'name': name,
         if (mode != null) 'mode': mode,
         if (voice != null) 'voice': voice,
+        if (claudeSessionId != null) 'claudeSessionId': claudeSessionId,
       }),
     );
     if (r.statusCode != 200) {
@@ -85,6 +87,19 @@ class Api {
     }
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     return Session.fromJson(data['session'] as Map<String, dynamic>);
+  }
+
+  /// GET /api/claude-sessions — existing Claude Code sessions for this session's
+  /// project, to attach & resume. Returns [{id, title, mtime}].
+  Future<List<Map<String, dynamic>>> claudeSessions(String sessionId) async {
+    final uri = _u('/api/claude-sessions')
+        .replace(queryParameters: {'sessionId': sessionId});
+    final r = await http.get(uri, headers: _headers());
+    if (r.statusCode != 200) return [];
+    final data = jsonDecode(r.body) as Map<String, dynamic>;
+    return ((data['sessions'] as List?) ?? const [])
+        .map((e) => (e as Map<String, dynamic>))
+        .toList();
   }
 
   /// GET /api/commands?sessionId= — the project's slash commands + npm scripts.
