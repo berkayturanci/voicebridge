@@ -499,6 +499,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // ---- Send + stream ----
   Future<void> _send(String text) async {
     if (_busy) return;
+    _tts.stop(); // barge-in: a new message interrupts any ongoing spoken readout
     _input.clear();
     final me = Message('me', text);
     final reply = Message('claude', '');
@@ -523,6 +524,9 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
       if (full.trim().isEmpty) setState(() => reply.text = '(boş cevap)');
+      // Turn (network/agent) is done — release _busy NOW so the user can type and
+      // send a new message during the spoken readout below (it barge-ins the TTS).
+      if (mounted) setState(() => _busy = false);
       if (_talking && full.trim().isNotEmpty) {
         await _stt.stop(); // release the mic's audio session before TTS speaks
         // The mic just left the shared session in record/.playAndRecord state.
@@ -540,7 +544,7 @@ class _ChatScreenState extends State<ChatScreen> {
           IosTextToSpeechAudioMode.voicePrompt,
         );
         await _speak(full, summarize: true); // hands-free: read the lead, not 200 lines
-        if (_talking && !_talkMuted) _listen();
+        if (_talking && !_talkMuted && !_busy) _listen(); // skip if a new turn already started
       }
     } catch (e) {
       if (_talking) _cue('error');
@@ -574,9 +578,8 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) => _CommandSheet(groups: groups),
     );
     if (picked != null) {
-      _input.text = picked;
-      _input.selection =
-          TextSelection.collapsed(offset: picked.length);
+      final cmd = picked.trim();
+      if (cmd.isNotEmpty) _send(cmd); // run the command immediately on pick
     }
   }
 
