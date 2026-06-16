@@ -42,6 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _canSend = false;
   bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
   SessionWatch? _watch; // self-reconnecting live transcript watch (#141)
+  final List<String> _sentEcho = []; // optimistic sends awaiting their watch echo
   bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
@@ -154,6 +155,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onWatchTurn(String role, String text) {
     if (!mounted || text.trim().isEmpty) return;
+    if (role != 'assistant') {
+      // Our own message already shown optimistically — skip the watch echo.
+      final i = _sentEcho.indexWhere((s) => s.trim() == text.trim());
+      if (i >= 0) {
+        _sentEcho.removeAt(i);
+        return;
+      }
+    }
     setState(() =>
         _messages.add(Message(role == 'assistant' ? 'claude' : 'me', text)));
     _toBottom();
@@ -166,6 +175,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendTmux(String text) async {
     _tts.stop();
     _input.clear();
+    setState(() => _messages.add(Message('me', text))); // show it instantly
+    _sentEcho.add(text);
+    _toBottom();
     try {
       await _api.tmuxSend(widget.session.id, text);
     } catch (e) {
