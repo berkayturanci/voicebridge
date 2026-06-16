@@ -416,7 +416,14 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   String? _mode;
   String _projectDir = '';
   bool _busy = false;
-  bool _fullSession = false; // Tat Y: run a full interactive claude in tmux
+  bool _fullSession = false; // Tat Y: run a full interactive agent in tmux
+
+  // Agents that support a full interactive tmux session (live-synced transcript).
+  // claude binds via --session-id; codex via its rollout-*.jsonl. (#137)
+  bool get _tmuxCapable {
+    final a = _agent ?? 'claude';
+    return a == 'claude' || a == 'codex';
+  }
 
   List<dynamic> get _modes {
     final a = widget.agents.firstWhere((e) => e['id'] == _agent,
@@ -450,7 +457,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         agent: _agent ?? 'claude',
         mode: _mode ?? '',
         projectDir: _projectDir.isEmpty ? null : _projectDir,
-        runner: (_fullSession && (_agent ?? 'claude') == 'claude') ? 'tmux' : 'local',
+        runner: (_fullSession && _tmuxCapable) ? 'tmux' : 'local',
       );
       if (mounted) Navigator.pop(context, s);
     } catch (e) {
@@ -567,7 +574,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                 ),
               ),
             ),
-            if ((_agent ?? 'claude') == 'claude') ...[
+            if (_tmuxCapable) ...[
               const SizedBox(height: 16),
               Material(
                 color: VbColors.surfaceHigh,
@@ -592,7 +599,10 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                                       fontWeight: FontWeight.w600,
                                       color: VbColors.textPrimary)),
                               const SizedBox(height: 2),
-                              Text("Mac'ten de gir, /remote-control çalışır",
+                              Text(
+                                  (_agent ?? 'claude') == 'codex'
+                                      ? "Mac'ten de gir; telefon + CLI aynı oturum"
+                                      : "Mac'ten de gir, /remote-control çalışır",
                                   style: TextStyle(
                                       fontSize: 11.5,
                                       color: VbColors.textMuted)),

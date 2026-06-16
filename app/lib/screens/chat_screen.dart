@@ -814,36 +814,41 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     final cmd = (info['attachCmd'] as String?) ?? '';
     final steps = (info['remoteControlSteps'] as List?)?.cast<String>() ?? const [];
+    // Remote Control (/remote-control + Claude app) is claude-native. codex
+    // reaches the same live session by attaching the tmux; its own remote is a
+    // separate `codex remote-control` daemon, not an in-TUI toggle we drive.
+    final isCodex = widget.session.agent == 'codex';
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: VbColors.surface,
-        title: const Text("Mac'te aç / Claude app"),
+        title: Text(isCodex ? "Mac'te aç / codex" : "Mac'te aç / Claude app"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                    info['rcActive'] == true
-                        ? Icons.cloud_done_rounded
-                        : Icons.cloud_off_rounded,
-                    size: 18,
-                    color: info['rcActive'] == true
-                        ? VbColors.accent
-                        : VbColors.textMuted),
-                const SizedBox(width: 8),
-                Text(
-                    info['rcActive'] == true
-                        ? 'Remote Control: açık'
-                        : 'Remote Control: kapalı',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: VbColors.textPrimary)),
-              ],
-            ),
-            const SizedBox(height: 12),
+            if (!isCodex)
+              Row(
+                children: [
+                  Icon(
+                      info['rcActive'] == true
+                          ? Icons.cloud_done_rounded
+                          : Icons.cloud_off_rounded,
+                      size: 18,
+                      color: info['rcActive'] == true
+                          ? VbColors.accent
+                          : VbColors.textMuted),
+                  const SizedBox(width: 8),
+                  Text(
+                      info['rcActive'] == true
+                          ? 'Remote Control: açık'
+                          : 'Remote Control: kapalı',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: VbColors.textPrimary)),
+                ],
+              ),
+            if (!isCodex) const SizedBox(height: 12),
             Text('Mac terminalinde bu oturuma canlı gir:',
                 style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
             const SizedBox(height: 8),
@@ -859,7 +864,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
             ),
             const SizedBox(height: 14),
-            Text('Claude uygulamasından erişmek için:',
+            Text(isCodex ? 'Aynı oturuma her yerden eriş:' : 'Claude uygulamasından erişmek için:',
                 style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
             const SizedBox(height: 6),
             for (var i = 0; i < steps.length; i++)
@@ -878,23 +883,29 @@ class _ChatScreenState extends State<ChatScreen> {
             },
             child: const Text('Komutu kopyala'),
           ),
-          FilledButton(
-            onPressed: () async {
-              final active = info['rcActive'] == true;
-              Navigator.pop(context);
-              try {
-                await _api.tmuxRc(widget.session.id, active ? 'stop' : 'start');
-                _toast(active
-                    ? 'Remote Control durduruldu'
-                    : 'Remote Control başlatıldı');
-              } catch (e) {
-                _toast('Olmadı: ${e.toString().replaceFirst('Exception: ', '')}');
-              }
-            },
-            child: Text(info['rcActive'] == true
-                ? "Remote Control'ü durdur"
-                : 'Remote Control başlat'),
-          ),
+          if (isCodex)
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam'),
+            )
+          else
+            FilledButton(
+              onPressed: () async {
+                final active = info['rcActive'] == true;
+                Navigator.pop(context);
+                try {
+                  await _api.tmuxRc(widget.session.id, active ? 'stop' : 'start');
+                  _toast(active
+                      ? 'Remote Control durduruldu'
+                      : 'Remote Control başlatıldı');
+                } catch (e) {
+                  _toast('Olmadı: ${e.toString().replaceFirst('Exception: ', '')}');
+                }
+              },
+              child: Text(info['rcActive'] == true
+                  ? "Remote Control'ü durdur"
+                  : 'Remote Control başlat'),
+            ),
         ],
       ),
     );

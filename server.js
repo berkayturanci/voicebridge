@@ -459,11 +459,41 @@ function turnFromTranscriptLine(line) {
   return { role: o.type, text };
 }
 
+// One codex rollout line -> {role,text} or null. Codex writes a clean text
+// transcript at ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl. The
+// conversational turns are the `event_msg` entries with payload.type
+// "user_message"/"agent_message" (payload.message holds the text); everything
+// else (reasoning, function_call, response_item, token_count) is skipped — the
+// same way we drop claude's tool/meta noise. (#137 codex full session)
+function turnFromCodexLine(line) {
+  let o; try { o = JSON.parse(line); } catch (_) { return null; }
+  if (o.type !== "event_msg") return null;
+  const p = o.payload; if (!p) return null;
+  const role = p.type === "user_message" ? "user" : p.type === "agent_message" ? "assistant" : null;
+  if (!role) return null;
+  let text = (typeof p.message === "string" ? p.message : "").trim();
+  text = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+  // Skip the env/context block codex prepends to the first user turn, and any
+  // hook-injected wrapper lines (mirrors the claude parser's leading-"<" guard).
+  if (!text || (role === "user" && (text.startsWith("<") || text.startsWith("Caveat:")))) return null;
+  return { role, text };
+}
+
+// The transcript line parser for a session's agent. claude and codex write
+// different .jsonl schemas; both tail through the same watch/history machinery.
+function parserFor(session) {
+  return session && session.agent === "codex" ? turnFromCodexLine : turnFromTranscriptLine;
+}
+
 // The .jsonl path backing a session: the tmux transcript captured at spawn, else
 // the bound claudeSessionId, else the most-recently-written file in the dir.
 function resolveJsonlPath(session) {
+  // tmuxJsonl is an absolute path set at bind time for BOTH claude (~/.claude
+  // projects) and codex (~/.codex rollout) — so it works agent-agnostically.
   if (session.tmuxJsonl && fs.existsSync(session.tmuxJsonl)) return session.tmuxJsonl;
-  if (session.claudeSessionId) {
+  // The claudeSessionId → ~/.claude/projects/<dir>/<id>.jsonl shortcut is
+  // claude-only (codex stores its uuid elsewhere; it binds via tmuxJsonl above).
+  if (session.agent !== "codex" && session.claudeSessionId) {
     const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
     const p = path.join(dir, session.claudeSessionId + ".jsonl");
     if (fs.existsSync(p)) return p;
@@ -474,11 +504,46 @@ function resolveJsonlPath(session) {
   return null;
 }
 
-function readTranscriptTurns(jsonlPath, limit = 200) {
+function readTranscriptTurns(jsonlPath, limit = 200, parse = turnFromTranscriptLine) {
   let raw; try { raw = fs.readFileSync(jsonlPath, "utf8"); } catch (_) { return { turns: [], size: 0 }; }
   const turns = [];
-  for (const line of raw.split("\n")) { if (!line.trim()) continue; const t = turnFromTranscriptLine(line); if (t) turns.push(t); }
+  for (const line of raw.split("\n")) { if (!line.trim()) continue; const t = parse(line); if (t) turns.push(t); }
   return { turns: turns.slice(-limit), size: Buffer.byteLength(raw, "utf8") };
+}
+
+// Codex has no deterministic --session-id; instead it writes one rollout file
+// per process under ~/.codex/sessions/YYYY/MM/DD/. Bind a tmux-hosted codex
+// session to its rollout by picking the newest rollout whose session_meta.cwd
+// matches the project dir and whose mtime is at/after the tmux launch. Sets
+// tmuxJsonl (absolute) + claudeSessionId (the rollout uuid, for `codex resume`).
+function bindCodexRollout(session, sinceMs) {
+  const root = path.join(os.homedir(), ".codex", "sessions");
+  let best = null, bestM = 0;
+  const walk = (dir, depth) => {
+    let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of ents) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (depth < 4) walk(p, depth + 1); continue; }
+      if (!/^rollout-.*\.jsonl$/.test(e.name)) continue;
+      let m; try { m = fs.statSync(p).mtimeMs; } catch (_) { continue; }
+      if (sinceMs && m < sinceMs - 2000) continue; // small skew allowance
+      if (m <= bestM) continue;
+      // confirm cwd matches via session_meta (the FIRST line of the rollout).
+      // /tmp is a symlink to /private/tmp on macOS, so substring-match both ways.
+      const head = readFileHead(p, 4096);
+      const pd = session.projectDir || "";
+      if (pd && !(head.includes(pd) || head.includes("/private" + pd) || head.includes(pd.replace(/^\/private/, "")))) continue;
+      best = p; bestM = m;
+    }
+  };
+  walk(root, 0);
+  if (best) {
+    session.tmuxJsonl = best;
+    const mm = path.basename(best).match(/rollout-.*-([0-9a-f-]{36})\.jsonl$/i);
+    session.claudeSessionId = mm ? mm[1] : (session.claudeSessionId || undefined);
+    saveSessions();
+  }
+  return best;
 }
 
 function readFileTail(p, bytes) {
@@ -490,6 +555,16 @@ function readFileTail(p, bytes) {
     fs.readSync(fd, buf, 0, buf.length, start);
     fs.closeSync(fd);
     return buf.toString("utf8");
+  } catch (_) { return ""; }
+}
+
+function readFileHead(p, bytes) {
+  try {
+    const fd = fs.openSync(p, "r");
+    const buf = Buffer.alloc(bytes);
+    const n = fs.readSync(fd, buf, 0, bytes, 0);
+    fs.closeSync(fd);
+    return buf.slice(0, n).toString("utf8");
   } catch (_) { return ""; }
 }
 
@@ -874,8 +949,18 @@ function killTmux(sessionId) {
   tmuxRun(["kill-session", "-t", tmuxName(sessionId)]);
 }
 
-async function ensureTmuxClaude(session) {
+// Launch (or reuse) the detached tmux session hosting the interactive agent.
+// claude and codex differ in launch command, transcript binding and the TUI
+// "ready" marker; antigravity will slot in here later the same way.
+async function ensureTmuxAgent(session) {
   const name = tmuxName(session.id);
+  if (await tmuxHas(name)) return name;
+  if (session.agent === "codex") return ensureTmuxCodex(session, name);
+  return ensureTmuxClaude(session, name);
+}
+
+async function ensureTmuxClaude(session, name) {
+  name = name || tmuxName(session.id);
   if (await tmuxHas(name)) return name;
   // Deterministic transcript: give claude an explicit --session-id so we KNOW its
   // .jsonl path (no content-match guessing). Resume that same id after a
@@ -892,6 +977,38 @@ async function ensureTmuxClaude(session) {
   for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
     await sleepMs(500);
     if (/Claude Code v|❯/.test(await tmuxCapture(name))) { await sleepMs(900); break; }
+  }
+  return name;
+}
+
+// Codex full session. Codex has no settable session-id, so we can't pre-compute
+// the rollout path — instead we launch, clear any stale transcript binding, and
+// rebind to the fresh rollout after the first turn (bindCodexRollout). A prior
+// session id resumes context via `codex resume <id>`. On first launch codex
+// shows a "trust this directory?" gate; we auto-confirm it.
+async function ensureTmuxCodex(session, name) {
+  name = name || tmuxName(session.id);
+  if (await tmuxHas(name)) return name;
+  const bin = AGENTS.codex.bin();
+  // `codex resume <id>` continues a previous session; bare `codex` starts fresh.
+  // Either way codex opens a NEW rollout file, so force a rebind on next turn.
+  const launch = session.claudeSessionId
+    ? (bin + " resume " + session.claudeSessionId)
+    : bin;
+  session._codexBoundAt = Date.now();
+  session._codexNeedsBind = true;
+  session.tmuxJsonl = undefined; // don't tail a stale rollout until rebind
+  await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, launch]);
+  for (let i = 0; i < 50; i++) {
+    await sleepMs(500);
+    const pane = await tmuxCapture(name);
+    if (/trust the contents|Press enter to continue/i.test(pane)) { // trust gate
+      await tmuxRun(["send-keys", "-t", name, "Enter"]); await sleepMs(800); continue;
+    }
+    // The welcome box ("OpenAI Codex (vX)") stays on screen once the TUI is up —
+    // a reliable ready signal. (Don't break on a bare "›": the trust gate uses it
+    // too, and "esc to interrupt" means it's still generating, not ready.)
+    if (/OpenAI Codex/.test(pane)) { await sleepMs(900); break; }
   }
   return name;
 }
@@ -927,7 +1044,7 @@ const TMUX_GENERATING_RE = /esc to interrupt|Cogitating|Thinking|Working…|Pond
 async function streamTmux(session, prompt, res, emit) {
   const old = tmuxIdleTimers.get(session.id); if (old) { clearTimeout(old); tmuxIdleTimers.delete(session.id); }
   let name;
-  try { name = await ensureTmuxClaude(session); }
+  try { name = await ensureTmuxAgent(session); }
   catch (e) { emit({ type: "error", error: "tmux başlatılamadı: " + e.message }); return res.end(); }
 
   // The TUI input is single-line and submits on Enter; flatten newlines.
@@ -935,7 +1052,7 @@ async function streamTmux(session, prompt, res, emit) {
   await tmuxRun(["send-keys", "-t", name, "-l", text]);
   await sleepMs(180);
   await tmuxRun(["send-keys", "-t", name, "Enter"]);
-  emit({ type: "activity", text: "tmux: claude düşünüyor…" });
+  emit({ type: "activity", text: "tmux: " + AGENTS[session.agent].label + " düşünüyor…" });
 
   const MAXMS = (Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0) || 20 * 60 * 1000;
   const t0 = Date.now();
@@ -950,17 +1067,27 @@ async function streamTmux(session, prompt, res, emit) {
     if (stable >= 2 && !TMUX_GENERATING_RE.test(cur) && (sawGen || stable >= 4)) break;
   }
   if (closed) return; // barge-in — process keeps running for the next turn / attach
-  const reply = extractTuiReply(await tmuxCapture(name, -250), text);
-  emit({ type: "delta", text: reply || "(yanıt yakalanamadı — Mac'te `tmux attach` ile bakabilirsin)" });
   session.started = true;
-  // Bind the transcript .jsonl by content — the file containing this turn's input
-  // (reliable even with many .jsonl in the dir). Needed for sync/resume/handoff.
-  if (!session.claudeSessionId) {
-    const jp = findJsonlByContent(session.projectDir, String(prompt || "").slice(0, 80));
-    if (jp) {
-      session.tmuxJsonl = jp;
-      session.claudeSessionId = path.basename(jp).replace(/\.jsonl$/, "");
-      saveSessions();
+  // Bind the transcript so sync/resume/handoff have it, then read the clean reply
+  // from the transcript (codex pane is noisy — tool calls + hooks all use •). For
+  // claude we keep the proven pane-scrape; the .jsonl bind is for sync.
+  if (session.agent === "codex") {
+    bindCodexRollout(session, session._codexBoundAt || (t0 - 4000));
+    session._codexNeedsBind = false;
+    const jsonl = resolveJsonlPath(session);
+    const { turns } = jsonl ? readTranscriptTurns(jsonl, 30, turnFromCodexLine) : { turns: [] };
+    const last = [...(turns || [])].reverse().find((t) => t.role === "assistant");
+    emit({ type: "delta", text: (last && last.text) || "(yanıt yakalanamadı — Mac'te `tmux attach -t " + name + "` ile bakabilirsin)" });
+  } else {
+    const reply = extractTuiReply(await tmuxCapture(name, -250), text);
+    emit({ type: "delta", text: reply || "(yanıt yakalanamadı — Mac'te `tmux attach` ile bakabilirsin)" });
+    if (!session.claudeSessionId) {
+      const jp = findJsonlByContent(session.projectDir, String(prompt || "").slice(0, 80));
+      if (jp) {
+        session.tmuxJsonl = jp;
+        session.claudeSessionId = path.basename(jp).replace(/\.jsonl$/, "");
+        saveSessions();
+      }
     }
   }
   if (TMUX_IDLE_MS > 0) tmuxIdleTimers.set(session.id, setTimeout(() => killTmux(session.id), TMUX_IDLE_MS));
@@ -1466,12 +1593,20 @@ function handleRequest(req, res) {
       if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) modunda değil." });
       const name = tmuxName(session.id);
       return tmuxHas(name).then(async (running) => {
+        // /remote-control + /rc are claude-native (Claude web/mobile app). Codex
+        // reaches the same live session by attaching the tmux on the Mac; its own
+        // remote is the separate `codex remote-control` daemon, not in-TUI.
+        const isCodex = session.agent === "codex";
         let rcActive = false;
-        if (running) { try { rcActive = /\/rc active/.test(await tmuxCapture(name)); } catch (_) {} }
+        if (running && !isCodex) { try { rcActive = /\/rc active/.test(await tmuxCapture(name)); } catch (_) {} }
         sendJson(res, 200, {
           name, running, rcActive,
           attachCmd: "tmux attach -t " + name,
-          remoteControlSteps: [
+          remoteControlSteps: isCodex ? [
+            "Mac terminalinde: tmux attach -t " + name,
+            "Açılan codex oturumunu canlı sürebilirsin (telefonla aynı oturum).",
+            "Uzaktan kontrol için ayrıca: codex remote-control start (ayrı daemon).",
+          ] : [
             "Mac terminalinde: tmux attach -t " + name,
             "Açılan claude oturumunda: /remote-control",
             "Claude mobil uygulamasında bu oturuma bağlan",
@@ -1526,14 +1661,19 @@ function handleRequest(req, res) {
         const text = (typeof data.text === "string" ? data.text : "").replace(/\s*\n\s*/g, " ");
         (async () => {
           let name;
-          try { name = await ensureTmuxClaude(session); }
+          try { name = await ensureTmuxAgent(session); }
           catch (err) { return sendJson(res, 500, { error: "tmux: " + err.message }); }
           if (text.length) { await tmuxRun(["send-keys", "-t", name, "-l", text]); await sleepMs(150); }
           await tmuxRun(["send-keys", "-t", name, "Enter"]);
           sendJson(res, 200, { ok: true });
-          // Bind the transcript .jsonl by content shortly after (the user message
-          // is written quickly) so sync/resume have the id.
-          if (!session.claudeSessionId && text.trim().length >= 6) {
+          // Bind the transcript shortly after the turn (the user message is
+          // written quickly) so sync/resume have it. codex binds by newest
+          // rollout (cwd match); claude binds by content of this turn's input.
+          if (session.agent === "codex") {
+            if (session._codexNeedsBind) {
+              setTimeout(() => { if (bindCodexRollout(session, session._codexBoundAt)) session._codexNeedsBind = false; }, 2500);
+            }
+          } else if (!session.claudeSessionId && text.trim().length >= 6) {
             setTimeout(() => {
               const jp = findJsonlByContent(session.projectDir, text.slice(0, 80));
               if (jp) { session.tmuxJsonl = jp; session.claudeSessionId = path.basename(jp).replace(/\.jsonl$/, ""); saveSessions(); }
@@ -1551,7 +1691,7 @@ function handleRequest(req, res) {
       if (!session) return sendJson(res, 404, { error: "Unknown session" });
       const jsonl = resolveJsonlPath(session);
       if (!jsonl) return sendJson(res, 200, { turns: [], size: 0 });
-      return sendJson(res, 200, readTranscriptTurns(jsonl));
+      return sendJson(res, 200, readTranscriptTurns(jsonl, 200, parserFor(session)));
     }
 
     // Live watch (#141): tail the session's .jsonl and stream every new turn
@@ -1572,6 +1712,7 @@ function handleRequest(req, res) {
       let offset = Number(q.get("since"));
       if (!Number.isFinite(offset) || offset < 0) { try { offset = fs.statSync(jsonl).size; } catch (_) { offset = 0; } }
       let carry = "", closed = false;
+      const parse = parserFor(session);
       const write = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
       write({ type: "ready", offset });
       const tick = () => {
@@ -1591,7 +1732,7 @@ function handleRequest(req, res) {
         let nl;
         while ((nl = carry.indexOf("\n")) >= 0) {
           const line = carry.slice(0, nl); carry = carry.slice(nl + 1);
-          const t = turnFromTranscriptLine(line);
+          const t = parse(line);
           if (t) write({ type: "turn", role: t.role, text: t.text, offset });
         }
       };
@@ -1721,6 +1862,12 @@ module.exports = {
   publicSession,
   saveSessions,
   loadSessions,
+  turnFromTranscriptLine,
+  turnFromCodexLine,
+  parserFor,
+  readTranscriptTurns,
+  resolveJsonlPath,
+  bindCodexRollout,
   buildServer,
   handleRequest,
   start,
