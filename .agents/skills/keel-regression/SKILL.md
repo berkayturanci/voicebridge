@@ -9,6 +9,21 @@ Use this skill when the user asks to run the keel command `regression` (e.g. `ke
 
 # /keel:regression
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `orient` → `preflight` → `fanout` → `aggregate` → `dedupe` → `open` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `regression-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command regression --run-id "$RUN" --phase orient`
+- Re-run with the next `--phase` (`preflight`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -196,4 +211,4 @@ section for the dropped low-confidence findings.
   findings ⇒ same issues) · `/keel:regression` never edits code, pushes, or merges — fixes go
   through `/keel:ship`'s backbone (window + lock + review).
 
-<!-- keel-generated: surface=skills command=regression keel_version=1.2.3 source_sha256=9e74e0d77be89e88ce1aaff098d2eff04510107b476fa79ce8694978f9859fe1 generated_sha256=969fa97b5559c60bb7d776bde300dfd58704f3dfe07a48746623371c619b07e1 -->
+<!-- keel-generated: surface=skills command=regression keel_version=1.6.5 source_sha256=148d0e8ebc7bc6cbcc8105de5617725b5abdb69818754f5c4ed4445a43543dfb generated_sha256=f49baf3c2b3c6428d445843381a74e3cd742d5e60176525793d52691b6e9d4a0 -->

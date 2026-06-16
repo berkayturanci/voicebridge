@@ -9,6 +9,21 @@ Use this skill when the user asks to run the keel command `work-block` (e.g. `ke
 
 # /keel:work-block
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `snapshot` → `loop` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `work-block-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command work-block --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`snapshot`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -106,4 +121,4 @@ must include the fixed queue snapshot and these buckets:
 
 Also include open questions, consent gaps, and the next 1–3 operator actions.
 
-<!-- keel-generated: surface=skills command=work-block keel_version=1.2.3 source_sha256=0698f77f77539c09880a4299aada98027d29f98c63b5e6f05a45ba071a8c4d94 generated_sha256=f58e09065ab95b6ddb16ea12f76ba7c1d4bd4e267c9cb037b004e2fe22f06eea -->
+<!-- keel-generated: surface=skills command=work-block keel_version=1.6.5 source_sha256=1a267f0138cefb0bbdef978ad56f2df3753a9c6f7aeb76d0c247ac76f477301d generated_sha256=e6d9ad4985256de753b4babc27c10e29b0f755b8915e383331eed969fb06c5b7 -->

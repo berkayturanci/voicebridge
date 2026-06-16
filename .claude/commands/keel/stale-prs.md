@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Read, Edit
 
 # /keel:stale-prs
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `orient` → `list` → `classify` → `triage` → `post` → `rebase` → `summary`. Pick one stable `--run-id` for the whole run
+(e.g. `stale-prs-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command stale-prs --run-id "$RUN" --phase orient`
+- Re-run with the next `--phase` (`list`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -153,4 +168,4 @@ Print a summary table: PR · title · bucket · action, where action is one of `
 - **Never modify a PR's tree** beyond the merge commit that brings in `base_branch`.
 - Fail-soft per PR; deterministic ordering.
 
-<!-- keel-generated: surface=claude command=stale-prs keel_version=1.2.3 source_sha256=d2784174b2a25febccd6a6eada629d6d2abfd7020b4faa6dab1efbc5ee5007e3 generated_sha256=d2784174b2a25febccd6a6eada629d6d2abfd7020b4faa6dab1efbc5ee5007e3 -->
+<!-- keel-generated: surface=claude command=stale-prs keel_version=1.6.5 source_sha256=c38026730f14278d6bb7c41bc9ee38d2b1ed30b9c9ca370c079291613c0dd67a generated_sha256=c38026730f14278d6bb7c41bc9ee38d2b1ed30b9c9ca370c079291613c0dd67a -->

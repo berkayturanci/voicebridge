@@ -9,6 +9,21 @@ Use this skill when the user asks to run the keel command `deps-audit` (e.g. `ke
 
 # /keel:deps-audit
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `orient` → `tracking` → `scan` → `drift` → `report` → `post`. Pick one stable `--run-id` for the whole run
+(e.g. `deps-audit-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command deps-audit --run-id "$RUN" --phase orient`
+- Re-run with the next `--phase` (`tracking`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -153,4 +168,4 @@ review). Never bump a dependency and merge directly from here. Under `--dry-run`
   and skipped.
 - Fail-soft · deterministic for identical inputs.
 
-<!-- keel-generated: surface=skills command=deps-audit keel_version=1.2.3 source_sha256=2eb4428507b9b87917adae0dcff83e885423dc8eed861063698f2aa29ffa93f6 generated_sha256=07144841e71775913aeb99d320b12b02d1e03d5ca1a1f35ff2d1b9d6689b3e59 -->
+<!-- keel-generated: surface=skills command=deps-audit keel_version=1.6.5 source_sha256=187bee7c5dd68ce5ac939fd6cbad8b12066e90f2c017f26f7b6fcbba3348e699 generated_sha256=c5f05305d05ee591558bc90a0924054eeacaeb90fd6fa54b4be2161606f04661 -->

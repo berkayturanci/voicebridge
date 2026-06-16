@@ -9,6 +9,21 @@ Use this skill when the user asks to run the keel command `ci-check` (e.g. `keel
 
 # /keel:ci-check
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `poll` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `ci-check-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command ci-check --run-id "$RUN" --phase poll`
+- Re-run with the next `--phase` (`report`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -86,4 +101,4 @@ Route by the Step 2 classification — never merge here:
 - **Deterministic** for identical CI state.
 - **Fail-soft** — a missing CLI degrades to the Step 0 clean-exit note, not a crash.
 
-<!-- keel-generated: surface=skills command=ci-check keel_version=1.2.3 source_sha256=a9515465d188c9db8ab6ce3badfcd87837ac61abaaff5396946992af9f677fd7 generated_sha256=fa07460b6d8bfe8989d6d473119fcaceabc3b2dfb70153a4b18983e472df7f36 -->
+<!-- keel-generated: surface=skills command=ci-check keel_version=1.6.5 source_sha256=fb3c23e6e7427ca862f10aa6cdfa7bb625b0f4d2a94bac11d9653d2a8f163e50 generated_sha256=b2123020b76c041375617a25c249ea81cc423675bb426b4e7900a41c7ffdfcc0 -->

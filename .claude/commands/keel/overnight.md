@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Bash(jury:*), Read, Edit, 
 
 # /keel:overnight
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `preflight` → `queue` → `loop` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `overnight-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command overnight --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`preflight`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -185,4 +200,4 @@ When stopped, write the session report immediately, even if partial.
 Never merge outside the window · merge lock · fail-soft per issue (one failure
 never aborts the loop) · attribute the effective agents (vendor + base model).
 
-<!-- keel-generated: surface=claude command=overnight keel_version=1.2.3 source_sha256=ae1c729a954f1881963e222406d6d7e55c8f217cb40e241282216585b2cb9d64 generated_sha256=ae1c729a954f1881963e222406d6d7e55c8f217cb40e241282216585b2cb9d64 -->
+<!-- keel-generated: surface=claude command=overnight keel_version=1.6.5 source_sha256=1ccc85b63576106f661e9fe7efbef62296c783a08276075692294caa72486ffb generated_sha256=1ccc85b63576106f661e9fe7efbef62296c783a08276075692294caa72486ffb -->

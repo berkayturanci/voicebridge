@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Bash(jury:*), Read, Edit, 
 
 # /keel:review-cycle
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `validate` → `loop` → `reviewers` → `post` → `fixloop` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `review-cycle-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command review-cycle --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`validate`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -213,4 +228,4 @@ Do every read plus `keel validate` / `keel plan` / `keel run-gates` and the revi
 but redirect every state-changing `gh` write (comments, label) to a logged
 `DRY-RUN: <action>` line.
 
-<!-- keel-generated: surface=claude command=review-cycle keel_version=1.2.3 source_sha256=950f8d2ef9d84e486405a88aac1934713643bc41204254b978c5f49d27b11e25 generated_sha256=950f8d2ef9d84e486405a88aac1934713643bc41204254b978c5f49d27b11e25 -->
+<!-- keel-generated: surface=claude command=review-cycle keel_version=1.6.5 source_sha256=0b6ca8cb4fdb0b311a3302262a252c9d8541f4e9a18d3aa6c6a9c37159154d8c generated_sha256=0b6ca8cb4fdb0b311a3302262a252c9d8541f4e9a18d3aa6c6a9c37159154d8c -->

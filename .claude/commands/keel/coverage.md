@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Read, Edit
 
 # /keel:coverage
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `orient` → `areas` → `baseline` → `head` → `delta` → `hotspots` → `post`. Pick one stable `--run-id` for the whole run
+(e.g. `coverage-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command coverage --run-id "$RUN" --phase orient`
+- Re-run with the next `--phase` (`areas`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -144,4 +159,4 @@ print the would-be issues and route nothing.
   and skipped.
 - Deterministic for identical coverage data.
 
-<!-- keel-generated: surface=claude command=coverage keel_version=1.2.3 source_sha256=64fd36967be8b855e523cec7d22eb26eb47f16bccd4ea3d8b45c28ea821611a1 generated_sha256=64fd36967be8b855e523cec7d22eb26eb47f16bccd4ea3d8b45c28ea821611a1 -->
+<!-- keel-generated: surface=claude command=coverage keel_version=1.6.5 source_sha256=10835f7876b936e5eea138503b73611a934949616db232c05e724beb333f633d generated_sha256=10835f7876b936e5eea138503b73611a934949616db232c05e724beb333f633d -->

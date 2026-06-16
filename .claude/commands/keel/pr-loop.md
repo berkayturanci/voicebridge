@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Bash(jury:*), Read, Edit, 
 
 # /keel:pr-loop
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `find` → `open` → `read` → `categorize` → `fix` → `review` → `post` → `recheck` → `collect` → `handoff`. Pick one stable `--run-id` for the whole run
+(e.g. `pr-loop-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command pr-loop --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`find`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -189,4 +204,4 @@ Do every read plus `keel validate` / `keel plan` / `keel run-gates`, but redirec
 state-changing `git`/`gh` write to a logged `DRY-RUN: <action>` line. No push, no PR, no
 merge.
 
-<!-- keel-generated: surface=claude command=pr-loop keel_version=1.2.3 source_sha256=c0543e98390a3c6cfab487ef0c9f06ef6340be0a0208dfcc49bf9b2da18ee0a1 generated_sha256=c0543e98390a3c6cfab487ef0c9f06ef6340be0a0208dfcc49bf9b2da18ee0a1 -->
+<!-- keel-generated: surface=claude command=pr-loop keel_version=1.6.5 source_sha256=bd1c409c0142bb4b829563c0daba47704b80b348009100400a8d80fc40077c10 generated_sha256=bd1c409c0142bb4b829563c0daba47704b80b348009100400a8d80fc40077c10 -->

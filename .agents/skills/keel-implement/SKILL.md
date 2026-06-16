@@ -9,6 +9,21 @@ Use this skill when the user asks to run the keel command `implement` (e.g. `kee
 
 # /keel:implement
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `fetch` → `branch` → `resolve` → `codename` → `delegate` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `implement-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command implement --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`fetch`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -154,4 +169,4 @@ review / CI / merge.
 Fail over to the host agent on delegate quota errors; attribute the **effective**
 agent.
 
-<!-- keel-generated: surface=skills command=implement keel_version=1.2.3 source_sha256=0195f50fbd70f3c6c8ee189d62e69494ab4e2eee72f1fa061d2f824d38aa9474 generated_sha256=4170fe1605d18923f8bed3ebc90ab62557bfbe0d09b7351822deec5b262a8df9 -->
+<!-- keel-generated: surface=skills command=implement keel_version=1.6.5 source_sha256=0cf5c8d3387b4736ebdccb7ea928fefe56dd4e280c517bfb9fe71d72593ec17d generated_sha256=79bd41da7e2d79d0ed5e2ee70c4eb21161a085b2c64d4e4a8cf3d726f3747be6 -->

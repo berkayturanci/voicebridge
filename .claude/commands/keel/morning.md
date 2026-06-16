@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Read, Write
 
 # /keel:morning
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `deferrals` → `shipped` → `health` → `enrichment` → `window` → `output`. Pick one stable `--run-id` for the whole run
+(e.g. `morning-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command morning --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`deferrals`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -120,4 +135,4 @@ On the **first run** (no prior brief at the reports path), offer to schedule the
 brief on a recurring cadence at the configured `timezone` — the exact scheduler
 mechanism is project-specific.
 
-<!-- keel-generated: surface=claude command=morning keel_version=1.2.3 source_sha256=578c29dadc635d4c38540019d36c049e4c9aa511ed4fecba7cd6a1c6df5bc33e generated_sha256=578c29dadc635d4c38540019d36c049e4c9aa511ed4fecba7cd6a1c6df5bc33e -->
+<!-- keel-generated: surface=claude command=morning keel_version=1.6.5 source_sha256=5bcd4d2e1d791805237934d8333fa14283bf5bac184020b71fdfdcd80fd25b65 generated_sha256=5bcd4d2e1d791805237934d8333fa14283bf5bac184020b71fdfdcd80fd25b65 -->

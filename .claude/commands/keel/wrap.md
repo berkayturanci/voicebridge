@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Read, Edit, Write, mcp__gi
 
 # /keel:wrap
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `sanity` → `gates` → `commit` → `push` → `recap`. Pick one stable `--run-id` for the whole run
+(e.g. `wrap-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command wrap --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`sanity`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -111,4 +126,4 @@ skips, deferred capture, and missing markers. If `capture_health.status` is
 `capture_health.reconcile_actions` and hand the gap to the morning queue; do not mutate the
 ledger, GitHub, or project capture destinations from this reporting step.
 
-<!-- keel-generated: surface=claude command=wrap keel_version=1.2.3 source_sha256=a1776fd1ab56af6529de3bc4adecd6b2960a345fd4cf37a098130c1d1febc973 generated_sha256=a1776fd1ab56af6529de3bc4adecd6b2960a345fd4cf37a098130c1d1febc973 -->
+<!-- keel-generated: surface=claude command=wrap keel_version=1.6.5 source_sha256=6d6b85fa68abda9dc20c031ff4f78c42840817f31d91070051e7410f8587379a generated_sha256=6d6b85fa68abda9dc20c031ff4f78c42840817f31d91070051e7410f8587379a -->

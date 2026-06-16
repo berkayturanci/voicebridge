@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Read, Edit
 
 # /keel:flake-audit
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `orient` → `evidence` → `aggregate` → `classify` → `dedupe` → `report` → `open`. Pick one stable `--run-id` for the whole run
+(e.g. `flake-audit-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command flake-audit --run-id "$RUN" --phase orient`
+- Re-run with the next `--phase` (`evidence`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -165,4 +180,4 @@ the operator to spelunk the tracker after the fact.
   skipped.
 - Fail-soft · deterministic for identical inputs.
 
-<!-- keel-generated: surface=claude command=flake-audit keel_version=1.2.3 source_sha256=17b5e120e6978bb027e088280a2f318252b676f77cc8498b3417b5cc06607c68 generated_sha256=17b5e120e6978bb027e088280a2f318252b676f77cc8498b3417b5cc06607c68 -->
+<!-- keel-generated: surface=claude command=flake-audit keel_version=1.6.5 source_sha256=2db602135ab21d6640c0fe76609d218327eda13ac38b9dd27f9fa2ec2774755c generated_sha256=2db602135ab21d6640c0fe76609d218327eda13ac38b9dd27f9fa2ec2774755c -->

@@ -6,6 +6,21 @@ allowed-tools: Bash(keel:*), Bash(git:*), Bash(gh:*), Bash(jury:*), Read, Edit, 
 
 # /keel:review-all-day
 
+## Live progress — stamp this run (required)
+
+So this run shows live on `keel-visual`'s board, record it with `keel activity` **as you
+go**. This command's phases are: `config` → `parse` → `commits` → `decide` → `classify` → `open` → `report`. Pick one stable `--run-id` for the whole run
+(e.g. `review-all-day-<issue-or-pr>`):
+
+- **Right now, before the work below**, stamp the first phase:
+  `keel activity .keel/project.yaml --root . --write --command review-all-day --run-id "$RUN" --phase config`
+- Re-run with the next `--phase` (`parse`, …) **as you advance** through the flow.
+- At the end: `keel activity .keel/project.yaml --root . --run-id "$RUN" --done`
+
+Treat this like any other contractual step — do not skip it. The one allowed exception is a
+core too old to ship `keel activity` (keel < 1.6.0): then skip it silently and never block
+the command.
+
 ## Command step evidence
 
 Every numbered step in this command is contractual. Complete the step, record the
@@ -253,4 +268,4 @@ Always print the final report on exit, even if partial.
 - Fail-soft (a missing tool/gate degrades to a skipped check, never aborts) · deterministic
   ordering (same commits ⇒ same findings ⇒ same issues).
 
-<!-- keel-generated: surface=claude command=review-all-day keel_version=1.2.3 source_sha256=8e4b1f2652a13d57d558324fceb8da61ad8a29f744fd0e1a922c8542e57992bd generated_sha256=8e4b1f2652a13d57d558324fceb8da61ad8a29f744fd0e1a922c8542e57992bd -->
+<!-- keel-generated: surface=claude command=review-all-day keel_version=1.6.5 source_sha256=842cce774206617213e7abe7c71913873a7cf78c1bcfd8b65800440611f9b6c5 generated_sha256=842cce774206617213e7abe7c71913873a7cf78c1bcfd8b65800440611f9b6c5 -->
