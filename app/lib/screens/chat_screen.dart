@@ -9,6 +9,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:http/http.dart' as http;
 
 import '../api.dart';
 import '../models.dart';
@@ -41,6 +42,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
   bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
+  http.Client? _watch; // live transcript watch for tmux (full) sessions (#141)
+  bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
 
@@ -107,7 +110,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final can = _input.text.trim().isNotEmpty;
       if (can != _canSend) setState(() => _canSend = can);
     });
-    _loadHistory();
+    if (_isTmux) {
+      _startTmuxSync(); // full sessions: server transcript is the source of truth
+    } else {
+      _loadHistory();
+    }
     _loadModes();
     SharedPreferences.getInstance().then((p) {
       if (mounted) setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
@@ -118,6 +125,62 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _hideActivity = !_hideActivity);
     final p = await SharedPreferences.getInstance();
     await p.setBool('vb_hide_activity', _hideActivity);
+  }
+
+  // Full (tmux) sessions: load the server transcript, then watch for every new
+  // turn from ANY source (this app, the local CLI, Remote Control, another
+  // client). The server transcript is the single source of truth — no optimistic
+  // echo, so nothing duplicates and nothing goes missing (#141).
+  Future<void> _startTmuxSync() async {
+    int offset = 0;
+    try {
+      final h = await _api.sessionHistory(widget.session.id);
+      offset = (h['size'] as num?)?.toInt() ?? 0;
+      final turns = (h['turns'] as List?) ?? const [];
+      if (mounted) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(turns.map((t) {
+              final m = t as Map<String, dynamic>;
+              return Message(m['role'] == 'assistant' ? 'claude' : 'me',
+                  (m['text'] ?? '') as String);
+            }));
+        });
+        _toBottom();
+      }
+    } catch (_) {/* fresh session / no transcript yet */}
+    _watch = _api.watchSession(widget.session.id, offset, onTurn: _onWatchTurn);
+  }
+
+  void _onWatchTurn(String role, String text) {
+    if (!mounted || text.trim().isEmpty) return;
+    setState(() =>
+        _messages.add(Message(role == 'assistant' ? 'claude' : 'me', text)));
+    _toBottom();
+    if (role == 'assistant' && _talking) _speak(text, summarize: true);
+  }
+
+  // Full (tmux) sessions: deliver the input; the watch renders the turn + reply.
+  Future<void> _sendTmux(String text) async {
+    if (_busy) return;
+    _tts.stop();
+    _input.clear();
+    setState(() => _busy = true);
+    try {
+      await _api.ask(
+        sessionId: widget.session.id,
+        text: text,
+        mode: _mode,
+        onDelta: (_) {},
+        onActivity: (_) {},
+      );
+    } catch (e) {
+      setState(() => _messages.add(
+          Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   // Pick the highest-quality installed voice for the locale. flutter_tts otherwise
@@ -303,6 +366,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _watch?.close(); // stop the live transcript watch (#141)
     WakelockPlus.disable();
     _stt.cancel();
     _tts.stop();
@@ -503,6 +567,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- Send + stream ----
   Future<void> _send(String text) async {
+    if (_isTmux) return _sendTmux(text); // full sessions render via the watch
     if (_busy) return;
     _tts.stop(); // barge-in: a new message interrupts any ongoing spoken readout
     _input.clear();

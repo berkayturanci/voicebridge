@@ -67,6 +67,49 @@ class Api {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// GET /api/session-history — full transcript as {role,text} turns + byte
+  /// offset to resume a watch from (#141).
+  Future<Map<String, dynamic>> sessionHistory(String sessionId) async {
+    final r = await http.get(_u('/api/session-history?sessionId=$sessionId'),
+        headers: _headers());
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Geçmiş alınamadı (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// GET /api/session-watch — long-lived NDJSON tail. Calls [onTurn] for every
+  /// new {type:"turn",role,text}. Returns the http.Client; close() it to stop.
+  http.Client watchSession(
+    String sessionId,
+    int since, {
+    required void Function(String role, String text) onTurn,
+  }) {
+    final client = http.Client();
+    final req = http.Request(
+        'GET', _u('/api/session-watch?sessionId=$sessionId&since=$since'));
+    req.headers.addAll(_headers());
+    client.send(req).then((resp) {
+      var buf = '';
+      resp.stream.transform(utf8.decoder).listen((chunk) {
+        buf += chunk;
+        int nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          final line = buf.substring(0, nl);
+          buf = buf.substring(nl + 1);
+          if (line.trim().isEmpty) continue;
+          try {
+            final o = jsonDecode(line) as Map<String, dynamic>;
+            if (o['type'] == 'turn') {
+              onTurn((o['role'] ?? '') as String, (o['text'] ?? '') as String);
+            }
+          } catch (_) {}
+        }
+      }, onError: (_) {}, cancelOnError: false);
+    }).catchError((_) {});
+    return client;
+  }
+
   /// GET /api/sessions
   Future<List<Session>> sessions() async {
     final r = await http.get(_u('/api/sessions'), headers: _headers());
