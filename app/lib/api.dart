@@ -67,6 +67,17 @@ class Api {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// POST /api/tmux-rc — toggle Remote Control on a full (tmux) session.
+  Future<Map<String, dynamic>> tmuxRc(String sessionId, String action) async {
+    final r = await http.post(_u('/api/tmux-rc'),
+        headers: _headers({'Content-Type': 'application/json'}),
+        body: jsonEncode({'sessionId': sessionId, 'action': action}));
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Remote Control değişmedi (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   /// GET /api/session-history — full transcript as {role,text} turns + byte
   /// offset to resume a watch from (#141).
   Future<Map<String, dynamic>> sessionHistory(String sessionId) async {

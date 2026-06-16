@@ -770,6 +770,27 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Icon(
+                    info['rcActive'] == true
+                        ? Icons.cloud_done_rounded
+                        : Icons.cloud_off_rounded,
+                    size: 18,
+                    color: info['rcActive'] == true
+                        ? VbColors.accent
+                        : VbColors.textMuted),
+                const SizedBox(width: 8),
+                Text(
+                    info['rcActive'] == true
+                        ? 'Remote Control: açık'
+                        : 'Remote Control: kapalı',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: VbColors.textPrimary)),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text('Mac terminalinde bu oturuma canlı gir:',
                 style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
             const SizedBox(height: 8),
@@ -805,11 +826,21 @@ class _ChatScreenState extends State<ChatScreen> {
             child: const Text('Komutu kopyala'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
+              final active = info['rcActive'] == true;
               Navigator.pop(context);
-              _send('/remote-control'); // start Remote Control from the phone
+              try {
+                await _api.tmuxRc(widget.session.id, active ? 'stop' : 'start');
+                _toast(active
+                    ? 'Remote Control durduruldu'
+                    : 'Remote Control başlatıldı');
+              } catch (e) {
+                _toast('Olmadı: ${e.toString().replaceFirst('Exception: ', '')}');
+              }
             },
-            child: const Text('Remote Control başlat'),
+            child: Text(info['rcActive'] == true
+                ? "Remote Control'ü durdur"
+                : 'Remote Control başlat'),
           ),
         ],
       ),
