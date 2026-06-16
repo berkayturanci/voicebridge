@@ -87,17 +87,21 @@ class _ChatScreenState extends State<ChatScreen> {
     // mode routes correctly to CarPlay/external devices. mixWithOthers is kept on
     // purpose: it stops flutter_tts from deactivating the shared session between
     // turns (the original "silent after the first reply" fix).
-    _tts.setSharedInstance(true);
-    _tts.setIosAudioCategory(
-      IosTextToSpeechAudioCategory.playback,
-      [
-        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-        IosTextToSpeechAudioCategoryOptions.duckOthers, // duck Spotify while speaking → conversational on CarPlay, not bleeding through (#133)
-        IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP, // stereo BT / CarPlay
-        IosTextToSpeechAudioCategoryOptions.allowAirPlay,
-      ],
-      IosTextToSpeechAudioMode.voicePrompt,
-    );
+    // iOS-only: AVAudioSession category. On macOS these throw MissingPluginException
+    // (no flutter_tts macOS impl) and would break talking mode — so guard them.
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      _tts.setSharedInstance(true);
+      _tts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playback,
+        [
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          IosTextToSpeechAudioCategoryOptions.duckOthers, // duck Spotify while speaking → conversational on CarPlay, not bleeding through (#133)
+          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP, // stereo BT / CarPlay
+          IosTextToSpeechAudioCategoryOptions.allowAirPlay,
+        ],
+        IosTextToSpeechAudioMode.voicePrompt,
+      );
+    }
     _input.addListener(() {
       final can = _input.text.trim().isNotEmpty;
       if (can != _canSend) setState(() => _canSend = can);
@@ -533,16 +537,18 @@ class _ChatScreenState extends State<ChatScreen> {
         // Re-claim the route-friendly playback category ONCE here (not per
         // utterance) so the reply reaches CarPlay/AirPods instead of being silenced
         // or mis-routed.
-        await _tts.setIosAudioCategory(
-          IosTextToSpeechAudioCategory.playback,
-          [
-            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-            IosTextToSpeechAudioCategoryOptions.duckOthers, // duck music while speaking (#133)
-            IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
-            IosTextToSpeechAudioCategoryOptions.allowAirPlay,
-          ],
-          IosTextToSpeechAudioMode.voicePrompt,
-        );
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          await _tts.setIosAudioCategory(
+            IosTextToSpeechAudioCategory.playback,
+            [
+              IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+              IosTextToSpeechAudioCategoryOptions.duckOthers, // duck music while speaking (#133)
+              IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+              IosTextToSpeechAudioCategoryOptions.allowAirPlay,
+            ],
+            IosTextToSpeechAudioMode.voicePrompt,
+          );
+        }
         await _speak(full, summarize: true); // hands-free: read the lead, not 200 lines
         if (_talking && !_talkMuted && !_busy) _listen(); // skip if a new turn already started
       }
