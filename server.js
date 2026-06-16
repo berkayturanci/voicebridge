@@ -1520,6 +1520,9 @@ function handleRequest(req, res) {
         "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no",
       });
+      // Send each turn immediately (no Nagle buffering) — without this some
+      // clients (notably the macOS app) get turns late or not at all.
+      try { res.socket && res.socket.setNoDelay(true); } catch (_) {}
       let offset = Number(q.get("since"));
       if (!Number.isFinite(offset) || offset < 0) { try { offset = fs.statSync(jsonl).size; } catch (_) { offset = 0; } }
       let carry = "", closed = false;
