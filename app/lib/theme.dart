@@ -1,28 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// App-wide light/dark switch. Persisted across launches; default dark. Listen to
-/// [isDark] to rebuild the app (and re-point [VbColors]) when it changes.
+/// App-wide theme. [mode] is 'system' | 'dark' | 'light'; 'system' follows the
+/// phone and updates live when the device switches light/dark. [isDark] is the
+/// resolved value — listen to it to rebuild the app (and re-point [VbColors]).
 class VbThemeController {
   VbThemeController._();
-  static final ValueNotifier<bool> isDark = ValueNotifier<bool>(true);
-  static const _key = 'vb_theme_dark';
+  static final ValueNotifier<bool> isDark = ValueNotifier<bool>(true); // resolved
+  static final ValueNotifier<String> mode = ValueNotifier<String>('system');
+  static const _modeKey = 'vb_theme_mode';
+  static const _legacyKey = 'vb_theme_dark'; // old light/dark bool
+
+  static bool _systemIsDark() =>
+      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+      Brightness.dark;
+  static bool _resolve(String m) => m == 'system' ? _systemIsDark() : m == 'dark';
+  static void _apply() =>
+      VbColors.setPalette(isDark.value ? VbPalette.dark : VbPalette.light);
 
   static Future<void> load() async {
     try {
-      final v = (await SharedPreferences.getInstance()).getBool(_key);
-      if (v != null) isDark.value = v;
+      final p = await SharedPreferences.getInstance();
+      var m = p.getString(_modeKey);
+      if (m == null) {
+        final legacy = p.getBool(_legacyKey); // migrate old toggle, else default system
+        m = legacy == null ? 'system' : (legacy ? 'dark' : 'light');
+      }
+      mode.value = m;
     } catch (_) {}
-    VbColors.setPalette(isDark.value ? VbPalette.dark : VbPalette.light);
+    isDark.value = _resolve(mode.value);
+    _apply();
+    // In system mode, follow the device when it flips light/dark.
+    WidgetsBinding.instance.platformDispatcher.onPlatformBrightnessChanged = () {
+      if (mode.value == 'system') {
+        isDark.value = _systemIsDark();
+        _apply();
+      }
+    };
   }
 
-  static Future<void> set(bool dark) async {
-    VbColors.setPalette(dark ? VbPalette.dark : VbPalette.light);
-    isDark.value = dark; // notifies listeners -> app rebuilds with the new theme
+  static Future<void> setMode(String m) async {
+    mode.value = m;
+    isDark.value = _resolve(m);
+    _apply(); // notifies listeners -> app rebuilds with the new theme
     try {
-      await (await SharedPreferences.getInstance()).setBool(_key, dark);
+      await (await SharedPreferences.getInstance()).setString(_modeKey, m);
     } catch (_) {}
   }
+
+  // Back-compat for callers that pass a bool.
+  static Future<void> set(bool dark) => setMode(dark ? 'dark' : 'light');
 }
 
 /// One named palette (dark or light). Same keys; different values.

@@ -184,10 +184,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _themeToggle() {
-    return ValueListenableBuilder<bool>(
-      valueListenable: VbThemeController.isDark,
-      builder: (_, dark, __) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+    return ValueListenableBuilder<String>(
+      valueListenable: VbThemeController.mode,
+      builder: (_, mode, __) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: VbColors.surface,
           borderRadius: BorderRadius.circular(VbRadius.card),
@@ -195,18 +195,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Row(
           children: [
-            Icon(dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                size: 20, color: VbColors.accent),
+            Icon(Icons.brightness_6_rounded, size: 20, color: VbColors.accent),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(dark ? 'Koyu tema' : 'Açık tema',
+              child: Text('Tema',
                   style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                       color: VbColors.textPrimary)),
             ),
-            Switch(value: dark, onChanged: (v) => VbThemeController.set(v)),
+            _themeSeg('system', 'Sistem', mode == 'system'),
+            _themeSeg('light', 'Açık', mode == 'light'),
+            _themeSeg('dark', 'Koyu', mode == 'dark'),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _themeSeg(String id, String label, bool selected) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Material(
+        color: selected
+            ? VbColors.accent.withValues(alpha: 0.16)
+            : VbColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(9),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: () => VbThemeController.setMode(id),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? VbColors.accent : VbColors.textMuted)),
+          ),
         ),
       ),
     );
