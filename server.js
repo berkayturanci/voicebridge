@@ -35,7 +35,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const crypto = require("crypto");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 
 // Minimal .env support (no dependency): load KEY=VALUE lines from ./.env without
 // overriding variables already present in the environment.
@@ -238,10 +238,11 @@ function resolveMode(agentId, mode) {
   return agent.defaultMode;
 }
 
-// "local" runs the agent CLI here; "cloud" proxies to CLOUD_RUNNER_URL.
+// "local" runs the agent CLI here; "cloud" proxies to CLOUD_RUNNER_URL; "tmux"
+// runs a full interactive claude in a tmux session you can also attach to (Tat Y).
 function resolveRunner(runner) {
   runner = runner || "local";
-  if (runner !== "local" && runner !== "cloud") throw new Error("unknown runner: " + runner);
+  if (runner !== "local" && runner !== "cloud" && runner !== "tmux") throw new Error("unknown runner: " + runner);
   if (runner === "cloud" && !(process.env.CLOUD_RUNNER_URL || "")) throw new Error("cloud runner not configured");
   return runner;
 }
@@ -513,7 +514,7 @@ function loadSessions(file) {
     sessions.set(s.id, {
       id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir,
       mode: AGENTS[s.agent].modes[s.mode] ? s.mode : AGENTS[s.agent].defaultMode,
-      voice: !!s.voice, runner: s.runner === "cloud" ? "cloud" : "local",
+      voice: !!s.voice, runner: (s.runner === "cloud" || s.runner === "tmux") ? s.runner : "local",
       model: (s.model && String(s.model).trim()) || undefined,
       claudeSessionId: (s.claudeSessionId && String(s.claudeSessionId).trim()) || undefined,
       started: false,
@@ -677,6 +678,7 @@ function streamAsk(session, prompt, res) {
   }, SECURITY_HEADERS));
   const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
+  if (session.runner === "tmux") return streamTmux(session, prompt, res, emit);
   if (session.agent === "ollama") return streamOllama(session, prompt, res, emit);
   return streamLocal(session, prompt, res, emit);
 }
@@ -762,6 +764,109 @@ function streamCloud(session, prompt, res, emit) {
   up.on("error", (e) => { emit({ type: "error", error: "cloud runner: " + e.message }); res.end(); });
   up.write(payload); up.end();
   res.on("close", () => { try { up.destroy(); } catch (_) {} });
+}
+
+// ---------------------------------------------------------------------------
+// Tat Y — full interactive sessions via tmux (runner: "tmux")
+// A real interactive `claude` runs in a detached tmux session (vb_<id>) so the
+// SAME session can be driven from the phone (send-keys) and attached on the Mac
+// (`tmux attach -t vb_<id>`), where built-ins like /remote-control work. Replies
+// are scraped from the pane. Spike-proven; see #128-132.
+// ---------------------------------------------------------------------------
+const TMUX_IDLE_MS = Number(process.env.TMUX_IDLE_MS ?? 60 * 60 * 1000) || 0;
+const tmuxIdleTimers = new Map(); // sessionId -> idle kill timer
+
+function tmuxName(id) { return "vb_" + String(id).replace(/[^a-zA-Z0-9_]/g, "_"); }
+function tmuxRun(args) {
+  return new Promise((resolve) => {
+    execFile("tmux", args, { env: process.env, maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout) => resolve({ err, out: (stdout || "").toString() }));
+  });
+}
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+async function tmuxHas(name) { return !(await tmuxRun(["has-session", "-t", name])).err; }
+async function tmuxCapture(name, scroll) {
+  const args = ["capture-pane", "-p", "-t", name];
+  if (scroll) args.splice(1, 0, "-S", String(scroll));
+  return (await tmuxRun(args)).out;
+}
+function killTmux(sessionId) {
+  const t = tmuxIdleTimers.get(sessionId); if (t) { clearTimeout(t); tmuxIdleTimers.delete(sessionId); }
+  tmuxRun(["kill-session", "-t", tmuxName(sessionId)]);
+}
+
+async function ensureTmuxClaude(session) {
+  const name = tmuxName(session.id);
+  if (await tmuxHas(name)) return name;
+  // DEFAULT mode (claude is already in auto mode); no --dangerously-skip-permissions.
+  await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, "claude"]);
+  for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
+    await sleepMs(500);
+    if (/Claude Code v|❯/.test(await tmuxCapture(name))) { await sleepMs(900); break; }
+  }
+  return name;
+}
+
+// Turn a captured claude TUI pane into the clean assistant reply: drop the welcome
+// box, ─── input borders, the ❯ echo, ✻ Cogitated and ⎿ chrome; keep the ⏺ body.
+function extractTuiReply(pane, promptEcho) {
+  const lines = pane.split("\n");
+  const key = (promptEcho || "").trim().slice(0, 24);
+  let start = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i].trim();
+    if (t.startsWith("❯") && key && t.includes(key)) { start = i; break; }
+  }
+  if (start < 0) for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim().startsWith("⏺")) { start = i - 1; break; } }
+  const out = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) { out.push(""); continue; }
+    if (/^[╭╰│]/.test(t)) continue;          // welcome box
+    if (/^─{5,}$/.test(t)) break;             // bottom input border → reply ended
+    if (t.startsWith("❯")) break;             // empty input prompt → ended
+    if (/^✻/.test(t)) continue;               // "Cogitated for Xs"
+    if (/^⎿/.test(t)) continue;               // hook/tool-result chrome
+    out.push(lines[i].replace(/^\s*⏺\s?/, "").replace(/^\s{0,3}/, ""));
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+const TMUX_GENERATING_RE = /esc to interrupt|Cogitating|Thinking|Working…|Pondering|Forging/i;
+
+// Drive one turn through the tmux-hosted interactive claude.
+async function streamTmux(session, prompt, res, emit) {
+  const old = tmuxIdleTimers.get(session.id); if (old) { clearTimeout(old); tmuxIdleTimers.delete(session.id); }
+  let name;
+  try { name = await ensureTmuxClaude(session); }
+  catch (e) { emit({ type: "error", error: "tmux başlatılamadı: " + e.message }); return res.end(); }
+
+  // The TUI input is single-line and submits on Enter; flatten newlines.
+  const text = buildPrompt(session.voice, prompt).replace(/\s*\n\s*/g, " ").trim();
+  await tmuxRun(["send-keys", "-t", name, "-l", text]);
+  await sleepMs(180);
+  await tmuxRun(["send-keys", "-t", name, "Enter"]);
+  emit({ type: "activity", text: "tmux: claude düşünüyor…" });
+
+  const MAXMS = (Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0) || 20 * 60 * 1000;
+  const t0 = Date.now();
+  let prev = "", stable = 0, sawGen = false, closed = false;
+  res.on("close", () => { closed = true; }); // barge-in: leave the tmux session alive
+  while (!closed && Date.now() - t0 < MAXMS) {
+    await sleepMs(1400);
+    const cur = await tmuxCapture(name);
+    if (TMUX_GENERATING_RE.test(cur)) sawGen = true;
+    if (cur === prev) stable++; else stable = 0;
+    prev = cur;
+    if (stable >= 2 && !TMUX_GENERATING_RE.test(cur) && (sawGen || stable >= 4)) break;
+  }
+  if (closed) return; // barge-in — process keeps running for the next turn / attach
+  const reply = extractTuiReply(await tmuxCapture(name, -250), text);
+  emit({ type: "delta", text: reply || "(yanıt yakalanamadı — Mac'te `tmux attach` ile bakabilirsin)" });
+  session.started = true;
+  if (TMUX_IDLE_MS > 0) tmuxIdleTimers.set(session.id, setTimeout(() => killTmux(session.id), TMUX_IDLE_MS));
+  emit({ type: "done" });
+  res.end();
 }
 
 // ---------------------------------------------------------------------------
@@ -1110,7 +1215,7 @@ function handleRequest(req, res) {
       const id = urlPath.slice("/api/sessions/".length);
       if (id === defaultSessionId) return sendJson(res, 400, { error: "Cannot delete the default session" });
       const existed = sessions.delete(id);
-      if (existed) saveSessions();
+      if (existed) { killTmux(id); killLive(id); saveSessions(); } // tear down any live/tmux backing process
       return sendJson(res, existed ? 200 : 404, existed ? { ok: true } : { error: "Not found" });
     }
 
