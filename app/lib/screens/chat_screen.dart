@@ -1193,7 +1193,7 @@ class _ChatScreenState extends State<ChatScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: VbColors.border),
           ),
-          child: Text('claude yazıyor…',
+          child: Text('${widget.session.agentLabel.split(' ').first.toLowerCase()} yazıyor…',
               style: TextStyle(
                   fontSize: 13.5,
                   color: VbColors.textMuted,
