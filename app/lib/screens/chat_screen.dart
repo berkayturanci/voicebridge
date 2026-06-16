@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show File, Directory; // temp .wav for bridge (Piper) playback
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart'; // defaultTargetPlatform / TargetPlatform
@@ -35,6 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer(); // bridge (Piper) neural TTS playback
   bool _bridgeVoice = false; // play replies via the bridge voice instead of on-device
+  bool _bridgeVoiceWarned = false; // surface the bridge-voice failure reason once
   bool _sttReady = false;
 
   bool _busy = false;
@@ -542,11 +544,21 @@ class _ChatScreenState extends State<ChatScreen> {
         final bytes = await _api.ttsAudio(clean);
         try { await _stt.stop(); } catch (_) {}
         await _player.stop();
-        await _player.play(BytesSource(bytes));
+        // Play from a temp .wav file (DeviceFileSource). BytesSource playback is
+        // unreliable on iOS — it was silently failing here and falling back to the
+        // on-device voice, which is why Piper "sounded like Yelda". (#138)
+        final f = File('${Directory.systemTemp.path}/vb_piper.wav');
+        await f.writeAsBytes(bytes, flush: true);
+        await _player.play(DeviceFileSource(f.path));
         await _player.onPlayerComplete.first; // wait until playback finishes
         return;
-      } catch (_) {
-        // bridge offline / TTS failed → fall back to the on-device voice
+      } catch (e) {
+        // bridge offline / TTS failed → tell the user once why, then fall back to
+        // the on-device voice so speech still happens.
+        if (!_bridgeVoiceWarned) {
+          _bridgeVoiceWarned = true;
+          _toast('Köprü sesi çalınamadı, cihaz sesine geçildi: $e');
+        }
       }
     }
     // The audio session is configured ONCE in initState and kept alive by
@@ -716,6 +728,7 @@ class _ChatScreenState extends State<ChatScreen> {
         canAttach:
             widget.session.agent == 'claude' && widget.session.runner == 'local',
         isTmux: widget.session.runner == 'tmux',
+        isCodex: widget.session.agent == 'codex',
       ),
     );
     // The bridge-voice switch persists itself inside the sheet; refresh our copy.
@@ -1967,12 +1980,14 @@ class _SessionSettingsSheet extends StatefulWidget {
   final String currentMode;
   final bool canAttach;
   final bool isTmux;
+  final bool isCodex;
   const _SessionSettingsSheet({
     required this.currentName,
     required this.modes,
     required this.currentMode,
     this.canAttach = false,
     this.isTmux = false,
+    this.isCodex = false,
   });
 
   @override
@@ -2215,7 +2230,10 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                                 size: 22, color: VbColors.accent),
                             SizedBox(width: 13),
                             Expanded(
-                              child: Text("Mac'te aç / Claude app'ten eriş",
+                              child: Text(
+                                  widget.isCodex
+                                      ? "Mac'te aç / codex app'ten eriş"
+                                      : "Mac'te aç / Claude app'ten eriş",
                                   style: TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.w600,

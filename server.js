@@ -1604,8 +1604,8 @@ function handleRequest(req, res) {
           attachCmd: "tmux attach -t " + name,
           remoteControlSteps: isCodex ? [
             "Mac terminalinde: tmux attach -t " + name,
-            "Açılan codex oturumunu canlı sürebilirsin (telefonla aynı oturum).",
-            "Uzaktan kontrol için ayrıca: codex remote-control start (ayrı daemon).",
+            "Açılan codex oturumu telefonla aynı — canlı sürebilirsin.",
+            "codex app / uzaktan kontrol için: codex remote-control start",
           ] : [
             "Mac terminalinde: tmux attach -t " + name,
             "Açılan claude oturumunda: /remote-control",
