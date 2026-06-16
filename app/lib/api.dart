@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
@@ -23,6 +24,35 @@ class Api {
     final r = await http.get(_u('/api/config'), headers: _headers());
     if (r.statusCode == 401) throw Exception('Token gerekli/geçersiz');
     if (r.statusCode != 200) throw Exception('Köprüye ulaşılamadı (${r.statusCode})');
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// POST /api/tts — bridge-side (Piper) neural TTS. Returns WAV audio bytes.
+  Future<Uint8List> ttsAudio(String text) async {
+    final r = await http.post(
+      _u('/api/tts'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({'text': text}),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Köprü sesi başarısız (${r.statusCode})');
+    }
+    return r.bodyBytes;
+  }
+
+  /// POST /api/handoff — pause this session for the phone and get a
+  /// `claude --resume <id>` for the terminal (direction:'pc'), or reclaim it
+  /// (direction:'phone'). Returns {resumeCmd, claudeSessionId, note, direction}.
+  Future<Map<String, dynamic>> handoff(String sessionId,
+      {String direction = 'pc'}) async {
+    final r = await http.post(
+      _u('/api/handoff'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({'sessionId': sessionId, 'direction': direction}),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Handoff başarısız (${r.statusCode})');
+    }
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 

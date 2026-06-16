@@ -807,12 +807,11 @@ function getOrSpawnLive(session) {
 // Anthropic Messages NDJSON line, stream assistant/tool events back until this
 // turn's `result` line, then resolve. The process survives for the next turn.
 function streamLive(session, prompt, res, emit) {
-  // Single-writer: while handed off to the PC, the phone must not write the same
-  // session (concurrent .jsonl writers corrupt it). Reclaim via /api/handoff (#123).
-  if (session.handoff === "pc") {
-    emit({ type: "error", error: "Bu oturum PC'ye devredildi. Telefonda sürdürmek için önce devralma (reclaim) yap." });
-    return res.end();
-  }
+  // Handoff: while handed off to the PC the live process was killed. A new phone
+  // turn means the user is taking it back, so auto-reclaim and respawn (which
+  // --resume's the possibly PC-advanced history). Single-writer holds because the
+  // phone process was gone during the handoff. (#123)
+  if (session.handoff === "pc") { session.handoff = null; saveSessions(); }
   const p = getOrSpawnLive(session);
   if (p.busy) { emit({ type: "error", error: "Bu oturum şu an meşgul (önceki tur sürüyor)." }); return res.end(); }
   p.busy = true;
