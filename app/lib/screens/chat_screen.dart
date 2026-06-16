@@ -92,6 +92,7 @@ class _ChatScreenState extends State<ChatScreen> {
       IosTextToSpeechAudioCategory.playback,
       [
         IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+        IosTextToSpeechAudioCategoryOptions.duckOthers, // duck Spotify while speaking → conversational on CarPlay, not bleeding through (#133)
         IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP, // stereo BT / CarPlay
         IosTextToSpeechAudioCategoryOptions.allowAirPlay,
       ],
@@ -532,6 +533,7 @@ class _ChatScreenState extends State<ChatScreen> {
           IosTextToSpeechAudioCategory.playback,
           [
             IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+            IosTextToSpeechAudioCategoryOptions.duckOthers, // duck music while speaking (#133)
             IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
             IosTextToSpeechAudioCategoryOptions.allowAirPlay,
           ],
