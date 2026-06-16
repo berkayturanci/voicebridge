@@ -1500,6 +1500,37 @@ function handleRequest(req, res) {
       });
     }
 
+    // Fire-and-forget input to a full (tmux) session (#sync). Just send-keys the
+    // text + Enter and return — the watch renders the turn. This decouples send
+    // from receive, so a prompt/question waiting in the TUI never blocks the app
+    // (and you answer it by sending "y"/"1"/etc. as the next message).
+    if (req.method === "POST" && urlPath === "/api/tmux-send") {
+      return readBody(req, 64 * 1024, (e, body) => {
+        if (e) return sendJson(res, 400, { error: "Bad request" });
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        const session = resolveSession(data.sessionId);
+        if (!session) return sendJson(res, 404, { error: "Unknown session" });
+        if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) değil." });
+        const text = (typeof data.text === "string" ? data.text : "").replace(/\s*\n\s*/g, " ");
+        (async () => {
+          let name;
+          try { name = await ensureTmuxClaude(session); }
+          catch (err) { return sendJson(res, 500, { error: "tmux: " + err.message }); }
+          if (text.length) { await tmuxRun(["send-keys", "-t", name, "-l", text]); await sleepMs(150); }
+          await tmuxRun(["send-keys", "-t", name, "Enter"]);
+          sendJson(res, 200, { ok: true });
+          // Bind the transcript .jsonl by content shortly after (the user message
+          // is written quickly) so sync/resume have the id.
+          if (!session.claudeSessionId && text.trim().length >= 6) {
+            setTimeout(() => {
+              const jp = findJsonlByContent(session.projectDir, text.slice(0, 80));
+              if (jp) { session.tmuxJsonl = jp; session.claudeSessionId = path.basename(jp).replace(/\.jsonl$/, ""); saveSessions(); }
+            }, 2500);
+          }
+        })();
+      });
+    }
+
     // Live transcript (#141). Full history of a session's .jsonl as {role,text}
     // turns + the byte offset to resume a watch from.
     if (req.method === "GET" && urlPath === "/api/session-history") {

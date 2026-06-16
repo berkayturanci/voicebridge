@@ -67,6 +67,17 @@ class Api {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// POST /api/tmux-send — fire-and-forget input to a full (tmux) session. The
+  /// watch renders the turn; this never blocks (so prompts/questions don't hang).
+  Future<void> tmuxSend(String sessionId, String text) async {
+    final r = await http.post(_u('/api/tmux-send'),
+        headers: _headers({'Content-Type': 'application/json'}),
+        body: jsonEncode({'sessionId': sessionId, 'text': text}));
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Gönderilemedi (${r.statusCode})');
+    }
+  }
+
   /// POST /api/tmux-rc — toggle Remote Control on a full (tmux) session.
   Future<Map<String, dynamic>> tmuxRc(String sessionId, String action) async {
     final r = await http.post(_u('/api/tmux-rc'),

@@ -160,25 +160,19 @@ class _ChatScreenState extends State<ChatScreen> {
     if (role == 'assistant' && _talking) _speak(text, summarize: true);
   }
 
-  // Full (tmux) sessions: deliver the input; the watch renders the turn + reply.
+  // Full (tmux) sessions: fire-and-forget the input; the watch renders the turn
+  // and the reply. No _busy block — so a prompt/question waiting in the session
+  // never freezes the app, and you can answer it ("y"/"1"/…) right away.
   Future<void> _sendTmux(String text) async {
-    if (_busy) return;
     _tts.stop();
     _input.clear();
-    setState(() => _busy = true);
     try {
-      await _api.ask(
-        sessionId: widget.session.id,
-        text: text,
-        mode: _mode,
-        onDelta: (_) {},
-        onActivity: (_) {},
-      );
+      await _api.tmuxSend(widget.session.id, text);
     } catch (e) {
-      setState(() => _messages.add(
-          Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _messages.add(
+            Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
+      }
     }
   }
 
