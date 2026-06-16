@@ -1546,11 +1546,12 @@ function handleRequest(req, res) {
         while ((nl = carry.indexOf("\n")) >= 0) {
           const line = carry.slice(0, nl); carry = carry.slice(nl + 1);
           const t = turnFromTranscriptLine(line);
-          if (t) write({ type: "turn", role: t.role, text: t.text });
+          if (t) write({ type: "turn", role: t.role, text: t.text, offset });
         }
       };
       const timer = setInterval(tick, 1000);
-      const beat = setInterval(() => write({ type: "ping" }), 25000);
+      // offset on the ping lets a reconnecting client resume without gaps/dups.
+      const beat = setInterval(() => write({ type: "ping", offset }), 20000);
       const stop = () => { if (closed) return; closed = true; clearInterval(timer); clearInterval(beat); try { res.end(); } catch (_) {} };
       req.on("close", stop); res.on("close", stop); res.on("error", stop);
       return;

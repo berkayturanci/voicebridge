@@ -89,37 +89,15 @@ class Api {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  /// GET /api/session-watch — long-lived NDJSON tail. Calls [onTurn] for every
-  /// new {type:"turn",role,text}. Returns the http.Client; close() it to stop.
-  http.Client watchSession(
+  /// GET /api/session-watch — long-lived NDJSON tail with auto-reconnect. Calls
+  /// [onTurn] for every new {type:"turn",role,text}. Returns a [SessionWatch];
+  /// call close() to stop.
+  SessionWatch watchSession(
     String sessionId,
     int since, {
     required void Function(String role, String text) onTurn,
-  }) {
-    final client = http.Client();
-    final req = http.Request(
-        'GET', _u('/api/session-watch?sessionId=$sessionId&since=$since'));
-    req.headers.addAll(_headers());
-    client.send(req).then((resp) {
-      var buf = '';
-      resp.stream.transform(utf8.decoder).listen((chunk) {
-        buf += chunk;
-        int nl;
-        while ((nl = buf.indexOf('\n')) >= 0) {
-          final line = buf.substring(0, nl);
-          buf = buf.substring(nl + 1);
-          if (line.trim().isEmpty) continue;
-          try {
-            final o = jsonDecode(line) as Map<String, dynamic>;
-            if (o['type'] == 'turn') {
-              onTurn((o['role'] ?? '') as String, (o['text'] ?? '') as String);
-            }
-          } catch (_) {}
-        }
-      }, onError: (_) {}, cancelOnError: false);
-    }).catchError((_) {});
-    return client;
-  }
+  }) =>
+      SessionWatch(this, sessionId, since, onTurn);
 
   /// GET /api/sessions
   Future<List<Session>> sessions() async {
@@ -297,5 +275,69 @@ class Api {
     } catch (_) {
       return null;
     }
+  }
+}
+
+/// A self-reconnecting tail of /api/session-watch. Survives idle disconnects by
+/// reconnecting from the last byte offset (no gaps, no duplicates). close() to stop.
+class SessionWatch {
+  final Api _api;
+  final String sessionId;
+  final void Function(String role, String text) onTurn;
+  int _offset;
+  http.Client? _client;
+  bool _closed = false;
+
+  SessionWatch(this._api, this.sessionId, this._offset, this.onTurn) {
+    _connect();
+  }
+
+  void _connect() {
+    if (_closed) return;
+    final client = http.Client();
+    _client = client;
+    final req = http.Request('GET',
+        _api._u('/api/session-watch?sessionId=$sessionId&since=$_offset'));
+    req.headers.addAll(_api._headers());
+    client.send(req).then((resp) {
+      if (_closed) {
+        client.close();
+        return;
+      }
+      var buf = '';
+      resp.stream.transform(utf8.decoder).listen((chunk) {
+        buf += chunk;
+        int nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          final line = buf.substring(0, nl);
+          buf = buf.substring(nl + 1);
+          if (line.trim().isEmpty) continue;
+          try {
+            final o = jsonDecode(line) as Map<String, dynamic>;
+            if (o['offset'] is num) _offset = (o['offset'] as num).toInt();
+            if (o['type'] == 'turn') {
+              onTurn((o['role'] ?? '') as String, (o['text'] ?? '') as String);
+            }
+          } catch (_) {}
+        }
+      }, onError: (_) => _retry(), onDone: _retry, cancelOnError: true);
+    }).catchError((_) {
+      _retry();
+    });
+  }
+
+  void _retry() {
+    if (_closed) return;
+    try {
+      _client?.close();
+    } catch (_) {}
+    Future.delayed(const Duration(milliseconds: 1500), _connect);
+  }
+
+  void close() {
+    _closed = true;
+    try {
+      _client?.close();
+    } catch (_) {}
   }
 }

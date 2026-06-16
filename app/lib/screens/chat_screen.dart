@@ -9,7 +9,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
-import 'package:http/http.dart' as http;
 
 import '../api.dart';
 import '../models.dart';
@@ -42,7 +41,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
   bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
-  http.Client? _watch; // live transcript watch for tmux (full) sessions (#141)
+  SessionWatch? _watch; // self-reconnecting live transcript watch (#141)
   bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
