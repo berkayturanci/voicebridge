@@ -463,15 +463,15 @@ function turnFromTranscriptLine(line) {
 // the bound claudeSessionId, else the most-recently-written file in the dir.
 function resolveJsonlPath(session) {
   if (session.tmuxJsonl && fs.existsSync(session.tmuxJsonl)) return session.tmuxJsonl;
-  const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
   if (session.claudeSessionId) {
+    const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
     const p = path.join(dir, session.claudeSessionId + ".jsonl");
     if (fs.existsSync(p)) return p;
   }
-  const files = safeListJsonl(dir);
-  if (!files.length) return null;
-  files.sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs);
-  return path.join(dir, files[0]);
+  // Not bound yet (e.g. a brand-new session before its first turn). Do NOT fall
+  // back to the newest file in the dir — that's a DIFFERENT session's transcript
+  // and would show the previous conversation. Empty until the first turn binds it.
+  return null;
 }
 
 function readTranscriptTurns(jsonlPath, limit = 200) {
