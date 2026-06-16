@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart'; // defaultTargetPlatform / TargetPlatform
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // SystemSound + HapticFeedback (earcons)
 import 'package:flutter_tts/flutter_tts.dart';
