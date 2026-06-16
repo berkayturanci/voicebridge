@@ -478,6 +478,35 @@ function readTranscriptTurns(jsonlPath, limit = 200) {
   return { turns: turns.slice(-limit), size: Buffer.byteLength(raw, "utf8") };
 }
 
+function readFileTail(p, bytes) {
+  try {
+    const st = fs.statSync(p);
+    const start = Math.max(0, st.size - bytes);
+    const fd = fs.openSync(p, "r");
+    const buf = Buffer.alloc(st.size - start);
+    fs.readSync(fd, buf, 0, buf.length, start);
+    fs.closeSync(fd);
+    return buf.toString("utf8");
+  } catch (_) { return ""; }
+}
+
+// Identify a tmux session's transcript .jsonl by content: the file whose recent
+// tail contains the just-sent user input. Robust even when many .jsonl share the
+// project dir (worktrees, other sessions) — unlike "newest file". (#141 fix)
+function findJsonlByContent(projectDir, needle) {
+  needle = (needle || "").trim();
+  if (needle.length < 6) return null;
+  const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(projectDir));
+  const files = safeListJsonl(dir)
+    .map((f) => ({ f, m: (() => { try { return fs.statSync(path.join(dir, f)).mtimeMs; } catch (_) { return 0; } })() }))
+    .sort((a, b) => b.m - a.m)
+    .slice(0, 12);
+  for (const { f } of files) {
+    if (readFileTail(path.join(dir, f), 131072).includes(needle)) return path.join(dir, f);
+  }
+  return null;
+}
+
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
 function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId } = {}) {
@@ -846,27 +875,15 @@ async function ensureTmuxClaude(session) {
   const name = tmuxName(session.id);
   if (await tmuxHas(name)) return name;
   // DEFAULT mode (claude is already in auto mode); no --dangerously-skip-permissions.
-  const projDir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
-  const before = new Set(safeListJsonl(projDir));
   // Resume the bound transcript if we have one (after a kill/idle/restart) so the
-  // conversation context survives; else start fresh. (#cleanup)
+  // conversation context survives; else start fresh. The .jsonl is identified by
+  // content after the first turn (spawn-time detection is unreliable). (#cleanup)
   const launch = session.claudeSessionId ? ("claude --resume " + session.claudeSessionId) : "claude";
   await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, launch]);
   for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
     await sleepMs(500);
     if (/Claude Code v|❯/.test(await tmuxCapture(name))) { await sleepMs(900); break; }
   }
-  // Capture this session's transcript .jsonl (the file that appeared) for live
-  // sync (#141) — so turns from any source can be tailed back to the clients.
-  try {
-    const fresh = safeListJsonl(projDir).filter((f) => !before.has(f));
-    if (fresh.length) {
-      fresh.sort((a, b) => fs.statSync(path.join(projDir, b)).mtimeMs - fs.statSync(path.join(projDir, a)).mtimeMs);
-      session.tmuxJsonl = path.join(projDir, fresh[0]);
-      session.claudeSessionId = fresh[0].replace(/\.jsonl$/, "");
-      saveSessions();
-    }
-  } catch (_) {}
   return name;
 }
 
@@ -927,19 +944,15 @@ async function streamTmux(session, prompt, res, emit) {
   const reply = extractTuiReply(await tmuxCapture(name, -250), text);
   emit({ type: "delta", text: reply || "(yanıt yakalanamadı — Mac'te `tmux attach` ile bakabilirsin)" });
   session.started = true;
-  // After a turn the .jsonl definitely exists; capture it (spawn-time detection
-  // can miss it before the first message) so resume/sync/handoff have the id.
+  // Bind the transcript .jsonl by content — the file containing this turn's input
+  // (reliable even with many .jsonl in the dir). Needed for sync/resume/handoff.
   if (!session.claudeSessionId) {
-    try {
-      const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
-      const files = safeListJsonl(dir);
-      if (files.length) {
-        files.sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs);
-        session.tmuxJsonl = path.join(dir, files[0]);
-        session.claudeSessionId = files[0].replace(/\.jsonl$/, "");
-        saveSessions();
-      }
-    } catch (_) {}
+    const jp = findJsonlByContent(session.projectDir, String(prompt || "").slice(0, 80));
+    if (jp) {
+      session.tmuxJsonl = jp;
+      session.claudeSessionId = path.basename(jp).replace(/\.jsonl$/, "");
+      saveSessions();
+    }
   }
   if (TMUX_IDLE_MS > 0) tmuxIdleTimers.set(session.id, setTimeout(() => killTmux(session.id), TMUX_IDLE_MS));
   emit({ type: "done" });
