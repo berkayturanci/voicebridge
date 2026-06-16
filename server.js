@@ -1312,9 +1312,15 @@ function handleRequest(req, res) {
 
     if (req.method === "DELETE" && urlPath.startsWith("/api/sessions/")) {
       const id = urlPath.slice("/api/sessions/".length);
-      if (id === defaultSessionId) return sendJson(res, 400, { error: "Cannot delete the default session" });
       const existed = sessions.delete(id);
-      if (existed) { killTmux(id); killLive(id); saveSessions(); } // tear down any live/tmux backing process
+      if (existed) {
+        killTmux(id); killLive(id); // tear down any live/tmux backing process
+        if (id === defaultSessionId) { // default is deletable: hand it to any remaining session
+          const next = sessions.keys().next();
+          defaultSessionId = next.done ? null : next.value;
+        }
+        saveSessions();
+      }
       return sendJson(res, existed ? 200 : 404, existed ? { ok: true } : { error: "Not found" });
     }
 
@@ -1662,8 +1668,11 @@ function start() {
   }
   loadSessions(); // restore persisted sessions
   if (!defaultSessionId || !sessions.has(defaultSessionId)) {
-    const boot = createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR });
-    defaultSessionId = boot.id;
+    // Adopt an existing session as default; only create the "default" one when
+    // there are none — so a deleted default doesn't keep coming back. (#default)
+    defaultSessionId = sessions.size
+      ? sessions.keys().next().value
+      : createSession({ name: "default", agent: DEFAULT_AGENT, projectDir: DEFAULT_PROJECT_DIR }).id;
     saveSessions();
   }
   const boot = sessions.get(defaultSessionId);

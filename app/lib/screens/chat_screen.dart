@@ -43,6 +43,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
   SessionWatch? _watch; // self-reconnecting live transcript watch (#141)
   final List<String> _sentEcho = []; // optimistic sends awaiting their watch echo
+  bool _waitingReply = false; // show "claude yazıyor…" until the reply arrives
   bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
@@ -163,8 +164,10 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
     }
-    setState(() =>
-        _messages.add(Message(role == 'assistant' ? 'claude' : 'me', text)));
+    setState(() {
+      _messages.add(Message(role == 'assistant' ? 'claude' : 'me', text));
+      if (role == 'assistant') _waitingReply = false; // reply arrived
+    });
     _toBottom();
     if (role == 'assistant' && _talking) _speak(text, summarize: true);
   }
@@ -175,7 +178,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendTmux(String text) async {
     _tts.stop();
     _input.clear();
-    setState(() => _messages.add(Message('me', text))); // show it instantly
+    setState(() {
+      _messages.add(Message('me', text)); // show it instantly
+      _waitingReply = true; // "claude yazıyor…" until the reply lands
+    });
     _sentEcho.add(text);
     _toBottom();
     try {
@@ -957,11 +963,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? _emptyChat()
                 : Builder(builder: (_) {
                     final rows = _rows();
+                    final extra = _waitingReply ? 1 : 0;
                     return ListView.builder(
                       controller: _scroll,
                       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                      itemCount: rows.length,
+                      itemCount: rows.length + extra,
                       itemBuilder: (_, i) {
+                        if (i >= rows.length) return _typingIndicator();
                         final r = rows[i];
                         return r is List<Message>
                             ? _ActivityGroup(items: r)
@@ -1105,6 +1113,28 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (run != null) rows.add(run);
     return rows;
+  }
+
+  Widget _typingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: VbColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: VbColors.border),
+          ),
+          child: Text('claude yazıyor…',
+              style: TextStyle(
+                  fontSize: 13.5,
+                  color: VbColors.textMuted,
+                  fontStyle: FontStyle.italic)),
+        ),
+      ),
+    );
   }
 
   Widget _bubble(Message m) {
