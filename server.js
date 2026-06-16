@@ -431,6 +431,53 @@ function listClaudeSessions(projectDir, limit = 40) {
   return out.slice(0, limit);
 }
 
+// --- Live transcript sync (#141) ------------------------------------------
+// Tail a session's .jsonl so every new turn — typed from the app, the local
+// CLI, Remote Control, or another client — reaches all connected clients.
+function safeListJsonl(dir) {
+  try { return fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")); } catch (_) { return []; }
+}
+
+// One transcript line -> {role:'user'|'assistant', text} or null (skip meta,
+// tool-only, and system-injected lines).
+function turnFromTranscriptLine(line) {
+  let o; try { o = JSON.parse(line); } catch (_) { return null; }
+  if (o.isMeta || o.isSidechain) return null;
+  if (o.type !== "user" && o.type !== "assistant") return null;
+  const m = o.message; if (!m) return null;
+  const c = m.content;
+  let text = "";
+  if (typeof c === "string") text = c;
+  else if (Array.isArray(c)) {
+    text = c.filter((b) => b && b.type === "text" && typeof b.text === "string").map((b) => b.text).join("");
+  }
+  text = (text || "").trim();
+  if (!text || text.startsWith("<") || text.startsWith("Caveat:")) return null;
+  return { role: o.type, text };
+}
+
+// The .jsonl path backing a session: the tmux transcript captured at spawn, else
+// the bound claudeSessionId, else the most-recently-written file in the dir.
+function resolveJsonlPath(session) {
+  if (session.tmuxJsonl && fs.existsSync(session.tmuxJsonl)) return session.tmuxJsonl;
+  const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
+  if (session.claudeSessionId) {
+    const p = path.join(dir, session.claudeSessionId + ".jsonl");
+    if (fs.existsSync(p)) return p;
+  }
+  const files = safeListJsonl(dir);
+  if (!files.length) return null;
+  files.sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs);
+  return path.join(dir, files[0]);
+}
+
+function readTranscriptTurns(jsonlPath, limit = 200) {
+  let raw; try { raw = fs.readFileSync(jsonlPath, "utf8"); } catch (_) { return { turns: [], size: 0 }; }
+  const turns = [];
+  for (const line of raw.split("\n")) { if (!line.trim()) continue; const t = turnFromTranscriptLine(line); if (t) turns.push(t); }
+  return { turns: turns.slice(-limit), size: Buffer.byteLength(raw, "utf8") };
+}
+
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
 function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId } = {}) {
@@ -799,11 +846,24 @@ async function ensureTmuxClaude(session) {
   const name = tmuxName(session.id);
   if (await tmuxHas(name)) return name;
   // DEFAULT mode (claude is already in auto mode); no --dangerously-skip-permissions.
+  const projDir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
+  const before = new Set(safeListJsonl(projDir));
   await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, "claude"]);
   for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
     await sleepMs(500);
     if (/Claude Code v|❯/.test(await tmuxCapture(name))) { await sleepMs(900); break; }
   }
+  // Capture this session's transcript .jsonl (the file that appeared) for live
+  // sync (#141) — so turns from any source can be tailed back to the clients.
+  try {
+    const fresh = safeListJsonl(projDir).filter((f) => !before.has(f));
+    if (fresh.length) {
+      fresh.sort((a, b) => fs.statSync(path.join(projDir, b)).mtimeMs - fs.statSync(path.join(projDir, a)).mtimeMs);
+      session.tmuxJsonl = path.join(projDir, fresh[0]);
+      session.claudeSessionId = fresh[0].replace(/\.jsonl$/, "");
+      saveSessions();
+    }
+  } catch (_) {}
   return name;
 }
 
@@ -1369,6 +1429,62 @@ function handleRequest(req, res) {
           "Claude mobil uygulamasında bu oturuma bağlan",
         ],
       }));
+    }
+
+    // Live transcript (#141). Full history of a session's .jsonl as {role,text}
+    // turns + the byte offset to resume a watch from.
+    if (req.method === "GET" && urlPath === "/api/session-history") {
+      const q = new URL(req.url, "http://x").searchParams;
+      const session = resolveSession(q.get("sessionId"));
+      if (!session) return sendJson(res, 404, { error: "Unknown session" });
+      const jsonl = resolveJsonlPath(session);
+      if (!jsonl) return sendJson(res, 200, { turns: [], size: 0 });
+      return sendJson(res, 200, readTranscriptTurns(jsonl));
+    }
+
+    // Live watch (#141): tail the session's .jsonl and stream every new turn
+    // (from any client/CLI/Remote Control) as NDJSON {type:"turn",role,text}.
+    if (req.method === "GET" && urlPath === "/api/session-watch") {
+      const q = new URL(req.url, "http://x").searchParams;
+      const session = resolveSession(q.get("sessionId"));
+      if (!session) return sendJson(res, 404, { error: "Unknown session" });
+      const jsonl = resolveJsonlPath(session);
+      if (!jsonl) return sendJson(res, 404, { error: "Bu oturum için transcript yok." });
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no",
+      });
+      let offset = Number(q.get("since"));
+      if (!Number.isFinite(offset) || offset < 0) { try { offset = fs.statSync(jsonl).size; } catch (_) { offset = 0; } }
+      let carry = "", closed = false;
+      const write = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
+      write({ type: "ready", offset });
+      const tick = () => {
+        if (closed) return;
+        let size; try { size = fs.statSync(jsonl).size; } catch (_) { return; }
+        if (size < offset) { offset = 0; carry = ""; } // rotated/truncated
+        if (size <= offset) return;
+        let chunk = "";
+        try {
+          const fd = fs.openSync(jsonl, "r");
+          const buf = Buffer.alloc(size - offset);
+          fs.readSync(fd, buf, 0, buf.length, offset);
+          fs.closeSync(fd);
+          chunk = buf.toString("utf8");
+        } catch (_) { return; }
+        offset = size; carry += chunk;
+        let nl;
+        while ((nl = carry.indexOf("\n")) >= 0) {
+          const line = carry.slice(0, nl); carry = carry.slice(nl + 1);
+          const t = turnFromTranscriptLine(line);
+          if (t) write({ type: "turn", role: t.role, text: t.text });
+        }
+      };
+      const timer = setInterval(tick, 1000);
+      const beat = setInterval(() => write({ type: "ping" }), 25000);
+      const stop = () => { if (closed) return; closed = true; clearInterval(timer); clearInterval(beat); try { res.end(); } catch (_) {} };
+      req.on("close", stop); res.on("close", stop); res.on("error", stop);
+      return;
     }
 
     // List locally-available Ollama models (proxies /api/tags).
