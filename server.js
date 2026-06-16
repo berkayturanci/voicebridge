@@ -848,7 +848,10 @@ async function ensureTmuxClaude(session) {
   // DEFAULT mode (claude is already in auto mode); no --dangerously-skip-permissions.
   const projDir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
   const before = new Set(safeListJsonl(projDir));
-  await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, "claude"]);
+  // Resume the bound transcript if we have one (after a kill/idle/restart) so the
+  // conversation context survives; else start fresh. (#cleanup)
+  const launch = session.claudeSessionId ? ("claude --resume " + session.claudeSessionId) : "claude";
+  await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, launch]);
   for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
     await sleepMs(500);
     if (/Claude Code v|❯/.test(await tmuxCapture(name))) { await sleepMs(900); break; }
@@ -924,6 +927,20 @@ async function streamTmux(session, prompt, res, emit) {
   const reply = extractTuiReply(await tmuxCapture(name, -250), text);
   emit({ type: "delta", text: reply || "(yanıt yakalanamadı — Mac'te `tmux attach` ile bakabilirsin)" });
   session.started = true;
+  // After a turn the .jsonl definitely exists; capture it (spawn-time detection
+  // can miss it before the first message) so resume/sync/handoff have the id.
+  if (!session.claudeSessionId) {
+    try {
+      const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
+      const files = safeListJsonl(dir);
+      if (files.length) {
+        files.sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs);
+        session.tmuxJsonl = path.join(dir, files[0]);
+        session.claudeSessionId = files[0].replace(/\.jsonl$/, "");
+        saveSessions();
+      }
+    } catch (_) {}
+  }
   if (TMUX_IDLE_MS > 0) tmuxIdleTimers.set(session.id, setTimeout(() => killTmux(session.id), TMUX_IDLE_MS));
   emit({ type: "done" });
   res.end();

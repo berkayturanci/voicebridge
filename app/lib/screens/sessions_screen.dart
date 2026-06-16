@@ -16,7 +16,8 @@ class SessionsScreen extends StatefulWidget {
   State<SessionsScreen> createState() => _SessionsScreenState();
 }
 
-class _SessionsScreenState extends State<SessionsScreen> {
+class _SessionsScreenState extends State<SessionsScreen>
+    with WidgetsBindingObserver {
   late final Api _api = Api(widget.settings);
   List<Session> _sessions = [];
   List<dynamic> _agents = [];
@@ -26,7 +27,21 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Cross-delete: refresh when the app returns, so a session deleted on
+    // another client (its tmux already killed) disappears here too.
+    if (state == AppLifecycleState.resumed) _refresh();
   }
 
   Future<void> _refresh() async {
