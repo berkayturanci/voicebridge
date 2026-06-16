@@ -739,9 +739,13 @@ class _ChatScreenState extends State<ChatScreen> {
             },
             child: const Text('Komutu kopyala'),
           ),
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam')),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _send('/remote-control'); // start Remote Control from the phone
+            },
+            child: const Text('Remote Control başlat'),
+          ),
         ],
       ),
     );
