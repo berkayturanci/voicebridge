@@ -33,6 +33,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final SpeechToText _stt = SpeechToText();
   final FlutterTts _tts = FlutterTts();
+  final AudioPlayer _player = AudioPlayer(); // bridge (Piper) neural TTS playback
+  bool _bridgeVoice = false; // play replies via the bridge voice instead of on-device
   bool _sttReady = false;
 
   bool _busy = false;
@@ -118,8 +120,27 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _loadModes();
     SharedPreferences.getInstance().then((p) {
-      if (mounted) setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
+      if (mounted) {
+        setState(() {
+          _hideActivity = p.getBool('vb_hide_activity') ?? false;
+          _bridgeVoice = p.getBool(_bridgeVoiceKey) ?? false;
+        });
+      }
     });
+    // Route bridge (Piper) audio like the TTS: playback + duck music for CarPlay.
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      _player.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const {
+            AVAudioSessionOptions.mixWithOthers,
+            AVAudioSessionOptions.duckOthers,
+            AVAudioSessionOptions.allowBluetoothA2DP,
+            AVAudioSessionOptions.allowAirPlay,
+          },
+        ),
+      ));
+    }
   }
 
   Future<void> _toggleHideActivity() async {
@@ -177,6 +198,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // never freezes the app, and you can answer it ("y"/"1"/…) right away.
   Future<void> _sendTmux(String text) async {
     _tts.stop();
+    _player.stop();
     _input.clear();
     setState(() {
       _messages.add(Message('me', text)); // show it instantly
@@ -201,6 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Voices), so this keeps the hands-free car/CarPlay path network-free.
   // Persisted TTS voice name chosen in the picker (#125).
   static const _voiceKey = 'vb_tts_voice';
+  static const _bridgeVoiceKey = 'vb_bridge_voice';
 
   // Installed tr-TR voices, best-quality first (premium > enhanced > compact).
   Future<List<Map<String, String>>> _turkishVoices() async {
@@ -381,6 +404,7 @@ class _ChatScreenState extends State<ChatScreen> {
     WakelockPlus.disable();
     _stt.cancel();
     _tts.stop();
+    _player.dispose();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -513,6 +537,18 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _speak(String text, {bool summarize = false}) async {
     final clean = _forSpeech(text, summarize: summarize);
     if (clean.isEmpty) return;
+    if (_bridgeVoice) {
+      try {
+        final bytes = await _api.ttsAudio(clean);
+        try { await _stt.stop(); } catch (_) {}
+        await _player.stop();
+        await _player.play(BytesSource(bytes));
+        await _player.onPlayerComplete.first; // wait until playback finishes
+        return;
+      } catch (_) {
+        // bridge offline / TTS failed → fall back to the on-device voice
+      }
+    }
     // The audio session is configured ONCE in initState and kept alive by
     // mixWithOthers, so we do NOT stop()/re-assert the category/sleep before every
     // utterance — that churn is what made speech choppy. Just release the mic so it
@@ -581,6 +617,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_isTmux) return _sendTmux(text); // full sessions render via the watch
     if (_busy) return;
     _tts.stop(); // barge-in: a new message interrupts any ongoing spoken readout
+    _player.stop();
     _input.clear();
     final me = Message('me', text);
     final reply = Message('claude', '');
@@ -681,6 +718,11 @@ class _ChatScreenState extends State<ChatScreen> {
         isTmux: widget.session.runner == 'tmux',
       ),
     );
+    // The bridge-voice switch persists itself inside the sheet; refresh our copy.
+    final p = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _bridgeVoice = p.getBool(_bridgeVoiceKey) ?? false);
+    }
     if (result == null) return;
     if (result['action'] == 'attach') {
       await _attachClaudeSession();
@@ -1930,6 +1972,15 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
   late final TextEditingController _nameCtl =
       TextEditingController(text: widget.currentName);
   late String _mode = widget.currentMode;
+  bool _bridgeVoice = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _bridgeVoice = p.getBool('vb_bridge_voice') ?? false);
+    });
+  }
 
   @override
   void dispose() {
@@ -2209,6 +2260,24 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _bridgeVoice,
+                  onChanged: (v) async {
+                    setState(() => _bridgeVoice = v);
+                    final p = await SharedPreferences.getInstance();
+                    await p.setBool('vb_bridge_voice', v);
+                  },
+                  title: Text('Köprü sesi (Piper)',
+                      style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: VbColors.textPrimary)),
+                  subtitle: Text("Mac üzerinden nöral ses; offline'da cihaz sesi",
+                      style: TextStyle(
+                          fontSize: 11.5, color: VbColors.textMuted)),
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
