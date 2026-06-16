@@ -877,11 +877,17 @@ function killTmux(sessionId) {
 async function ensureTmuxClaude(session) {
   const name = tmuxName(session.id);
   if (await tmuxHas(name)) return name;
-  // DEFAULT mode (claude is already in auto mode); no --dangerously-skip-permissions.
-  // Resume the bound transcript if we have one (after a kill/idle/restart) so the
-  // conversation context survives; else start fresh. The .jsonl is identified by
-  // content after the first turn (spawn-time detection is unreliable). (#cleanup)
-  const launch = session.claudeSessionId ? ("claude --resume " + session.claudeSessionId) : "claude";
+  // Deterministic transcript: give claude an explicit --session-id so we KNOW its
+  // .jsonl path (no content-match guessing). Resume that same id after a
+  // kill/idle/restart so context survives. DEFAULT mode (claude is in auto mode);
+  // no --dangerously-skip-permissions.
+  if (!session.claudeSessionId) session.claudeSessionId = crypto.randomUUID();
+  const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
+  session.tmuxJsonl = path.join(dir, session.claudeSessionId + ".jsonl");
+  saveSessions();
+  const launch = fs.existsSync(session.tmuxJsonl)
+    ? ("claude --resume " + session.claudeSessionId)
+    : ("claude --session-id " + session.claudeSessionId);
   await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, launch]);
   for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
     await sleepMs(500);
