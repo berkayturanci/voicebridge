@@ -1420,15 +1420,51 @@ function handleRequest(req, res) {
       if (!session) return sendJson(res, 404, { error: "Unknown session" });
       if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) modunda değil." });
       const name = tmuxName(session.id);
-      return tmuxHas(name).then((running) => sendJson(res, 200, {
-        name, running,
-        attachCmd: "tmux attach -t " + name,
-        remoteControlSteps: [
-          "Mac terminalinde: tmux attach -t " + name,
-          "Açılan claude oturumunda: /remote-control",
-          "Claude mobil uygulamasında bu oturuma bağlan",
-        ],
-      }));
+      return tmuxHas(name).then(async (running) => {
+        let rcActive = false;
+        if (running) { try { rcActive = /\/rc active/.test(await tmuxCapture(name)); } catch (_) {} }
+        sendJson(res, 200, {
+          name, running, rcActive,
+          attachCmd: "tmux attach -t " + name,
+          remoteControlSteps: [
+            "Mac terminalinde: tmux attach -t " + name,
+            "Açılan claude oturumunda: /remote-control",
+            "Claude mobil uygulamasında bu oturuma bağlan",
+          ],
+        });
+      });
+    }
+
+    // Toggle Remote Control on a full (tmux) session from the app (#rc). start
+    // sends /remote-control; stop opens the menu and navigates to "Disconnect
+    // this session" (no dedicated stop command exists yet).
+    if (req.method === "POST" && urlPath === "/api/tmux-rc") {
+      return readBody(req, 4 * 1024, async (e, body) => {
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        const session = resolveSession(data.sessionId);
+        if (!session) return sendJson(res, 404, { error: "Unknown session" });
+        if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) değil." });
+        const name = tmuxName(session.id);
+        if (!(await tmuxHas(name))) return sendJson(res, 400, { error: "tmux oturumu çalışmıyor." });
+        const stop = data.action === "stop";
+        await tmuxRun(["send-keys", "-t", name, "-l", "/remote-control"]);
+        await sleepMs(150);
+        await tmuxRun(["send-keys", "-t", name, "Enter"]);
+        if (!stop) return sendJson(res, 200, { ok: true, action: "start" });
+        // stop: navigate the disconnect menu (selection starts on "Continue").
+        await sleepMs(2600);
+        const lines = (await tmuxCapture(name)).split("\n");
+        const disc = lines.findIndex((l) => /Disconnect this session/i.test(l));
+        let sel = -1;
+        for (let i = lines.length - 1; i >= 0; i--) { if (/^\s*❯\s+\S/.test(lines[i])) { sel = i; break; } }
+        if (disc >= 0 && sel > disc) {
+          for (let i = 0; i < sel - disc; i++) { await tmuxRun(["send-keys", "-t", name, "Up"]); await sleepMs(120); }
+          await tmuxRun(["send-keys", "-t", name, "Enter"]);
+          return sendJson(res, 200, { ok: true, action: "stop" });
+        }
+        await tmuxRun(["send-keys", "-t", name, "Escape"]); // bail out cleanly
+        return sendJson(res, 200, { ok: false, action: "stop", note: "Disconnect menüsü bulunamadı; Mac'te /remote-control ile kapatabilirsin." });
+      });
     }
 
     // Live transcript (#141). Full history of a session's .jsonl as {role,text}
