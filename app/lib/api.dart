@@ -56,6 +56,17 @@ class Api {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// GET /api/tmux-attach — full (tmux) session: returns {attachCmd, name,
+  /// running, remoteControlSteps} for reaching it on the Mac / Claude app.
+  Future<Map<String, dynamic>> tmuxAttach(String sessionId) async {
+    final r = await http.get(_u('/api/tmux-attach?sessionId=$sessionId'),
+        headers: _headers());
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Attach bilgisi alınamadı (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   /// GET /api/sessions
   Future<List<Session>> sessions() async {
     final r = await http.get(_u('/api/sessions'), headers: _headers());

@@ -595,6 +595,7 @@ class _ChatScreenState extends State<ChatScreen> {
         currentMode: _mode,
         canAttach:
             widget.session.agent == 'claude' && widget.session.runner == 'local',
+        isTmux: widget.session.runner == 'tmux',
       ),
     );
     if (result == null) return;
@@ -604,6 +605,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (result['action'] == 'voice') {
       await _pickVoice();
+      return;
+    }
+    if (result['action'] == 'tmux-attach') {
+      await _showTmuxAttach();
       return;
     }
     final newName = result['name'];
@@ -669,6 +674,70 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       _toast('Bağlanamadı: ${e.toString().replaceFirst('Exception: ', '')}');
     }
+  }
+
+  // Tat Y: show how to reach a full (tmux) session live on the Mac and from the
+  // Claude app via /remote-control.
+  Future<void> _showTmuxAttach() async {
+    Map<String, dynamic> info;
+    try {
+      info = await _api.tmuxAttach(widget.session.id);
+    } catch (e) {
+      _toast('Alınamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      return;
+    }
+    if (!mounted) return;
+    final cmd = (info['attachCmd'] as String?) ?? '';
+    final steps = (info['remoteControlSteps'] as List?)?.cast<String>() ?? const [];
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: VbColors.surface,
+        title: const Text("Mac'te aç / Claude app"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Mac terminalinde bu oturuma canlı gir:',
+                style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: VbColors.surfaceHigh,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: VbColors.border),
+              ),
+              child: SelectableText(cmd,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+            ),
+            const SizedBox(height: 14),
+            Text('Claude uygulamasından erişmek için:',
+                style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 6),
+            for (var i = 0; i < steps.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('${i + 1}. ${steps[i]}',
+                    style: TextStyle(color: VbColors.textPrimary, fontSize: 13)),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: cmd));
+              _toast('Komut kopyalandı');
+            },
+            child: const Text('Komutu kopyala'),
+          ),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam')),
+        ],
+      ),
+    );
   }
 
   void _toast(String m) =>
@@ -1702,11 +1771,13 @@ class _SessionSettingsSheet extends StatefulWidget {
   final List<Map<String, dynamic>> modes;
   final String currentMode;
   final bool canAttach;
+  final bool isTmux;
   const _SessionSettingsSheet({
     required this.currentName,
     required this.modes,
     required this.currentMode,
     this.canAttach = false,
+    this.isTmux = false,
   });
 
   @override
@@ -1900,6 +1971,51 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                                     fontWeight: FontWeight.w600,
                                     color: VbColors.textPrimary),
                               ),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                color: VbColors.textMuted),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (widget.isTmux) ...[
+                  SizedBox(height: 18),
+                  Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    child: Text('TAM OTURUM',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: VbColors.textMuted)),
+                  ),
+                  Material(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(
+                          context, <String, String>{'action': 'tmux-attach'}),
+                      child: Container(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: VbColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.terminal_rounded,
+                                size: 22, color: VbColors.accent),
+                            SizedBox(width: 13),
+                            Expanded(
+                              child: Text("Mac'te aç / Claude app'ten eriş",
+                                  style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: VbColors.textPrimary)),
                             ),
                             Icon(Icons.chevron_right_rounded,
                                 color: VbColors.textMuted),

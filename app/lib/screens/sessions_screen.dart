@@ -401,6 +401,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   String? _mode;
   String _projectDir = '';
   bool _busy = false;
+  bool _fullSession = false; // Tat Y: run a full interactive claude in tmux
 
   List<dynamic> get _modes {
     final a = widget.agents.firstWhere((e) => e['id'] == _agent,
@@ -434,6 +435,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         agent: _agent ?? 'claude',
         mode: _mode ?? '',
         projectDir: _projectDir.isEmpty ? null : _projectDir,
+        runner: (_fullSession && (_agent ?? 'claude') == 'claude') ? 'tmux' : 'local',
       );
       if (mounted) Navigator.pop(context, s);
     } catch (e) {
@@ -550,6 +552,48 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                 ),
               ),
             ),
+            if ((_agent ?? 'claude') == 'claude') ...[
+              const SizedBox(height: 16),
+              Material(
+                color: VbColors.surfaceHigh,
+                borderRadius: BorderRadius.circular(VbRadius.field),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(VbRadius.field),
+                  onTap: () => setState(() => _fullSession = !_fullSession),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.terminal_rounded,
+                            size: 20, color: VbColors.accent),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Tam oturum (tmux)',
+                                  style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: VbColors.textPrimary)),
+                              const SizedBox(height: 2),
+                              Text("Mac'ten de gir, /remote-control çalışır",
+                                  style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: VbColors.textMuted)),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                            value: _fullSession,
+                            onChanged: (v) =>
+                                setState(() => _fullSession = v)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _busy ? null : _submit,
