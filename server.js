@@ -451,7 +451,10 @@ function turnFromTranscriptLine(line) {
   else if (Array.isArray(c)) {
     text = c.filter((b) => b && b.type === "text" && typeof b.text === "string").map((b) => b.text).join("");
   }
-  text = (text || "").trim();
+  // Strip the metadata Remote Control appends to messages (e.g.
+  // "<system-reminder>Message sent at …</system-reminder>") so it doesn't show
+  // as noise in voicebridge. The CLI shows the raw message (Anthropic's).
+  text = (text || "").replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
   if (!text || text.startsWith("<") || text.startsWith("Caveat:")) return null;
   return { role: o.type, text };
 }
