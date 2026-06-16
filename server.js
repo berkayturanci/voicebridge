@@ -1157,6 +1157,38 @@ function handleRequest(req, res) {
       });
     }
 
+    // Neural TTS via Piper. POST {text} -> audio/wav. Opt-in from the app so the
+    // phone can use a Mac-side neural voice instead of on-device flutter_tts.
+    // Configurable via PIPER_BIN / PIPER_VOICE / PIPER_DATA_DIR.
+    if (req.method === "POST" && urlPath === "/api/tts") {
+      return readBody(req, 64 * 1024, (e, body) => {
+        if (e) return sendJson(res, 400, { error: "Bad request" });
+        let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
+        const text = (typeof data.text === "string" ? data.text : "").trim();
+        if (!text) return sendJson(res, 400, { error: "Empty text" });
+        const bin = process.env.PIPER_BIN || path.join(os.homedir(), ".local/bin/piper");
+        const model = process.env.PIPER_VOICE || "tr_TR-dfki-medium";
+        const dataDir = process.env.PIPER_DATA_DIR || path.join(os.homedir(), ".local/share/piper-voices");
+        const tmp = path.join(os.tmpdir(), "vb-tts-" + crypto.randomBytes(6).toString("hex") + ".wav");
+        let child;
+        try { child = spawn(bin, ["-m", model, "--data-dir", dataDir, "-f", tmp], { env: process.env }); }
+        catch (ee) { return sendJson(res, 500, { error: "piper spawn: " + ee.message }); }
+        let err = "";
+        child.stderr.on("data", (d) => (err += d.toString()));
+        child.on("error", (ee) => { try { fs.unlinkSync(tmp); } catch (_) {} sendJson(res, 500, { error: "piper: " + ee.message }); });
+        child.on("close", (code) => {
+          if (code !== 0) { try { fs.unlinkSync(tmp); } catch (_) {} return sendJson(res, 500, { error: err.trim().slice(0, 300) || ("piper exit " + code) }); }
+          fs.readFile(tmp, (re, buf) => {
+            fs.unlink(tmp, () => {});
+            if (re || !buf || !buf.length) return sendJson(res, 500, { error: "tts produced no audio" });
+            res.writeHead(200, { "Content-Type": "audio/wav", "Content-Length": buf.length });
+            res.end(buf);
+          });
+        });
+        try { child.stdin.write(text); child.stdin.end(); } catch (_) {}
+      });
+    }
+
     if (req.method === "POST" && urlPath === "/api/stt") {
       return readBody(req, 12 * 1024 * 1024, (e, body) => {
         if (e || !body || !body.length) return sendJson(res, 400, { error: "No audio" });
