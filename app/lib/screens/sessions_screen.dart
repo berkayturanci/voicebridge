@@ -16,7 +16,8 @@ class SessionsScreen extends StatefulWidget {
   State<SessionsScreen> createState() => _SessionsScreenState();
 }
 
-class _SessionsScreenState extends State<SessionsScreen> {
+class _SessionsScreenState extends State<SessionsScreen>
+    with WidgetsBindingObserver {
   late final Api _api = Api(widget.settings);
   List<Session> _sessions = [];
   List<dynamic> _agents = [];
@@ -26,7 +27,21 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Cross-delete: refresh when the app returns, so a session deleted on
+    // another client (its tmux already killed) disappears here too.
+    if (state == AppLifecycleState.resumed) _refresh();
   }
 
   Future<void> _refresh() async {
@@ -102,7 +117,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
               height: 30,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(9),
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [VbColors.accentBright, VbColors.accentDim],
@@ -190,7 +205,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 22),
-        child: const Icon(Icons.delete_outline, color: VbColors.danger),
+        child: Icon(Icons.delete_outline, color: VbColors.danger),
       ),
       confirmDismiss: (_) async {
         await _delete(s);
@@ -243,7 +258,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                         s.name.isEmpty ? 'İsimsiz oturum' : s.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: VbColors.textPrimary,
@@ -270,7 +285,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: VbColors.textMuted),
+                Icon(Icons.chevron_right, color: VbColors.textMuted),
               ],
             ),
           ),
@@ -364,7 +379,7 @@ class _StateView extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: VbColors.textPrimary,
@@ -374,7 +389,7 @@ class _StateView extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: VbColors.textMuted, height: 1.4),
+          style: TextStyle(fontSize: 14, color: VbColors.textMuted, height: 1.4),
         ),
         const SizedBox(height: 24),
         Center(
@@ -401,6 +416,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   String? _mode;
   String _projectDir = '';
   bool _busy = false;
+  bool _fullSession = false; // Tat Y: run a full interactive claude in tmux
 
   List<dynamic> get _modes {
     final a = widget.agents.firstWhere((e) => e['id'] == _agent,
@@ -434,6 +450,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         agent: _agent ?? 'claude',
         mode: _mode ?? '',
         projectDir: _projectDir.isEmpty ? null : _projectDir,
+        runner: (_fullSession && (_agent ?? 'claude') == 'claude') ? 'tmux' : 'local',
       );
       if (mounted) Navigator.pop(context, s);
     } catch (e) {
@@ -448,7 +465,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VbColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -474,7 +491,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                     color: VbColors.accent.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Icon(Icons.add_comment_outlined,
+                  child: Icon(Icons.add_comment_outlined,
                       size: 20, color: VbColors.accent),
                 ),
                 const SizedBox(width: 12),
@@ -550,6 +567,48 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                 ),
               ),
             ),
+            if ((_agent ?? 'claude') == 'claude') ...[
+              const SizedBox(height: 16),
+              Material(
+                color: VbColors.surfaceHigh,
+                borderRadius: BorderRadius.circular(VbRadius.field),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(VbRadius.field),
+                  onTap: () => setState(() => _fullSession = !_fullSession),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.terminal_rounded,
+                            size: 20, color: VbColors.accent),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Tam oturum (tmux)',
+                                  style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: VbColors.textPrimary)),
+                              const SizedBox(height: 2),
+                              Text("Mac'ten de gir, /remote-control çalışır",
+                                  style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: VbColors.textMuted)),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                            value: _fullSession,
+                            onChanged: (v) =>
+                                setState(() => _fullSession = v)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _busy ? null : _submit,
@@ -572,7 +631,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         padding: const EdgeInsets.only(left: 4),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: VbColors.textPrimary,
@@ -671,12 +730,12 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline_rounded,
+                        Icon(Icons.error_outline_rounded,
                             size: 40, color: VbColors.danger),
                         const SizedBox(height: 14),
                         Text(_error!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: VbColors.textMuted)),
+                            style: TextStyle(color: VbColors.textMuted)),
                       ],
                     ),
                   ),
@@ -698,18 +757,18 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                                   horizontal: 12, vertical: 13),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.folder_rounded,
+                                  Icon(Icons.folder_rounded,
                                       size: 22, color: VbColors.accent),
                                   const SizedBox(width: 13),
                                   Expanded(
                                     child: Text(d,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontSize: 15,
                                             color: VbColors.textPrimary)),
                                   ),
-                                  const Icon(Icons.chevron_right_rounded,
+                                  Icon(Icons.chevron_right_rounded,
                                       color: VbColors.textMuted),
                                 ],
                               ),
@@ -718,7 +777,7 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                         ),
                       ),
                     if (_dirs.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(40),
                         child: Center(
                           child: Text('Alt klasör yok',

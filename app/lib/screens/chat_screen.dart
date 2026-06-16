@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart'; // defaultTargetPlatform / TargetPlatform
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // SystemSound + HapticFeedback (earcons)
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -34,7 +38,21 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _busy = false;
   bool _talking = false; // continuous voice loop
   bool _listening = false;
+  bool _talkMuted = false; // mic paused inside talking mode (without exiting)
   bool _canSend = false;
+  bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
+  SessionWatch? _watch; // self-reconnecting live transcript watch (#141)
+  final List<String> _sentEcho = []; // optimistic sends awaiting their watch echo
+  bool get _isTmux => widget.session.runner == 'tmux';
+  bool _ttsSpeaking = false; // true while TTS is actually producing audio
+  Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
+
+  // Autonomy mode — starts from the session's, but changeable from settings.
+  // Sent with every turn (the bridge also updates the stored session mode).
+  late String _mode = widget.session.mode;
+  List<Map<String, dynamic>> _modes = const []; // [{id, label}] for this agent
+  // Display name — editable from settings (the Session model's is immutable).
+  late String _name = widget.session.name;
 
   static const _locale = 'tr-TR';
 
@@ -45,11 +63,282 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _tts.setLanguage(_locale);
     _tts.awaitSpeakCompletion(true);
+    // Upgrade off the default *compact* system voice (the robotic sound) to the
+    // best installed neural voice for the locale. Runs async; see _configureBestVoice.
+    _configureBestVoice();
+    // Track real TTS audio state so the orb shows "Konuşuyor" only while audio is
+    // actually playing (not inferred), and so the "Sesli oku" button flips back.
+    // These are independent of awaitSpeakCompletion (which resolves speak() via the
+    // native result), so they don't affect the talking-loop await.
+    _tts.setStartHandler(() { if (mounted) setState(() => _ttsSpeaking = true); });
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+    });
+    _tts.setCancelHandler(() {
+      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+    });
+    _tts.setErrorHandler((msg) {
+      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+    });
+    // iOS audio session — configured ONCE here (not before every utterance).
+    // Re-applying the category per reply churns the live AVAudioSession route
+    // mid-stream, which is what made speech choppy ("kesik kesik").
+    //
+    // Routing for hands-free use (car / AirPods): .playback implicitly reaches
+    // Bluetooth A2DP / CarPlay / AirPlay; allowBluetoothA2DP + allowAirPlay make
+    // that explicit. We must NOT set defaultToSpeaker — it force-routes to the
+    // built-in speaker and is exactly why CarPlay/AirPods were silent. voicePrompt
+    // mode routes correctly to CarPlay/external devices. mixWithOthers is kept on
+    // purpose: it stops flutter_tts from deactivating the shared session between
+    // turns (the original "silent after the first reply" fix).
+    // iOS-only: AVAudioSession category. On macOS these throw MissingPluginException
+    // (no flutter_tts macOS impl) and would break talking mode — so guard them.
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      _tts.setSharedInstance(true);
+      _tts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playback,
+        [
+          IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          IosTextToSpeechAudioCategoryOptions.duckOthers, // duck Spotify while speaking → conversational on CarPlay, not bleeding through (#133)
+          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP, // stereo BT / CarPlay
+          IosTextToSpeechAudioCategoryOptions.allowAirPlay,
+        ],
+        IosTextToSpeechAudioMode.voicePrompt,
+      );
+    }
     _input.addListener(() {
       final can = _input.text.trim().isNotEmpty;
       if (can != _canSend) setState(() => _canSend = can);
     });
-    _loadHistory();
+    if (_isTmux) {
+      _startTmuxSync(); // full sessions: server transcript is the source of truth
+    } else {
+      _loadHistory();
+    }
+    _loadModes();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
+    });
+  }
+
+  Future<void> _toggleHideActivity() async {
+    setState(() => _hideActivity = !_hideActivity);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('vb_hide_activity', _hideActivity);
+  }
+
+  // Full (tmux) sessions: load the server transcript, then watch for every new
+  // turn from ANY source (this app, the local CLI, Remote Control, another
+  // client). The server transcript is the single source of truth — no optimistic
+  // echo, so nothing duplicates and nothing goes missing (#141).
+  Future<void> _startTmuxSync() async {
+    int offset = 0;
+    try {
+      final h = await _api.sessionHistory(widget.session.id);
+      offset = (h['size'] as num?)?.toInt() ?? 0;
+      final turns = (h['turns'] as List?) ?? const [];
+      if (mounted) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(turns.map((t) {
+              final m = t as Map<String, dynamic>;
+              return Message(m['role'] == 'assistant' ? 'claude' : 'me',
+                  (m['text'] ?? '') as String);
+            }));
+        });
+        _toBottom();
+      }
+    } catch (_) {/* fresh session / no transcript yet */}
+    _watch = _api.watchSession(widget.session.id, offset, onTurn: _onWatchTurn);
+  }
+
+  void _onWatchTurn(String role, String text) {
+    if (!mounted || text.trim().isEmpty) return;
+    if (role != 'assistant') {
+      // Our own message already shown optimistically — skip the watch echo.
+      final i = _sentEcho.indexWhere((s) => s.trim() == text.trim());
+      if (i >= 0) {
+        _sentEcho.removeAt(i);
+        return;
+      }
+    }
+    setState(() =>
+        _messages.add(Message(role == 'assistant' ? 'claude' : 'me', text)));
+    _toBottom();
+    if (role == 'assistant' && _talking) _speak(text, summarize: true);
+  }
+
+  // Full (tmux) sessions: fire-and-forget the input; the watch renders the turn
+  // and the reply. No _busy block — so a prompt/question waiting in the session
+  // never freezes the app, and you can answer it ("y"/"1"/…) right away.
+  Future<void> _sendTmux(String text) async {
+    _tts.stop();
+    _input.clear();
+    setState(() => _messages.add(Message('me', text))); // show it instantly
+    _sentEcho.add(text);
+    _toBottom();
+    try {
+      await _api.tmuxSend(widget.session.id, text);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _messages.add(
+            Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
+      }
+    }
+  }
+
+  // Pick the highest-quality installed voice for the locale. flutter_tts otherwise
+  // falls back to the default *compact* system voice — that's the robotic sound.
+  // Enhanced/premium neural voices ship with iOS/Android and run fully offline
+  // (the user downloads them once in Settings → Accessibility → Spoken Content →
+  // Voices), so this keeps the hands-free car/CarPlay path network-free.
+  // Persisted TTS voice name chosen in the picker (#125).
+  static const _voiceKey = 'vb_tts_voice';
+
+  // Installed tr-TR voices, best-quality first (premium > enhanced > compact).
+  Future<List<Map<String, String>>> _turkishVoices() async {
+    try {
+      final raw = await _tts.getVoices;
+      if (raw is! List) return const [];
+      final voices = raw
+          .whereType<Map>()
+          .map((e) => e.map((k, v) => MapEntry('$k', '$v')))
+          .where((v) => (v['locale'] ?? '').toLowerCase().startsWith('tr'))
+          .toList();
+      int rank(Map<String, String> v) {
+        final q = (v['quality'] ?? '').toLowerCase();
+        if (q.contains('premium')) return 3;
+        if (q.contains('enhanced')) return 2;
+        return 1;
+      }
+      voices.sort((a, b) => rank(b).compareTo(rank(a)));
+      return voices;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String _voiceQualityLabel(String? q) {
+    final s = (q ?? '').toLowerCase();
+    if (s.contains('premium')) return 'Premium (nöral)';
+    if (s.contains('enhanced')) return 'Enhanced';
+    return 'Standart';
+  }
+
+  Future<void> _configureBestVoice() async {
+    // Slightly slower than the racy plugin default; steadier for long replies.
+    await _tts.setSpeechRate(0.5);
+    await _tts.setPitch(1.0);
+    final voices = await _turkishVoices();
+    if (voices.isEmpty) return; // no localized voice installed → keep default
+    // Prefer the user's saved pick if it's still installed (#125); else best.
+    final p = await SharedPreferences.getInstance();
+    final savedName = p.getString(_voiceKey);
+    final chosen = (savedName != null)
+        ? voices.firstWhere((v) => v['name'] == savedName, orElse: () => voices.first)
+        : voices.first;
+    try {
+      await _tts.setVoice({'name': chosen['name']!, 'locale': chosen['locale']!});
+      debugPrint('TTS voice → ${chosen['name']} (${chosen['quality']})');
+    } catch (e) {
+      debugPrint('TTS setVoice failed: $e');
+    }
+  }
+
+  // In-app voice picker (#125): list the installed tr-TR voices, persist the
+  // choice, apply it, and speak a sample so it's heard immediately. iOS 26
+  // ignores the system-selected voice, so picking explicitly here is the fix.
+  Future<void> _pickVoice() async {
+    final voices = await _turkishVoices();
+    if (!mounted) return;
+    if (voices.isEmpty) {
+      _toast('Yüklü Türkçe ses yok. Ayarlar → Erişilebilirlik → Sözlü İçerik → Sesler\'den indir.');
+      return;
+    }
+    final p = await SharedPreferences.getInstance();
+    final savedName = p.getString(_voiceKey);
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: VbColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            children: [
+              const Center(child: _Grabber()),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: Text('Ses seç',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: VbColors.textPrimary)),
+              ),
+              for (final v in voices)
+                ListTile(
+                  title: Text(v['name'] ?? '',
+                      style: TextStyle(color: VbColors.textPrimary)),
+                  subtitle: Text(_voiceQualityLabel(v['quality']),
+                      style: TextStyle(color: VbColors.textMuted)),
+                  trailing: v['name'] == savedName
+                      ? Icon(Icons.check_rounded, color: VbColors.accent)
+                      : null,
+                  onTap: () => Navigator.pop(context, v),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    await p.setString(_voiceKey, picked['name']!);
+    try {
+      await _tts.setVoice({'name': picked['name']!, 'locale': picked['locale']!});
+      await _speak('Merhaba, artık bu sesle konuşacağım.'); // hear it right away
+    } catch (_) {}
+    if (mounted) _toast('Ses seçildi: ${picked['name']}');
+  }
+
+  // The autonomy modes this agent supports (label + id), for the settings sheet.
+  Future<void> _loadModes() async {
+    try {
+      final cfg = await _api.config();
+      final agents = (cfg['agents'] as List?) ?? const [];
+      final a = agents.firstWhere(
+        (e) => e is Map && e['id'] == widget.session.agent,
+        orElse: () => null,
+      );
+      if (a == null) return;
+      final modes = ((a['modes'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList();
+      if (mounted) setState(() => _modes = modes);
+    } catch (_) {/* offline / cloud session — settings just won't list modes */}
+  }
+
+  String _modeLabel(String id) {
+    final m = _modes.firstWhere((e) => e['id'] == id, orElse: () => const {});
+    return (m['label'] as String?) ?? id;
+  }
+
+  // Header subtitle, recomputed from the live mode (not the stale session one).
+  String get _subtitle {
+    final parts = <String>[];
+    if (widget.session.agentLabel.isNotEmpty) parts.add(widget.session.agentLabel);
+    if (_mode.isNotEmpty) parts.add(_modeLabel(_mode));
+    parts.add(widget.session.runner == 'cloud' ? '☁︎ cloud' : 'local');
+    return parts.join(' · ');
   }
 
   // ---- History (persisted per session, like the web client) ----
@@ -82,6 +371,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _watch?.close(); // stop the live transcript watch (#141)
+    WakelockPlus.disable();
     _stt.cancel();
     _tts.stop();
     _input.dispose();
@@ -92,6 +383,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<bool> _ensureStt() async {
     if (_sttReady) return true;
     _sttReady = await _stt.initialize(
+      // Small fallback: promote the last partial to a final if iOS ends listening
+      // without emitting its own — enough that the hands-free loop never stalls,
+      // but well below the old 2000ms window that caused premature first-turn submits.
+      finalTimeout: const Duration(milliseconds: 800),
       onStatus: (s) {
         if (s == 'done' || s == 'notListening') {
           if (mounted) setState(() => _listening = false);
@@ -116,52 +411,170 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  // Earcon: a short eyes-free cue (audible over AirPods/CarPlay + a haptic) for
+  // state changes, so you don't have to look at the orb while driving. Uses only
+  // built-in system sounds/haptics — no extra audio dependency.
+  void _cue(String kind) {
+    switch (kind) {
+      case 'listen': // mic opened — your turn
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.selectionClick();
+        break;
+      case 'sent': // captured what you said
+        SystemSound.play(SystemSoundType.click);
+        HapticFeedback.lightImpact();
+        break;
+      case 'error':
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.heavyImpact();
+        break;
+    }
+  }
+
   // ---- Voice ----
   Future<void> _listen() async {
+    if (_talkMuted) return;
     if (!await _ensureStt()) return;
+    if (_stt.isListening) return; // guard against a double-start after the TTS handoff
+
     setState(() => _listening = true);
+    if (_talking) _cue('listen'); // audible "your turn" cue in talking mode
+
+    // Start with a generous pause so the COLD first-turn recognizer warm-up can't
+    // trip the pause watchdog before the user has even started speaking (the cause
+    // of the first sentence being cut off). Once a real partial lands, tighten it so
+    // the turn still auto-submits promptly when the user genuinely stops.
+    const longPause = Duration(seconds: 6);
+    const shortPause = Duration(milliseconds: 2000);
+    var tightened = false;
+
     await _stt.listen(
       localeId: _locale,
       listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
+      pauseFor: longPause,
+      listenOptions: SpeechListenOptions(
+        listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
+        partialResults: true,
+        onDevice: false, // tr-TR uses server recognition
+        autoPunctuation: true,
+        cancelOnError: false,
+      ),
       onResult: (r) {
+        if (!tightened && r.recognizedWords.trim().isNotEmpty) {
+          tightened = true;
+          try {
+            if (_stt.isListening) _stt.changePauseFor(shortPause);
+          } catch (_) {/* listen already ended between the partial and this callback */}
+        }
         if (r.finalResult) {
           final t = r.recognizedWords.trim();
           setState(() => _listening = false);
-          if (t.isNotEmpty) _send(t);
+          if (t.isNotEmpty) {
+            if (_talking) _cue('sent');
+            _send(t);
+          }
         }
       },
     );
   }
 
-  String _forSpeech(String text) {
-    // Drop fenced code blocks and inline backticks so TTS isn't reading code.
-    final noFences = text.replaceAll(RegExp(r'```[\s\S]*?```'), ' (kod) ');
-    return noFences.replaceAll('`', '').trim();
+  // Longest auto-read (talking loop) before we shorten to the lead (#124).
+  static const int _speakMaxChars = 600;
+
+  // Clean text for TTS: drop code/markdown so it isn't read as symbols. When
+  // [summarize] (hands-free talking loop), a long reply is shortened to its lead
+  // sentences plus an "on screen" cue — the explicit "Sesli oku" button passes
+  // summarize:false to read the whole thing. Pure client-side, works offline.
+  String _forSpeech(String text, {bool summarize = false}) {
+    var s = text
+        .replaceAll(RegExp(r'```[\s\S]*?```'), ' (kod) ') // fenced code → marker
+        .replaceAll('`', ''); // inline code ticks
+    s = s.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), ''); // headings
+    s = s.replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), ''); // list bullets
+    s = s.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m[1]!); // bold → text
+    s = s.replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]+\)'), (m) => m[1]!); // links → text
+    s = s.replaceAll(RegExp(r'\(kod\)(?:\s*\(kod\))+'), '(kod)'); // collapse repeats
+    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (!summarize || s.length <= _speakMaxChars) return s;
+    final head = s.substring(0, _speakMaxChars);
+    // End on a whole sentence; (?<!\d) skips a period that just follows a number
+    // (e.g. "36.") so we don't cut mid-sentence.
+    final stop = head.lastIndexOf(RegExp(r'(?<!\d)[.!?…]'));
+    final lead = (stop > 200 ? head.substring(0, stop + 1) : head).trim();
+    return '$lead … (uzun cevap, tamamı ekranda)';
   }
 
-  Future<void> _speak(String text) async {
-    final clean = _forSpeech(text);
+  Future<void> _speak(String text, {bool summarize = false}) async {
+    final clean = _forSpeech(text, summarize: summarize);
     if (clean.isEmpty) return;
-    await _tts.speak(clean);
+    // The audio session is configured ONCE in initState and kept alive by
+    // mixWithOthers, so we do NOT stop()/re-assert the category/sleep before every
+    // utterance — that churn is what made speech choppy. Just release the mic so it
+    // isn't holding the input route. (The mic→TTS session re-assert that keeps
+    // replies audible happens once on the handoff in _send.)
+    try { await _stt.stop(); } catch (_) {}
+    await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
+  }
+
+  // Per-message "Sesli oku" toggle (the bubble button). _ttsMsg tracks which
+  // message is playing so the button shows "Durdur" and a second tap stops it.
+  Future<void> _readAloud(Message m) async {
+    await _tts.stop(); // halt any current readout first (also lets you switch messages)
+    if (!mounted) return;
+    setState(() => _ttsMsg = m);
+    await _speak(m.text);
+    // Safety net: if the text was empty, no completion handler fires — clear here.
+    if (mounted && _ttsMsg == m) setState(() => _ttsMsg = null);
+  }
+
+  Future<void> _stopSpeak() async {
+    await _tts.stop();
+    if (mounted) setState(() => _ttsMsg = null);
   }
 
   void _toggleTalking() async {
     if (_talking) {
-      setState(() => _talking = false);
+      setState(() { _talking = false; _talkMuted = false; });
+      WakelockPlus.disable();
       await _stt.stop();
       await _tts.stop();
       setState(() => _listening = false);
       return;
     }
     if (!await _ensureStt()) return;
-    setState(() => _talking = true);
+    setState(() { _talking = true; _talkMuted = false; });
+    WakelockPlus.enable(); // keep the screen on so the bridge connection doesn't drop
     _listen();
+  }
+
+  // Tap the orb: barge-in while it's speaking (cut the readout short and listen),
+  // otherwise pause/resume the mic — all without leaving talking mode.
+  void _toggleMute() async {
+    if (!_talking) return;
+    // Barge-in: a tap during playback stops TTS and hands the turn back to you.
+    if (_ttsSpeaking) {
+      await _tts.stop();
+      setState(() { _ttsSpeaking = false; _talkMuted = false; });
+      _listen();
+      return;
+    }
+    if (_talkMuted) {
+      setState(() => _talkMuted = false);
+      if (!_busy) _listen(); // resume listening
+    } else {
+      setState(() {
+        _talkMuted = true;
+        _listening = false;
+      });
+      await _stt.stop(); // pause the mic (TTS keeps playing)
+    }
   }
 
   // ---- Send + stream ----
   Future<void> _send(String text) async {
+    if (_isTmux) return _sendTmux(text); // full sessions render via the watch
     if (_busy) return;
+    _tts.stop(); // barge-in: a new message interrupts any ongoing spoken readout
     _input.clear();
     final me = Message('me', text);
     final reply = Message('claude', '');
@@ -175,7 +588,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final full = await _api.ask(
         sessionId: widget.session.id,
         text: text,
-        mode: widget.session.mode,
+        mode: _mode,
         onDelta: (d) {
           setState(() => reply.text += d);
           _toBottom();
@@ -186,14 +599,41 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
       if (full.trim().isEmpty) setState(() => reply.text = '(boş cevap)');
+      // Turn (network/agent) is done — release _busy NOW so the user can type and
+      // send a new message during the spoken readout below (it barge-ins the TTS).
+      if (mounted) setState(() => _busy = false);
       if (_talking && full.trim().isNotEmpty) {
-        await _speak(full);
-        if (_talking) _listen();
+        await _stt.stop(); // release the mic's audio session before TTS speaks
+        // The mic just left the shared session in record/.playAndRecord state.
+        // Re-claim the route-friendly playback category ONCE here (not per
+        // utterance) so the reply reaches CarPlay/AirPods instead of being silenced
+        // or mis-routed.
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          await _tts.setIosAudioCategory(
+            IosTextToSpeechAudioCategory.playback,
+            [
+              IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+              IosTextToSpeechAudioCategoryOptions.duckOthers, // duck music while speaking (#133)
+              IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+              IosTextToSpeechAudioCategoryOptions.allowAirPlay,
+            ],
+            IosTextToSpeechAudioMode.voicePrompt,
+          );
+        }
+        await _speak(full, summarize: true); // hands-free: read the lead, not 200 lines
+        if (_talking && !_talkMuted && !_busy) _listen(); // skip if a new turn already started
       }
     } catch (e) {
+      if (_talking) _cue('error');
       setState(() => _messages
           .add(Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
-      if (_talking) _toggleTalking();
+      // Eyes-free recovery: a transient error shouldn't silently drop talking mode —
+      // keep listening so the user can retry by voice (e.g. while driving).
+      if (_talking && !_talkMuted) {
+        _listen();
+      } else if (_talking) {
+        _toggleTalking();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
       _persist();
@@ -215,10 +655,201 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) => _CommandSheet(groups: groups),
     );
     if (picked != null) {
-      _input.text = picked;
-      _input.selection =
-          TextSelection.collapsed(offset: picked.length);
+      final cmd = picked.trim();
+      if (cmd.isNotEmpty) _send(cmd); // run the command immediately on pick
     }
+  }
+
+  // ---- Session settings: rename + mode (autonomy) selector ----
+  Future<void> _openSessionSettings() async {
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SessionSettingsSheet(
+        currentName: _name,
+        modes: _modes,
+        currentMode: _mode,
+        canAttach:
+            widget.session.agent == 'claude' && widget.session.runner == 'local',
+        isTmux: widget.session.runner == 'tmux',
+      ),
+    );
+    if (result == null) return;
+    if (result['action'] == 'attach') {
+      await _attachClaudeSession();
+      return;
+    }
+    if (result['action'] == 'voice') {
+      await _pickVoice();
+      return;
+    }
+    if (result['action'] == 'tmux-attach') {
+      await _showTmuxAttach();
+      return;
+    }
+    final newName = result['name'];
+    final newMode = result['mode'];
+    final nameChanged = newName != null && newName != _name;
+    final modeChanged = newMode != null && newMode != _mode;
+    if (!nameChanged && !modeChanged) return;
+    final prevName = _name, prevMode = _mode;
+    setState(() {
+      if (nameChanged) _name = newName;
+      if (modeChanged) _mode = newMode;
+    });
+    try {
+      await _api.updateSession(
+        widget.session.id,
+        name: nameChanged ? newName : null,
+        mode: modeChanged ? newMode : null,
+      );
+      _toast(nameChanged && modeChanged
+          ? 'İsim ve mod güncellendi'
+          : nameChanged
+              ? 'İsim güncellendi'
+              : 'Mod: ${_modeLabel(newMode!)}');
+    } catch (e) {
+      if (mounted) setState(() { _name = prevName; _mode = prevMode; });
+      _toast('Güncellenemedi: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+
+  // Attach this session to an existing Claude Code session and resume it by voice.
+  Future<void> _attachClaudeSession() async {
+    List<Map<String, dynamic>> list;
+    try {
+      list = await _api.claudeSessions(widget.session.id);
+    } catch (e) {
+      _toast('Claude oturumları alınamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      return;
+    }
+    if (!mounted) return;
+    if (list.isEmpty) {
+      _toast('Bu proje için kayıtlı Claude oturumu yok.');
+      return;
+    }
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ClaudeSessionsSheet(sessions: list),
+    );
+    if (picked == null) return;
+    try {
+      await _api.updateSession(widget.session.id, claudeSessionId: picked);
+      // The agent resumes that conversation; start the visible transcript fresh.
+      setState(() {
+        _messages
+          ..clear()
+          ..add(Message('activity',
+              '🔗 Claude oturumuna bağlanıldı — agent önceki konuşmayı hatırlayacak'));
+      });
+      _persist();
+      _toBottom();
+      _toast('Bağlandı — sıradaki mesajda bu oturum devam edecek.');
+    } catch (e) {
+      _toast('Bağlanamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+
+  // Tat Y: show how to reach a full (tmux) session live on the Mac and from the
+  // Claude app via /remote-control.
+  Future<void> _showTmuxAttach() async {
+    Map<String, dynamic> info;
+    try {
+      info = await _api.tmuxAttach(widget.session.id);
+    } catch (e) {
+      _toast('Alınamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      return;
+    }
+    if (!mounted) return;
+    final cmd = (info['attachCmd'] as String?) ?? '';
+    final steps = (info['remoteControlSteps'] as List?)?.cast<String>() ?? const [];
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: VbColors.surface,
+        title: const Text("Mac'te aç / Claude app"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                    info['rcActive'] == true
+                        ? Icons.cloud_done_rounded
+                        : Icons.cloud_off_rounded,
+                    size: 18,
+                    color: info['rcActive'] == true
+                        ? VbColors.accent
+                        : VbColors.textMuted),
+                const SizedBox(width: 8),
+                Text(
+                    info['rcActive'] == true
+                        ? 'Remote Control: açık'
+                        : 'Remote Control: kapalı',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: VbColors.textPrimary)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Mac terminalinde bu oturuma canlı gir:',
+                style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: VbColors.surfaceHigh,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: VbColors.border),
+              ),
+              child: SelectableText(cmd,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+            ),
+            const SizedBox(height: 14),
+            Text('Claude uygulamasından erişmek için:',
+                style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 6),
+            for (var i = 0; i < steps.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('${i + 1}. ${steps[i]}',
+                    style: TextStyle(color: VbColors.textPrimary, fontSize: 13)),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: cmd));
+              _toast('Komut kopyalandı');
+            },
+            child: const Text('Komutu kopyala'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final active = info['rcActive'] == true;
+              Navigator.pop(context);
+              try {
+                await _api.tmuxRc(widget.session.id, active ? 'stop' : 'start');
+                _toast(active
+                    ? 'Remote Control durduruldu'
+                    : 'Remote Control başlatıldı');
+              } catch (e) {
+                _toast('Olmadı: ${e.toString().replaceFirst('Exception: ', '')}');
+              }
+            },
+            child: Text(info['rcActive'] == true
+                ? "Remote Control'ü durdur"
+                : 'Remote Control başlat'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _toast(String m) =>
@@ -227,11 +858,14 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final color =
-        VbColors.seededFor(widget.session.name.isEmpty ? widget.session.agent : widget.session.name);
+        VbColors.seededFor(_name.isEmpty ? widget.session.agent : _name);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 8,
-        title: Row(
+        title: InkWell(
+          onTap: _openSessionSettings,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
           children: [
             Container(
               width: 34,
@@ -246,8 +880,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               alignment: Alignment.center,
               child: Text(
-                (widget.session.name.isEmpty ? '?' : widget.session.name.trim()[0])
-                    .toUpperCase(),
+                (_name.isEmpty ? '?' : _name.trim()[0]).toUpperCase(),
                 style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -261,9 +894,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.session.name.isEmpty
-                        ? 'İsimsiz oturum'
-                        : widget.session.name,
+                    _name.isEmpty ? 'İsimsiz oturum' : _name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -272,22 +903,39 @@ class _ChatScreenState extends State<ChatScreen> {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  Text(
-                    widget.session.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: VbColors.textMuted,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: VbColors.textMuted,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.expand_more_rounded,
+                          size: 15, color: VbColors.textMuted),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
+        ),
         actions: [
+          IconButton(
+            tooltip: _hideActivity ? 'Aktiviteyi göster' : 'Aktiviteyi gizle',
+            onPressed: _toggleHideActivity,
+            icon: Icon(_hideActivity
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined),
+          ),
           IconButton(
             tooltip: 'Komutlar',
             onPressed: _busy ? null : _openPalette,
@@ -307,12 +955,20 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _messages.isEmpty
                 ? _emptyChat()
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, i) => _bubble(_messages[i]),
-                  ),
+                : Builder(builder: (_) {
+                    final rows = _rows();
+                    return ListView.builder(
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                      itemCount: rows.length,
+                      itemBuilder: (_, i) {
+                        final r = rows[i];
+                        return r is List<Message>
+                            ? _ActivityGroup(items: r)
+                            : _bubble(r as Message);
+                      },
+                    );
+                  }),
           ),
           _composer(),
         ],
@@ -336,11 +992,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 border:
                     Border.all(color: VbColors.accent.withValues(alpha: 0.25)),
               ),
-              child: const Icon(Icons.auto_awesome_outlined,
+              child: Icon(Icons.auto_awesome_outlined,
                   size: 32, color: VbColors.accent),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Sohbete başla',
               style: TextStyle(
                   fontSize: 17,
@@ -348,7 +1004,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: VbColors.textPrimary),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Bir mesaj yaz, mikrofona dokun ya da konuşma modunu aç.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -362,44 +1018,93 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ---- Talking mode panel: the breathing orb + state ----
   Widget _talkPanel() {
-    final _OrbState st = _busy && !_listening
-        ? _OrbState.thinking
-        : _listening
-            ? _OrbState.listening
-            : _OrbState.speaking;
+    // Real state: speaking while TTS audio plays, else thinking while a turn is
+    // in flight, else listening (the resting state in talking mode).
+    final _OrbState st = _ttsSpeaking
+        ? _OrbState.speaking
+        : _busy
+            ? _OrbState.thinking
+            : _OrbState.listening;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: VbColors.surface,
-        border: const Border(bottom: BorderSide(color: VbColors.border)),
+        border: Border(bottom: BorderSide(color: VbColors.border)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
       child: Column(
         children: [
-          _VoiceOrb(state: st),
+          GestureDetector(
+            onTap: _toggleMute,
+            behavior: HitTestBehavior.opaque,
+            child: Opacity(
+              opacity: _talkMuted ? 0.4 : 1,
+              child: _VoiceOrb(state: st),
+            ),
+          ),
           const SizedBox(height: 16),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: Text(
-              st.label,
-              key: ValueKey(st),
+              _talkMuted ? 'Sessiz' : st.label,
+              key: ValueKey(_talkMuted ? 'muted' : st.label),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
-                color: st.color,
+                color: _talkMuted ? VbColors.textMuted : st.color,
               ),
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Konuşma modu açık · durdurmak için telefon simgesine dokun',
+          const SizedBox(height: 14),
+          // Clear mic on/off — mutes the mic WITHOUT ending the conversation.
+          OutlinedButton.icon(
+            onPressed: _toggleMute,
+            icon: Icon(
+              _talkMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+              size: 18,
+              color: _talkMuted ? VbColors.danger : VbColors.accent,
+            ),
+            label: Text(_talkMuted ? 'Mikrofonu aç' : 'Mikrofonu kapat'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor:
+                  _talkMuted ? VbColors.danger : VbColors.textPrimary,
+              side: BorderSide(
+                  color: _talkMuted ? VbColors.danger : VbColors.border),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(VbRadius.chip)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _ttsSpeaking
+                ? 'Konuşurken orb’a dokun → kes ve hemen konuş'
+                : 'Orb’a dokun → mikrofonu aç/kapat · bitirmek için üstteki telefon simgesi',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, color: VbColors.textMuted),
           ),
         ],
       ),
     );
+  }
+
+  // Fold runs of consecutive '⚙︎' activity lines into one collapsible group so
+  // the tool/bash chatter doesn't bury the conversation (like the web client).
+  // A non-activity message is kept as-is; a run becomes a List<Message>.
+  List<Object> _rows() {
+    final rows = <Object>[];
+    List<Message>? run;
+    for (final m in _messages) {
+      if (m.role == 'activity') {
+        if (_hideActivity) continue; // toggle: drop tool/bash chatter entirely
+        (run ??= <Message>[]).add(m);
+      } else {
+        if (run != null) { rows.add(run); run = null; }
+        rows.add(m);
+      }
+    }
+    if (run != null) rows.add(run);
+    return rows;
   }
 
   Widget _bubble(Message m) {
@@ -458,14 +1163,57 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         child: m.text.isEmpty
             ? const _TypingDots()
-            : _MessageBody(text: m.text, isMe: isMe),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MessageBody(text: m.text, isMe: isMe),
+                  if (!isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: InkWell(
+                        onTap: () =>
+                            _ttsMsg == m ? _stopSpeak() : _readAloud(m),
+                        borderRadius: BorderRadius.circular(VbRadius.chip),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _ttsMsg == m
+                                    ? Icons.stop_rounded
+                                    : Icons.volume_up_rounded,
+                                size: 16,
+                                color: _ttsMsg == m
+                                    ? VbColors.danger
+                                    : VbColors.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _ttsMsg == m ? 'Durdur' : 'Sesli oku',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _ttsMsg == m
+                                      ? VbColors.danger
+                                      : VbColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }
 
   Widget _composer() {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VbColors.bg,
         border: Border(top: BorderSide(color: VbColors.border)),
       ),
@@ -543,7 +1291,7 @@ class _MessageBody extends StatelessWidget {
     if (segments.length == 1 && !segments.first.isCode) {
       return SelectableText(
         text,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 15, height: 1.45, color: VbColors.textPrimary),
       );
     }
@@ -557,7 +1305,7 @@ class _MessageBody extends StatelessWidget {
                 ? _codeBlock(segments[i].text)
                 : SelectableText(
                     segments[i].text,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 15,
                         height: 1.45,
                         color: VbColors.textPrimary),
@@ -724,6 +1472,100 @@ class _VoiceOrbState extends State<_VoiceOrb>
           ),
         );
       },
+    );
+  }
+}
+
+/// A folded run of '⚙︎' tool/activity lines. Collapsed by default (shows a count
+/// and the latest action); tap to expand the full list. Keeps the transcript
+/// clean for voice/eyes-free use.
+class _ActivityGroup extends StatefulWidget {
+  final List<Message> items;
+  const _ActivityGroup({required this.items});
+
+  @override
+  State<_ActivityGroup> createState() => _ActivityGroupState();
+}
+
+class _ActivityGroupState extends State<_ActivityGroup> {
+  bool _open = false;
+
+  String _clean(String s) => s.replaceFirst('⚙︎ ', '').trim();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final last = items.isEmpty ? '' : _clean(items.last.text);
+    final header = items.length == 1
+        ? last
+        : (_open ? '${items.length} işlem' : '${items.length} işlem · $last');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.9),
+          child: Material(
+            color: VbColors.surfaceHigh,
+            borderRadius: BorderRadius.circular(VbRadius.chip),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(VbRadius.chip),
+              onTap: () => setState(() => _open = !_open),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _open
+                              ? Icons.keyboard_arrow_down_rounded
+                              : Icons.keyboard_arrow_right_rounded,
+                          size: 16,
+                          color: VbColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            header,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: VbTheme.mono(
+                                size: 11.5, color: VbColors.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_open)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final m in items)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 1.5),
+                                child: Text(
+                                  _clean(m.text),
+                                  style: VbTheme.mono(
+                                      size: 11.5, color: VbColors.textMuted),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -923,7 +1765,7 @@ class _CommandSheetState extends State<_CommandSheet> {
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
         child: Text(
           '${g['label']}'.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,
@@ -947,7 +1789,7 @@ class _CommandSheetState extends State<_CommandSheet> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   child: Row(
                     children: [
-                      const Icon(Icons.chevron_right_rounded,
+                      Icon(Icons.chevron_right_rounded,
                           size: 18, color: VbColors.accent),
                       const SizedBox(width: 10),
                       Expanded(
@@ -956,7 +1798,7 @@ class _CommandSheetState extends State<_CommandSheet> {
                           children: [
                             Text(
                               '${it['label']}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w600,
                                   color: VbColors.textPrimary),
@@ -985,7 +1827,7 @@ class _CommandSheetState extends State<_CommandSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: VbColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
@@ -997,7 +1839,7 @@ class _CommandSheetState extends State<_CommandSheet> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.bolt_outlined, color: VbColors.accent),
+                  Icon(Icons.bolt_outlined, color: VbColors.accent),
                   const SizedBox(width: 8),
                   const Text(
                     'Komutlar',
@@ -1010,7 +1852,7 @@ class _CommandSheetState extends State<_CommandSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
               child: TextField(
-                autofocus: true,
+                autofocus: false, // don't pop the keyboard on open (shrinks the list, hard to dismiss)
                 onChanged: (v) => setState(() => _q = v),
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
@@ -1020,7 +1862,7 @@ class _CommandSheetState extends State<_CommandSheet> {
             ),
             Expanded(
               child: tiles.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text('Eşleşme yok',
                           style: TextStyle(color: VbColors.textMuted)))
                   : ListView(
@@ -1029,6 +1871,479 @@ class _CommandSheetState extends State<_CommandSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Session settings: pick how autonomous the agent is (the "mode").
+/// Tapping a mode selects it and closes the sheet (returns the mode id).
+class _SessionSettingsSheet extends StatefulWidget {
+  final String currentName;
+  final List<Map<String, dynamic>> modes;
+  final String currentMode;
+  final bool canAttach;
+  final bool isTmux;
+  const _SessionSettingsSheet({
+    required this.currentName,
+    required this.modes,
+    required this.currentMode,
+    this.canAttach = false,
+    this.isTmux = false,
+  });
+
+  @override
+  State<_SessionSettingsSheet> createState() => _SessionSettingsSheetState();
+}
+
+class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
+  late final TextEditingController _nameCtl =
+      TextEditingController(text: widget.currentName);
+  late String _mode = widget.currentMode;
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    super.dispose();
+  }
+
+  void _save() => Navigator.pop(context, <String, String>{
+        'name': _nameCtl.text.trim(),
+        'mode': _mode,
+      });
+
+  IconData _icon(String id) {
+    switch (id) {
+      case 'full':
+        return Icons.bolt_rounded;
+      case 'autoEdit':
+      case 'acceptEdits':
+        return Icons.edit_note_rounded;
+      case 'ask':
+      case 'default':
+        return Icons.verified_user_outlined;
+      default:
+        return Icons.tune_rounded;
+    }
+  }
+
+  String _hint(String id) {
+    switch (id) {
+      case 'full':
+        return 'Tam yetki — izin sormaz, kesintisiz çalışır';
+      case 'autoEdit':
+      case 'acceptEdits':
+        return 'Dosya düzenlemelerini otomatik onaylar';
+      case 'ask':
+      case 'default':
+        return 'Her işlem için izin ister';
+      default:
+        return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: VbColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 0, 16, MediaQuery.of(context).viewInsets.bottom + 18),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(child: _Grabber()),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: VbColors.accent.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(Icons.tune_rounded,
+                          size: 20, color: VbColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text('Oturum ayarları',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text('İSİM',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: VbColors.textMuted)),
+                ),
+                TextField(
+                  controller: _nameCtl,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _save(),
+                  decoration: const InputDecoration(hintText: 'Oturum adı'),
+                ),
+                const SizedBox(height: 18),
+                Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 4),
+                  child: Text('OTONOMİ MODU',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: VbColors.textMuted)),
+                ),
+                if (widget.modes.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Text('Bu oturum için mod bilgisi yüklenemedi.',
+                        style: TextStyle(color: VbColors.textMuted)),
+                  )
+                else
+                  for (final m in widget.modes)
+                    _modeTile(context, (m['id'] ?? '').toString(),
+                        (m['label'] ?? m['id'] ?? '').toString()),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: VbColors.border),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 16, color: VbColors.textMuted),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Telefondan izin penceresi açılamaz; kesintisiz çalışmak için "tam yetki" modu en uygunudur.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: VbColors.textMuted,
+                              height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.canAttach) ...[
+                  SizedBox(height: 18),
+                  Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    child: Text('CLAUDE OTURUMU',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: VbColors.textMuted)),
+                  ),
+                  Material(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(
+                          context, <String, String>{'action': 'attach'}),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: VbColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.history_rounded,
+                                size: 22, color: VbColors.accent),
+                            SizedBox(width: 13),
+                            Expanded(
+                              child: Text(
+                                'CLI/masaüstü oturumuna bağlan & sesle devam et',
+                                style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: VbColors.textPrimary),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                color: VbColors.textMuted),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (widget.isTmux) ...[
+                  SizedBox(height: 18),
+                  Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    child: Text('TAM OTURUM',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: VbColors.textMuted)),
+                  ),
+                  Material(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(
+                          context, <String, String>{'action': 'tmux-attach'}),
+                      child: Container(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: VbColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.terminal_rounded,
+                                size: 22, color: VbColors.accent),
+                            SizedBox(width: 13),
+                            Expanded(
+                              child: Text("Mac'te aç / Claude app'ten eriş",
+                                  style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: VbColors.textPrimary)),
+                            ),
+                            Icon(Icons.chevron_right_rounded,
+                                color: VbColors.textMuted),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                SizedBox(height: 18),
+                Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  child: Text('SES',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: VbColors.textMuted)),
+                ),
+                Material(
+                  color: VbColors.surfaceHigh,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => Navigator.pop(
+                        context, <String, String>{'action': 'voice'}),
+                    child: Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: VbColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.record_voice_over_rounded,
+                              size: 22, color: VbColors.accent),
+                          SizedBox(width: 13),
+                          Expanded(
+                            child: Text('Konuşma sesini seç',
+                                style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: VbColors.textPrimary)),
+                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              color: VbColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _modeTile(BuildContext context, String id, String label) {
+    final selected = id == _mode;
+    final hint = _hint(id);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: selected
+            ? VbColors.accent.withValues(alpha: 0.10)
+            : VbColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => setState(() => _mode = id),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected
+                    ? VbColors.accent.withValues(alpha: 0.5)
+                    : VbColors.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(_icon(id),
+                    size: 22,
+                    color: selected ? VbColors.accent : VbColors.textMuted),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: VbColors.textPrimary)),
+                      if (hint.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(hint,
+                              style: TextStyle(
+                                  fontSize: 12, color: VbColors.textMuted)),
+                        ),
+                    ],
+                  ),
+                ),
+                if (selected)
+                  Icon(Icons.check_circle_rounded,
+                      size: 20, color: VbColors.accent),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Picker for an existing Claude Code session to attach & resume by voice.
+class _ClaudeSessionsSheet extends StatelessWidget {
+  final List<Map<String, dynamic>> sessions;
+  const _ClaudeSessionsSheet({required this.sessions});
+
+  String _ago(int ms) {
+    if (ms <= 0) return '';
+    final d =
+        DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ms));
+    if (d.inMinutes < 1) return 'az önce';
+    if (d.inMinutes < 60) return '${d.inMinutes} dk önce';
+    if (d.inHours < 24) return '${d.inHours} sa önce';
+    return '${d.inDays} gün önce';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: VbColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      height: MediaQuery.of(context).size.height * 0.7,
+      child: Column(
+        children: [
+          const _Grabber(),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, color: VbColors.accent),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Claude oturumları',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              itemCount: sessions.length,
+              itemBuilder: (_, i) {
+                final s = sessions[i];
+                final title = (s['title'] ?? '').toString().trim();
+                final ms = (s['mtime'] is num) ? (s['mtime'] as num).toInt() : 0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Material(
+                    color: VbColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () =>
+                          Navigator.pop(context, (s['id'] ?? '').toString()),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: VbColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title.isEmpty ? '(başlıksız oturum)' : title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 14.5,
+                                  color: VbColors.textPrimary,
+                                  height: 1.3),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(_ago(ms),
+                                style: VbTheme.mono(
+                                    size: 11, color: VbColors.textMuted)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

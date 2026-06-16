@@ -36,8 +36,9 @@ platform projects, fetch packages, then run:
 
 ```bash
 cd app
-bash tool/setup.sh          # generates ios/ android/ AND injects mic/speech permissions
-flutter run                 # on a connected device/simulator
+bash tool/setup.sh                # generates ios/ android/ + injects mic/speech permissions + pub get
+dart run flutter_launcher_icons   # apply the voicebridge app icon (from assets/icon/)
+flutter run                       # on a connected device/simulator
 flutter run -d macos        # …or a desktop target: macos | windows | linux
 ```
 

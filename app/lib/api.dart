@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
@@ -25,6 +26,89 @@ class Api {
     if (r.statusCode != 200) throw Exception('Köprüye ulaşılamadı (${r.statusCode})');
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
+
+  /// POST /api/tts — bridge-side (Piper) neural TTS. Returns WAV audio bytes.
+  Future<Uint8List> ttsAudio(String text) async {
+    final r = await http.post(
+      _u('/api/tts'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({'text': text}),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Köprü sesi başarısız (${r.statusCode})');
+    }
+    return r.bodyBytes;
+  }
+
+  /// POST /api/handoff — pause this session for the phone and get a
+  /// `claude --resume <id>` for the terminal (direction:'pc'), or reclaim it
+  /// (direction:'phone'). Returns {resumeCmd, claudeSessionId, note, direction}.
+  Future<Map<String, dynamic>> handoff(String sessionId,
+      {String direction = 'pc'}) async {
+    final r = await http.post(
+      _u('/api/handoff'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({'sessionId': sessionId, 'direction': direction}),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Handoff başarısız (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// GET /api/tmux-attach — full (tmux) session: returns {attachCmd, name,
+  /// running, remoteControlSteps} for reaching it on the Mac / Claude app.
+  Future<Map<String, dynamic>> tmuxAttach(String sessionId) async {
+    final r = await http.get(_u('/api/tmux-attach?sessionId=$sessionId'),
+        headers: _headers());
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Attach bilgisi alınamadı (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// POST /api/tmux-send — fire-and-forget input to a full (tmux) session. The
+  /// watch renders the turn; this never blocks (so prompts/questions don't hang).
+  Future<void> tmuxSend(String sessionId, String text) async {
+    final r = await http.post(_u('/api/tmux-send'),
+        headers: _headers({'Content-Type': 'application/json'}),
+        body: jsonEncode({'sessionId': sessionId, 'text': text}));
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Gönderilemedi (${r.statusCode})');
+    }
+  }
+
+  /// POST /api/tmux-rc — toggle Remote Control on a full (tmux) session.
+  Future<Map<String, dynamic>> tmuxRc(String sessionId, String action) async {
+    final r = await http.post(_u('/api/tmux-rc'),
+        headers: _headers({'Content-Type': 'application/json'}),
+        body: jsonEncode({'sessionId': sessionId, 'action': action}));
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Remote Control değişmedi (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// GET /api/session-history — full transcript as {role,text} turns + byte
+  /// offset to resume a watch from (#141).
+  Future<Map<String, dynamic>> sessionHistory(String sessionId) async {
+    final r = await http.get(_u('/api/session-history?sessionId=$sessionId'),
+        headers: _headers());
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Geçmiş alınamadı (${r.statusCode})');
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// GET /api/session-watch — long-lived NDJSON tail with auto-reconnect. Calls
+  /// [onTurn] for every new {type:"turn",role,text}. Returns a [SessionWatch];
+  /// call close() to stop.
+  SessionWatch watchSession(
+    String sessionId,
+    int since, {
+    required void Function(String role, String text) onTurn,
+  }) =>
+      SessionWatch(this, sessionId, since, onTurn);
 
   /// GET /api/sessions
   Future<List<Session>> sessions() async {
@@ -61,6 +145,45 @@ class Api {
     }
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     return Session.fromJson(data['session'] as Map<String, dynamic>);
+  }
+
+  /// POST /api/sessions/:id — update a session's name / mode / voice.
+  /// Returns the refreshed session.
+  Future<Session> updateSession(
+    String id, {
+    String? name,
+    String? mode,
+    bool? voice,
+    String? claudeSessionId, // "" detaches, a uuid attaches & resumes that session
+  }) async {
+    final r = await http.post(
+      _u('/api/sessions/$id'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({
+        if (name != null) 'name': name,
+        if (mode != null) 'mode': mode,
+        if (voice != null) 'voice': voice,
+        if (claudeSessionId != null) 'claudeSessionId': claudeSessionId,
+      }),
+    );
+    if (r.statusCode != 200) {
+      throw Exception(_err(r.body) ?? 'Güncellenemedi (${r.statusCode})');
+    }
+    final data = jsonDecode(r.body) as Map<String, dynamic>;
+    return Session.fromJson(data['session'] as Map<String, dynamic>);
+  }
+
+  /// GET /api/claude-sessions — existing Claude Code sessions for this session's
+  /// project, to attach & resume. Returns [{id, title, mtime}].
+  Future<List<Map<String, dynamic>>> claudeSessions(String sessionId) async {
+    final uri = _u('/api/claude-sessions')
+        .replace(queryParameters: {'sessionId': sessionId});
+    final r = await http.get(uri, headers: _headers());
+    if (r.statusCode != 200) return [];
+    final data = jsonDecode(r.body) as Map<String, dynamic>;
+    return ((data['sessions'] as List?) ?? const [])
+        .map((e) => (e as Map<String, dynamic>))
+        .toList();
   }
 
   /// GET /api/commands?sessionId= — the project's slash commands + npm scripts.
@@ -163,5 +286,69 @@ class Api {
     } catch (_) {
       return null;
     }
+  }
+}
+
+/// A self-reconnecting tail of /api/session-watch. Survives idle disconnects by
+/// reconnecting from the last byte offset (no gaps, no duplicates). close() to stop.
+class SessionWatch {
+  final Api _api;
+  final String sessionId;
+  final void Function(String role, String text) onTurn;
+  int _offset;
+  http.Client? _client;
+  bool _closed = false;
+
+  SessionWatch(this._api, this.sessionId, this._offset, this.onTurn) {
+    _connect();
+  }
+
+  void _connect() {
+    if (_closed) return;
+    final client = http.Client();
+    _client = client;
+    final req = http.Request('GET',
+        _api._u('/api/session-watch?sessionId=$sessionId&since=$_offset'));
+    req.headers.addAll(_api._headers());
+    client.send(req).then((resp) {
+      if (_closed) {
+        client.close();
+        return;
+      }
+      var buf = '';
+      resp.stream.transform(utf8.decoder).listen((chunk) {
+        buf += chunk;
+        int nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          final line = buf.substring(0, nl);
+          buf = buf.substring(nl + 1);
+          if (line.trim().isEmpty) continue;
+          try {
+            final o = jsonDecode(line) as Map<String, dynamic>;
+            if (o['offset'] is num) _offset = (o['offset'] as num).toInt();
+            if (o['type'] == 'turn') {
+              onTurn((o['role'] ?? '') as String, (o['text'] ?? '') as String);
+            }
+          } catch (_) {}
+        }
+      }, onError: (_) => _retry(), onDone: _retry, cancelOnError: true);
+    }).catchError((_) {
+      _retry();
+    });
+  }
+
+  void _retry() {
+    if (_closed) return;
+    try {
+      _client?.close();
+    } catch (_) {}
+    Future.delayed(const Duration(milliseconds: 1500), _connect);
+  }
+
+  void close() {
+    _closed = true;
+    try {
+      _client?.close();
+    } catch (_) {}
   }
 }
