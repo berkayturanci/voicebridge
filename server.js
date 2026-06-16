@@ -1352,6 +1352,25 @@ function handleRequest(req, res) {
       });
     }
 
+    // Tat Y: how to reach a full (tmux) session live on the Mac, and from there
+    // the Claude app via /remote-control. (#131)
+    if (req.method === "GET" && urlPath === "/api/tmux-attach") {
+      const q = new URL(req.url, "http://x").searchParams;
+      const session = resolveSession(q.get("sessionId"));
+      if (!session) return sendJson(res, 404, { error: "Unknown session" });
+      if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) modunda değil." });
+      const name = tmuxName(session.id);
+      return tmuxHas(name).then((running) => sendJson(res, 200, {
+        name, running,
+        attachCmd: "tmux attach -t " + name,
+        remoteControlSteps: [
+          "Mac terminalinde: tmux attach -t " + name,
+          "Açılan claude oturumunda: /remote-control",
+          "Claude mobil uygulamasında bu oturuma bağlan",
+        ],
+      }));
+    }
+
     // List locally-available Ollama models (proxies /api/tags).
     if (req.method === "GET" && urlPath === "/api/ollama/models") {
       let url;
