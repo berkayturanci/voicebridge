@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/hero.png" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
+  <img src="docs/hero.svg" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
 </p>
 
 # voicebridge
@@ -311,7 +311,6 @@ Details in [docs/security.md](docs/security.md).
 - [docs/configuration.md](docs/configuration.md) — full env-var reference, agents, and modes.
 - [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, and how to add an agent.
-- [docs/self-hosted-runner.md](docs/self-hosted-runner.md) — run CI on a free self-hosted runner.
 - [CHANGELOG.md](CHANGELOG.md) — release notes.
 
 ## Roadmap

@@ -7,9 +7,7 @@ on:
 
 jobs:
   test:
-    # Uses a self-hosted runner (free for private repos). Register one with
-    # scripts/setup-self-hosted-runner.sh — see docs/self-hosted-runner.md.
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

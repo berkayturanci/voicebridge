@@ -11,6 +11,12 @@ All notable changes to voicebridge are documented here. This project adheres to
 - **Voice-reactive orb**: while listening, the orb grows and glows as your speech
   is picked up, with a gentle idle breathing when you're quiet.
 
+### Changed
+- **License: now [PolyForm Noncommercial 1.0.0](LICENSE)** (previously MIT) —
+  free for personal, research, education, and nonprofit use; commercial use
+  requires a separate license, and the copyright notice must be kept on copies.
+- **CI now runs on GitHub-hosted `ubuntu-latest`** instead of a self-hosted runner.
+
 ### Fixed
 - **Replies now speak on iOS.** `speechSynthesis` is primed inside the first user
   gesture, so streamed replies are no longer silently blocked by Safari.
