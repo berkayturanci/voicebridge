@@ -5,6 +5,8 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-22
+
 ### Added
 - **Talking mode — mute** 🎙️: a mic toggle (top-left of the talking screen)
   pauses listening without leaving the conversation; tap the orb or 🎙️ to resume.
