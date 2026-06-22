@@ -22,9 +22,9 @@ PLIST="ios/Runner/Info.plist"
 if [ -f "$PLIST" ]; then
   if ! grep -q "NSMicrophoneUsageDescription" "$PLIST"; then
     /usr/libexec/PlistBuddy -c \
-      "Add :NSMicrophoneUsageDescription string Sesli komut için mikrofon kullanılır." "$PLIST"
+      "Add :NSMicrophoneUsageDescription string The microphone is used for voice commands." "$PLIST"
     /usr/libexec/PlistBuddy -c \
-      "Add :NSSpeechRecognitionUsageDescription string Konuştuklarını metne çevirmek için kullanılır." "$PLIST"
+      "Add :NSSpeechRecognitionUsageDescription string Used to transcribe what you say." "$PLIST"
     echo "✓ iOS: added NSMicrophoneUsageDescription + NSSpeechRecognitionUsageDescription"
   else
     echo "• iOS: permissions already present"

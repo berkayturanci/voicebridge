@@ -170,7 +170,7 @@ transcribes). Hands-free loop is browser-mode only.
   and a last-message preview. Tap a card to open it; **←** returns to the list.
 - Create a session with **＋ Yeni**: pick an **agent** (Claude / Codex /
   Antigravity / **Ollama**), a **mode**, a **project folder**, and a name. The
-  folder field has a **📁 Gözat** tree browser (no typing long paths); save
+  folder field has a **📁 Browse** tree browser (no typing long paths); save
   frequent projects as **favorites** (★) (or seed them with `FAVORITES`).
 - **Conversation history persists**: each session keeps its own transcript,
   restored on reload — come back and the conversation is still there.
@@ -196,12 +196,12 @@ transcribes). Hands-free loop is browser-mode only.
   [docs/configuration.md](docs/configuration.md#runners-local-vs-cloud).
 - **Eyes-free audio cues**: optional earcons signal *listening*, *reply done*, and
   *error* — so you can run or cycle without looking at the screen.
-- **Quick commands**: one-tap chips send canned prompts ("Ne değişti?", "Testler",
+- **Quick commands**: one-tap chips send canned prompts ("What changed?", "Tests",
   "Commit & push", …) to the active session — handy one-handed.
-- **Voice-friendly replies**: a "Kısa ses" toggle asks the agent to answer
+- **Voice-friendly replies**: a "Brief voice" toggle asks the agent to answer
   concisely for text-to-speech (no long code dumps, ending with a one-line
   summary) — the full text still shows in chat.
-- **Notifications**: opt-in "Bildirim" raises a notification when a reply
+- **Notifications**: opt-in "Notify" raises a notification when a reply
   finishes in the background or ends with a question — so a hands-free task
   pulls you back when it needs you. With VAPID keys configured it uses **real
   Web Push** (works even when the app is closed); otherwise in-page notifications.
@@ -285,7 +285,7 @@ CLAUDE_BIN=/tmp/claude npm start   # open the printed URL, type or speak
 
 | Symptom | Fix |
 |---------|-----|
-| Mic does nothing / "https şart" | Web Speech needs HTTPS — open the `tailscale serve` URL, not `http://…`. |
+| Mic does nothing / "https required" | Web Speech needs HTTPS — open the `tailscale serve` URL, not `http://…`. |
 | Mic button is **greyed out / disabled** on mobile | You're on a non-HTTPS origin (e.g. `http://<lan-ip>`). Open the `https://…ts.net` URL instead. See [mobile voice setup](docs/mobile-voice-setup.md). |
 | `Serve is not enabled on your tailnet` | One-time: open the printed `login.tailscale.com/f/serve?node=…` link and enable Serve in the admin console. |
 | iOS mic doesn't work | Use the Safari **tab**, not an installed PWA (iOS blocks the mic in installed PWAs). |

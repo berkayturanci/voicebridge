@@ -3,9 +3,9 @@ const $ = (id) => document.getElementById(id);
 
 function setRunning(running) {
   const pill = $("pill");
-  pill.textContent = running ? "● Çalışıyor" : "○ Durdu";
+  pill.textContent = running ? "● Running" : "○ Stopped";
   pill.classList.toggle("on", running);
-  $("toggle").textContent = running ? "Durdur" : "Başlat";
+  $("toggle").textContent = running ? "Stop" : "Start";
   $("open").disabled = !running;
 }
 

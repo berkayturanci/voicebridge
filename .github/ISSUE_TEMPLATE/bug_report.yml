@@ -1,0 +1,73 @@
+name: Bug report
+description: Report a problem with voicebridge
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill out the details below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When I…, voicebridge… but I expected…
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the bridge with `npm start`
+        2. Open the phone UI…
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which agent?
+      options:
+        - Claude
+        - Codex
+        - Antigravity
+        - Ollama
+        - Not agent-specific
+    validations:
+      required: false
+  - type: dropdown
+    id: client
+    attributes:
+      label: Where did it happen?
+      options:
+        - Phone browser (web UI)
+        - Native app (iOS/Android)
+        - Desktop app
+        - The Node bridge / server
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: 0.4.0 or a commit SHA
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS + version on the machine running the bridge, phone OS/browser, and Node version.
+      placeholder: |
+        - Bridge host: macOS 15.4, Node 20.11
+        - Phone: iOS 18.2, Safari
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Bridge console output or browser console errors. Redact any tokens.
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an idea or improvement for voicebridge
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do that's hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      description: voicebridge is intentionally small and (almost) dependency-free.
+      options:
+        - label: This keeps the project small and doesn't add heavy runtime dependencies
+          required: false

@@ -54,7 +54,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Display name — editable from settings (the Session model's is immutable).
   late String _name = widget.session.name;
 
-  static const _locale = 'tr-TR';
+  static const _locale = 'en-US';
 
   String get _histKey => 'vb_hist_${widget.session.id}';
 
@@ -66,8 +66,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // Upgrade off the default *compact* system voice (the robotic sound) to the
     // best installed neural voice for the locale. Runs async; see _configureBestVoice.
     _configureBestVoice();
-    // Track real TTS audio state so the orb shows "Konuşuyor" only while audio is
-    // actually playing (not inferred), and so the "Sesli oku" button flips back.
+    // Track real TTS audio state so the orb shows "Speaking" only while audio is
+    // actually playing (not inferred), and so the "Read aloud" button flips back.
     // These are independent of awaitSpeakCompletion (which resolves speak() via the
     // native result), so they don't affect the talking-loop await.
     _tts.setStartHandler(() { if (mounted) setState(() => _ttsSpeaking = true); });
@@ -82,7 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     // iOS audio session — configured ONCE here (not before every utterance).
     // Re-applying the category per reply churns the live AVAudioSession route
-    // mid-stream, which is what made speech choppy ("kesik kesik").
+    // mid-stream, which is what made speech choppy.
     //
     // Routing for hands-free use (car / AirPods): .playback implicitly reaches
     // Bluetooth A2DP / CarPlay / AirPlay; allowBluetoothA2DP + allowAirPlay make
@@ -196,7 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Persisted TTS voice name chosen in the picker (#125).
   static const _voiceKey = 'vb_tts_voice';
 
-  // Installed tr-TR voices, best-quality first (premium > enhanced > compact).
+  // Installed en voices, best-quality first (premium > enhanced > compact).
   Future<List<Map<String, String>>> _turkishVoices() async {
     try {
       final raw = await _tts.getVoices;
@@ -204,7 +204,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final voices = raw
           .whereType<Map>()
           .map((e) => e.map((k, v) => MapEntry('$k', '$v')))
-          .where((v) => (v['locale'] ?? '').toLowerCase().startsWith('tr'))
+          .where((v) => (v['locale'] ?? '').toLowerCase().startsWith('en'))
           .toList();
       int rank(Map<String, String> v) {
         final q = (v['quality'] ?? '').toLowerCase();
@@ -221,9 +221,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _voiceQualityLabel(String? q) {
     final s = (q ?? '').toLowerCase();
-    if (s.contains('premium')) return 'Premium (nöral)';
+    if (s.contains('premium')) return 'Premium (neural)';
     if (s.contains('enhanced')) return 'Enhanced';
-    return 'Standart';
+    return 'Standard';
   }
 
   Future<void> _configureBestVoice() async {
@@ -231,7 +231,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await _tts.setSpeechRate(0.5);
     await _tts.setPitch(1.0);
     final voices = await _turkishVoices();
-    if (voices.isEmpty) return; // no localized voice installed → keep default
+    if (voices.isEmpty) return; // no English voice installed → keep default
     // Prefer the user's saved pick if it's still installed (#125); else best.
     final p = await SharedPreferences.getInstance();
     final savedName = p.getString(_voiceKey);
@@ -246,14 +246,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // In-app voice picker (#125): list the installed tr-TR voices, persist the
+  // In-app voice picker (#125): list the installed en voices, persist the
   // choice, apply it, and speak a sample so it's heard immediately. iOS 26
   // ignores the system-selected voice, so picking explicitly here is the fix.
   Future<void> _pickVoice() async {
     final voices = await _turkishVoices();
     if (!mounted) return;
     if (voices.isEmpty) {
-      _toast('Yüklü Türkçe ses yok. Ayarlar → Erişilebilirlik → Sözlü İçerik → Sesler\'den indir.');
+      _toast('No English voice installed. Download one from Settings → Accessibility → Spoken Content → Voices.');
       return;
     }
     final p = await SharedPreferences.getInstance();
@@ -278,7 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                child: Text('Ses seç',
+                child: Text('Choose a voice',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -304,9 +304,9 @@ class _ChatScreenState extends State<ChatScreen> {
     await p.setString(_voiceKey, picked['name']!);
     try {
       await _tts.setVoice({'name': picked['name']!, 'locale': picked['locale']!});
-      await _speak('Merhaba, artık bu sesle konuşacağım.'); // hear it right away
+      await _speak('Hello, I\'ll speak with this voice from now on.'); // hear it right away
     } catch (_) {}
-    if (mounted) _toast('Ses seçildi: ${picked['name']}');
+    if (mounted) _toast('Voice selected: ${picked['name']}');
   }
 
   // The autonomy modes this agent supports (label + id), for the settings sheet.
@@ -397,7 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
       },
     );
     if (!_sttReady && mounted) {
-      _toast('Mikrofon izni yok veya ses tanıma kullanılamıyor.');
+      _toast('No microphone permission, or speech recognition is unavailable.');
     }
     return _sttReady;
   }
@@ -455,7 +455,7 @@ class _ChatScreenState extends State<ChatScreen> {
       listenOptions: SpeechListenOptions(
         listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
         partialResults: true,
-        onDevice: false, // tr-TR uses server recognition
+        onDevice: false, // en uses server recognition
         autoPunctuation: true,
         cancelOnError: false,
       ),
@@ -483,17 +483,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // Clean text for TTS: drop code/markdown so it isn't read as symbols. When
   // [summarize] (hands-free talking loop), a long reply is shortened to its lead
-  // sentences plus an "on screen" cue — the explicit "Sesli oku" button passes
+  // sentences plus an "on screen" cue — the explicit "Read aloud" button passes
   // summarize:false to read the whole thing. Pure client-side, works offline.
   String _forSpeech(String text, {bool summarize = false}) {
     var s = text
-        .replaceAll(RegExp(r'```[\s\S]*?```'), ' (kod) ') // fenced code → marker
+        .replaceAll(RegExp(r'```[\s\S]*?```'), ' (code) ') // fenced code → marker
         .replaceAll('`', ''); // inline code ticks
     s = s.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), ''); // headings
     s = s.replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), ''); // list bullets
     s = s.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m[1]!); // bold → text
     s = s.replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]+\)'), (m) => m[1]!); // links → text
-    s = s.replaceAll(RegExp(r'\(kod\)(?:\s*\(kod\))+'), '(kod)'); // collapse repeats
+    s = s.replaceAll(RegExp(r'\(code\)(?:\s*\(code\))+'), '(code)'); // collapse repeats
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (!summarize || s.length <= _speakMaxChars) return s;
     final head = s.substring(0, _speakMaxChars);
@@ -501,7 +501,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // (e.g. "36.") so we don't cut mid-sentence.
     final stop = head.lastIndexOf(RegExp(r'(?<!\d)[.!?…]'));
     final lead = (stop > 200 ? head.substring(0, stop + 1) : head).trim();
-    return '$lead … (uzun cevap, tamamı ekranda)';
+    return '$lead … (long reply, full text on screen)';
   }
 
   Future<void> _speak(String text, {bool summarize = false}) async {
@@ -516,8 +516,8 @@ class _ChatScreenState extends State<ChatScreen> {
     await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
   }
 
-  // Per-message "Sesli oku" toggle (the bubble button). _ttsMsg tracks which
-  // message is playing so the button shows "Durdur" and a second tap stops it.
+  // Per-message "Read aloud" toggle (the bubble button). _ttsMsg tracks which
+  // message is playing so the button shows "Stop" and a second tap stops it.
   Future<void> _readAloud(Message m) async {
     await _tts.stop(); // halt any current readout first (also lets you switch messages)
     if (!mounted) return;
@@ -598,7 +598,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _toBottom();
         },
       );
-      if (full.trim().isEmpty) setState(() => reply.text = '(boş cevap)');
+      if (full.trim().isEmpty) setState(() => reply.text = '(empty reply)');
       // Turn (network/agent) is done — release _busy NOW so the user can type and
       // send a new message during the spoken readout below (it barge-ins the TTS).
       if (mounted) setState(() => _busy = false);
@@ -645,7 +645,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final groups = await _api.commands(widget.session.id);
     if (!mounted) return;
     if (groups.isEmpty) {
-      _toast('Bu oturumda komut bulunamadı (cloud oturum olabilir).');
+      _toast('No commands found for this session (it may be a cloud session).');
       return;
     }
     final picked = await showModalBottomSheet<String>(
@@ -705,13 +705,13 @@ class _ChatScreenState extends State<ChatScreen> {
         mode: modeChanged ? newMode : null,
       );
       _toast(nameChanged && modeChanged
-          ? 'İsim ve mod güncellendi'
+          ? 'Name and mode updated'
           : nameChanged
-              ? 'İsim güncellendi'
-              : 'Mod: ${_modeLabel(newMode!)}');
+              ? 'Name updated'
+              : 'Mode: ${_modeLabel(newMode!)}');
     } catch (e) {
       if (mounted) setState(() { _name = prevName; _mode = prevMode; });
-      _toast('Güncellenemedi: ${e.toString().replaceFirst('Exception: ', '')}');
+      _toast('Update failed: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
 
@@ -721,12 +721,12 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       list = await _api.claudeSessions(widget.session.id);
     } catch (e) {
-      _toast('Claude oturumları alınamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      _toast('Couldn\'t load Claude sessions: ${e.toString().replaceFirst('Exception: ', '')}');
       return;
     }
     if (!mounted) return;
     if (list.isEmpty) {
-      _toast('Bu proje için kayıtlı Claude oturumu yok.');
+      _toast('No saved Claude session for this project.');
       return;
     }
     final picked = await showModalBottomSheet<String>(
@@ -743,24 +743,24 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages
           ..clear()
           ..add(Message('activity',
-              '🔗 Claude oturumuna bağlanıldı — agent önceki konuşmayı hatırlayacak'));
+              '🔗 Connected to the Claude session — the agent will remember the earlier conversation'));
       });
       _persist();
       _toBottom();
-      _toast('Bağlandı — sıradaki mesajda bu oturum devam edecek.');
+      _toast('Connected — this session continues on your next message.');
     } catch (e) {
-      _toast('Bağlanamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      _toast('Couldn\'t connect: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
 
-  // Tat Y: show how to reach a full (tmux) session live on the Mac and from the
+  // Show how to reach a full (tmux) session live on the Mac and from the
   // Claude app via /remote-control.
   Future<void> _showTmuxAttach() async {
     Map<String, dynamic> info;
     try {
       info = await _api.tmuxAttach(widget.session.id);
     } catch (e) {
-      _toast('Alınamadı: ${e.toString().replaceFirst('Exception: ', '')}');
+      _toast('Couldn\'t load: ${e.toString().replaceFirst('Exception: ', '')}');
       return;
     }
     if (!mounted) return;
@@ -770,7 +770,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: VbColors.surface,
-        title: const Text("Mac'te aç / Claude app"),
+        title: const Text("Open on Mac / Claude app"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -788,15 +788,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 8),
                 Text(
                     info['rcActive'] == true
-                        ? 'Remote Control: açık'
-                        : 'Remote Control: kapalı',
+                        ? 'Remote Control: on'
+                        : 'Remote Control: off',
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: VbColors.textPrimary)),
               ],
             ),
             const SizedBox(height: 12),
-            Text('Mac terminalinde bu oturuma canlı gir:',
+            Text('Join this session live in your Mac terminal:',
                 style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
             const SizedBox(height: 8),
             Container(
@@ -811,7 +811,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
             ),
             const SizedBox(height: 14),
-            Text('Claude uygulamasından erişmek için:',
+            Text('To access it from the Claude app:',
                 style: TextStyle(color: VbColors.textMuted, fontSize: 13)),
             const SizedBox(height: 6),
             for (var i = 0; i < steps.length; i++)
@@ -826,9 +826,9 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: cmd));
-              _toast('Komut kopyalandı');
+              _toast('Command copied');
             },
-            child: const Text('Komutu kopyala'),
+            child: const Text('Copy command'),
           ),
           FilledButton(
             onPressed: () async {
@@ -837,15 +837,15 @@ class _ChatScreenState extends State<ChatScreen> {
               try {
                 await _api.tmuxRc(widget.session.id, active ? 'stop' : 'start');
                 _toast(active
-                    ? 'Remote Control durduruldu'
-                    : 'Remote Control başlatıldı');
+                    ? 'Remote Control stopped'
+                    : 'Remote Control started');
               } catch (e) {
-                _toast('Olmadı: ${e.toString().replaceFirst('Exception: ', '')}');
+                _toast('Didn\'t work: ${e.toString().replaceFirst('Exception: ', '')}');
               }
             },
             child: Text(info['rcActive'] == true
-                ? "Remote Control'ü durdur"
-                : 'Remote Control başlat'),
+                ? "Stop Remote Control"
+                : 'Start Remote Control'),
           ),
         ],
       ),
@@ -894,7 +894,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _name.isEmpty ? 'İsimsiz oturum' : _name,
+                    _name.isEmpty ? 'Untitled session' : _name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -930,14 +930,14 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: _hideActivity ? 'Aktiviteyi göster' : 'Aktiviteyi gizle',
+            tooltip: _hideActivity ? 'Show activity' : 'Hide activity',
             onPressed: _toggleHideActivity,
             icon: Icon(_hideActivity
                 ? Icons.visibility_off_outlined
                 : Icons.visibility_outlined),
           ),
           IconButton(
-            tooltip: 'Komutlar',
+            tooltip: 'Commands',
             onPressed: _busy ? null : _openPalette,
             icon: const Icon(Icons.bolt_outlined),
           ),
@@ -997,7 +997,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Sohbete başla',
+              'Start a chat',
               style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
@@ -1005,7 +1005,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Bir mesaj yaz, mikrofona dokun ya da konuşma modunu aç.',
+              'Type a message, tap the mic, or turn on conversation mode.',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 13.5, color: VbColors.textMuted, height: 1.45),
@@ -1046,7 +1046,7 @@ class _ChatScreenState extends State<ChatScreen> {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: Text(
-              _talkMuted ? 'Sessiz' : st.label,
+              _talkMuted ? 'Muted' : st.label,
               key: ValueKey(_talkMuted ? 'muted' : st.label),
               style: TextStyle(
                 fontSize: 14,
@@ -1065,7 +1065,7 @@ class _ChatScreenState extends State<ChatScreen> {
               size: 18,
               color: _talkMuted ? VbColors.danger : VbColors.accent,
             ),
-            label: Text(_talkMuted ? 'Mikrofonu aç' : 'Mikrofonu kapat'),
+            label: Text(_talkMuted ? 'Turn on mic' : 'Turn off mic'),
             style: OutlinedButton.styleFrom(
               foregroundColor:
                   _talkMuted ? VbColors.danger : VbColors.textPrimary,
@@ -1078,8 +1078,8 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(height: 8),
           Text(
             _ttsSpeaking
-                ? 'Konuşurken orb’a dokun → kes ve hemen konuş'
-                : 'Orb’a dokun → mikrofonu aç/kapat · bitirmek için üstteki telefon simgesi',
+                ? 'While speaking, tap the orb → cut in and talk right away'
+                : 'Tap the orb → toggle the mic · tap the phone icon up top to finish',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, color: VbColors.textMuted),
           ),
@@ -1192,7 +1192,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                _ttsMsg == m ? 'Durdur' : 'Sesli oku',
+                                _ttsMsg == m ? 'Stop' : 'Read aloud',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: _ttsMsg == m
@@ -1228,7 +1228,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 icon: _listening ? Icons.mic : Icons.mic_none_rounded,
                 active: _listening,
                 onTap: _busy ? null : _listen,
-                tooltip: 'Sesle yaz',
+                tooltip: 'Dictate',
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1248,7 +1248,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (t.trim().isNotEmpty) _send(t.trim());
                     },
                     decoration: const InputDecoration(
-                      hintText: 'Mesaj yaz…',
+                      hintText: 'Type a message…',
                       filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -1368,11 +1368,11 @@ extension _OrbStateX on _OrbState {
   String get label {
     switch (this) {
       case _OrbState.listening:
-        return 'Dinliyor';
+        return 'Listening';
       case _OrbState.thinking:
-        return 'Düşünüyor';
+        return 'Thinking';
       case _OrbState.speaking:
-        return 'Konuşuyor';
+        return 'Speaking';
     }
   }
 
@@ -1498,7 +1498,7 @@ class _ActivityGroupState extends State<_ActivityGroup> {
     final last = items.isEmpty ? '' : _clean(items.last.text);
     final header = items.length == 1
         ? last
-        : (_open ? '${items.length} işlem' : '${items.length} işlem · $last');
+        : (_open ? '${items.length} actions' : '${items.length} actions · $last');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Center(
@@ -1704,7 +1704,7 @@ class _TalkButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: active ? 'Konuşmayı durdur' : 'Konuşma modu',
+      message: active ? 'Stop talking' : 'Conversation mode',
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Material(
@@ -1842,7 +1842,7 @@ class _CommandSheetState extends State<_CommandSheet> {
                   Icon(Icons.bolt_outlined, color: VbColors.accent),
                   const SizedBox(width: 8),
                   const Text(
-                    'Komutlar',
+                    'Commands',
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w700),
                   ),
@@ -1856,14 +1856,14 @@ class _CommandSheetState extends State<_CommandSheet> {
                 onChanged: (v) => setState(() => _q = v),
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
-                  hintText: 'Komut ara…',
+                  hintText: 'Search commands…',
                 ),
               ),
             ),
             Expanded(
               child: tiles.isEmpty
                   ? Center(
-                      child: Text('Eşleşme yok',
+                      child: Text('No matches',
                           style: TextStyle(color: VbColors.textMuted)))
                   : ListView(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -1930,13 +1930,13 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
   String _hint(String id) {
     switch (id) {
       case 'full':
-        return 'Tam yetki — izin sormaz, kesintisiz çalışır';
+        return 'Full-auto — never asks permission, runs uninterrupted';
       case 'autoEdit':
       case 'acceptEdits':
-        return 'Dosya düzenlemelerini otomatik onaylar';
+        return 'Auto-approves file edits';
       case 'ask':
       case 'default':
-        return 'Her işlem için izin ister';
+        return 'Asks permission for every action';
       default:
         return '';
     }
@@ -1975,7 +1975,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
-                      child: Text('Oturum ayarları',
+                      child: Text('Session settings',
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -1986,7 +1986,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 const SizedBox(height: 18),
                 Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text('İSİM',
+                  child: Text('NAME',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -1997,12 +1997,12 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   controller: _nameCtl,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _save(),
-                  decoration: const InputDecoration(hintText: 'Oturum adı'),
+                  decoration: const InputDecoration(hintText: 'Session name'),
                 ),
                 const SizedBox(height: 18),
                 Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 4),
-                  child: Text('OTONOMİ MODU',
+                  child: Text('AUTONOMY MODE',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -2012,7 +2012,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 if (widget.modes.isEmpty)
                   Padding(
                     padding: EdgeInsets.symmetric(vertical: 18),
-                    child: Text('Bu oturum için mod bilgisi yüklenemedi.',
+                    child: Text('Couldn\'t load mode info for this session.',
                         style: TextStyle(color: VbColors.textMuted)),
                   )
                 else
@@ -2035,7 +2035,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Telefondan izin penceresi açılamaz; kesintisiz çalışmak için "tam yetki" modu en uygunudur.',
+                          'Permission prompts can\'t open from the phone; "full-auto" mode is best for uninterrupted runs.',
                           style: TextStyle(
                               fontSize: 12,
                               color: VbColors.textMuted,
@@ -2049,7 +2049,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   SizedBox(height: 18),
                   Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 6),
-                    child: Text('CLAUDE OTURUMU',
+                    child: Text('CLAUDE SESSION',
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -2077,7 +2077,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                             SizedBox(width: 13),
                             Expanded(
                               child: Text(
-                                'CLI/masaüstü oturumuna bağlan & sesle devam et',
+                                'Connect to the CLI/desktop session & continue by voice',
                                 style: TextStyle(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w600,
@@ -2096,7 +2096,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   SizedBox(height: 18),
                   Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 6),
-                    child: Text('TAM OTURUM',
+                    child: Text('FULL SESSION',
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -2123,7 +2123,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                                 size: 22, color: VbColors.accent),
                             SizedBox(width: 13),
                             Expanded(
-                              child: Text("Mac'te aç / Claude app'ten eriş",
+                              child: Text("Open on Mac / access from the Claude app",
                                   style: TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.w600,
@@ -2140,7 +2140,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 SizedBox(height: 18),
                 Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 6),
-                  child: Text('SES',
+                  child: Text('VOICE',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -2167,7 +2167,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                               size: 22, color: VbColors.accent),
                           SizedBox(width: 13),
                           Expanded(
-                            child: Text('Konuşma sesini seç',
+                            child: Text('Choose the talking voice',
                                 style: TextStyle(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w600,
@@ -2184,7 +2184,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 FilledButton.icon(
                   onPressed: _save,
                   icon: const Icon(Icons.check_rounded),
-                  label: const Text('Kaydet'),
+                  label: const Text('Save'),
                 ),
               ],
             ),
@@ -2263,10 +2263,10 @@ class _ClaudeSessionsSheet extends StatelessWidget {
     if (ms <= 0) return '';
     final d =
         DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ms));
-    if (d.inMinutes < 1) return 'az önce';
-    if (d.inMinutes < 60) return '${d.inMinutes} dk önce';
-    if (d.inHours < 24) return '${d.inHours} sa önce';
-    return '${d.inDays} gün önce';
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+    if (d.inHours < 24) return '${d.inHours} hr ago';
+    return '${d.inDays} days ago';
   }
 
   @override
@@ -2287,7 +2287,7 @@ class _ClaudeSessionsSheet extends StatelessWidget {
                 Icon(Icons.history_rounded, color: VbColors.accent),
                 SizedBox(width: 8),
                 Expanded(
-                  child: Text('Claude oturumları',
+                  child: Text('Claude sessions',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
@@ -2322,7 +2322,7 @@ class _ClaudeSessionsSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              title.isEmpty ? '(başlıksız oturum)' : title,
+                              title.isEmpty ? '(untitled session)' : title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

@@ -58,9 +58,9 @@ allows the mic and speech recognition:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>Sesli komut vermek için mikrofon kullanılır.</string>
+<string>The microphone is used to give voice commands.</string>
 <key>NSSpeechRecognitionUsageDescription</key>
-<string>Konuştuklarınızı metne çevirmek için kullanılır.</string>
+<string>Used to transcribe what you say.</string>
 ```
 
 Minimum iOS deployment target **12.0+** (set in `ios/Podfile` /
@@ -99,7 +99,7 @@ The app runs on the desktop from the same code. Caveats:
 ## First launch
 
 1. Enter the **bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token.
-2. "Test et & Kaydet" verifies it can reach `/api/config`.
+2. "Test & Save" verifies it can reach `/api/config`.
 3. You land on the session list — open one and talk.
 
 ## Notes
@@ -108,7 +108,7 @@ The app runs on the desktop from the same code. Caveats:
   when you reopen a chat.
 - **Command palette** (⚡ in the chat app bar) lists the project's
   `.claude/commands` + npm scripts and prefills the composer.
-- **Folder browser** — the new-session sheet has a "Proje klasörü" picker backed
+- **Folder browser** — the new-session sheet has a "Project folder" picker backed
   by `/api/browse`.
 - Code is written against the bridge API but **hasn't been compiled in this
   repo's CI** (no Flutter toolchain here) — run `flutter analyze` locally.

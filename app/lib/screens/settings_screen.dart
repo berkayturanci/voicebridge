@@ -67,7 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: firstRun
           ? null
-          : AppBar(title: const Text('Köprü ayarları')),
+          : AppBar(title: const Text('Bridge settings')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
@@ -88,8 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Telefonundan Claude Code ile yaz ve konuş.\n'
-                'Başlamak için köprünün adresini gir.',
+                'Type and talk to Claude Code from your phone.\n'
+                'Enter the bridge address to get started.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 14, color: VbColors.textMuted, height: 1.5),
@@ -97,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 34),
             ] else
               const SizedBox(height: 12),
-            _label('Köprü URL'),
+            _label('Bridge URL'),
             const SizedBox(height: 8),
             TextField(
               controller: _url,
@@ -109,7 +109,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _label('Erişim token'),
+            _label('Access token'),
             const SizedBox(height: 8),
             TextField(
               controller: _token,
@@ -117,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               autocorrect: false,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.key_rounded),
-                hintText: 'opsiyonel',
+                hintText: 'optional',
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _obscure = !_obscure),
                   icon: Icon(_obscure
@@ -166,13 +166,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           strokeWidth: 2.2, color: Color(0xFF06210C)))
                   : const Icon(Icons.arrow_forward_rounded),
               label: Text(_busy
-                  ? 'Bağlanıyor…'
+                  ? 'Connecting…'
                   : firstRun
-                      ? 'Bağlan'
-                      : 'Test et & Kaydet'),
+                      ? 'Connect'
+                      : 'Test & Save'),
             ),
             const SizedBox(height: 24),
-            _label('Görünüm'),
+            _label('Appearance'),
             const SizedBox(height: 8),
             _themeToggle(),
             const SizedBox(height: 22),
@@ -198,15 +198,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Icon(Icons.brightness_6_rounded, size: 20, color: VbColors.accent),
             const SizedBox(width: 12),
             Expanded(
-              child: Text('Tema',
+              child: Text('Theme',
                   style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                       color: VbColors.textPrimary)),
             ),
-            _themeSeg('system', 'Sistem', mode == 'system'),
-            _themeSeg('light', 'Açık', mode == 'light'),
-            _themeSeg('dark', 'Koyu', mode == 'dark'),
+            _themeSeg('system', 'System', mode == 'system'),
+            _themeSeg('light', 'Light', mode == 'light'),
+            _themeSeg('dark', 'Dark', mode == 'dark'),
           ],
         ),
       ),
@@ -292,7 +292,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'İpucu',
+                  'Tip',
                   style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
@@ -300,7 +300,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Bilgisayarda köprüyü Tailscale ile HTTPS yayınla:',
+                  'On your computer, serve the bridge over HTTPS with Tailscale:',
                   style: TextStyle(
                       fontSize: 12.5,
                       color: VbColors.textMuted,

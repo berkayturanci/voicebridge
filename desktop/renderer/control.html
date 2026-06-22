@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline';" />
@@ -42,28 +42,28 @@
         <datalist id="hosts"><option value="127.0.0.1"><option value="0.0.0.0"></datalist>
       </label>
     </div>
-    <label>Erişim token (opsiyonel)
+    <label>Access token (optional)
       <span style="display:flex;gap:8px;">
-        <input id="token" style="flex:1" placeholder="boş = korumasız" />
-        <button id="gen" type="button">Üret</button>
+        <input id="token" style="flex:1" placeholder="empty = unprotected" />
+        <button id="gen" type="button">Generate</button>
       </span>
     </label>
     <div class="btns">
-      <button id="apply" type="button">Kaydet & yeniden başlat</button>
-      <button id="toggle" class="primary" type="button">Başlat</button>
-      <button id="open" type="button">Tarayıcıda aç</button>
+      <button id="apply" type="button">Save & restart</button>
+      <button id="toggle" class="primary" type="button">Start</button>
+      <button id="open" type="button">Open in browser</button>
     </div>
     <div>
-      <div class="hint">Telefon adresi:</div>
+      <div class="hint">Phone address:</div>
       <div class="url" id="url">—</div>
-      <div class="hint">Telefondan bağlanmak için QR kod aşağıdaki günlükte görünür (köprü başlarken basar). HTTPS için: <code>tailscale serve --bg PORT</code></div>
+      <div class="hint">A QR code to connect from your phone appears in the log below (printed when the bridge starts). For HTTPS: <code>tailscale serve --bg PORT</code></div>
     </div>
     <div>
-      <div class="hint">Agentlar:</div>
+      <div class="hint">Agents:</div>
       <div class="pills" id="agents"><span class="tag">—</span></div>
     </div>
     <div>
-      <div class="hint">Aktif oturumlar:</div>
+      <div class="hint">Active sessions:</div>
       <div id="sessions"><div class="sess">—</div></div>
     </div>
     <div class="log" id="log"></div>
