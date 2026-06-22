@@ -55,7 +55,7 @@
   <!-- tagline -->
   <text x="72" y="222" fill="#c9d1d9" font-size="29" font-weight="600">Talk to Claude Code from your phone.</text>
   <text x="72" y="260" fill="#8b949e" font-size="22">You speak or type; the agent does the work and replies</text>
-  <text x="72" y="289" fill="#8b949e" font-size="22">in chat <tspan fill="#c9d1d9">and aloud</tspan> — free, open-source, no ElevenLabs.</text>
+  <text x="72" y="289" fill="#8b949e" font-size="22">in chat <tspan fill="#c9d1d9">and aloud</tspan> — free, source-available, no ElevenLabs.</text>
 
   <!-- feature pills -->
   <g font-size="17">
@@ -82,7 +82,7 @@
 
   <!-- footer line -->
   <text x="72" y="566" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6e7681">github.com/berkayturanci/speak-with-claude-code</text>
-  <text x="520" y="566" font-size="16" fill="#484f58">·  MIT</text>
+  <text x="520" y="566" font-size="16" fill="#484f58">·  Noncommercial</text>
 
   <!-- ===== Right: phone mockup ===== -->
   <ellipse cx="935" cy="320" rx="220" ry="280" fill="url(#greenGlow)" opacity="0.7"/>

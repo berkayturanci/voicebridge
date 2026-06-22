@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="docs/hero.png" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
+  <img src="docs/hero.svg" alt="voicebridge — hands-free, two-way voice for your coding agent, from your phone" width="100%" />
 </p>
 
 # voicebridge
 
 [![CI](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-3fb950)](package.json)
-[![License: MIT](https://img.shields.io/badge/license-MIT-1f6feb)](LICENSE)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-1f6feb)](LICENSE)
 [![Agents: Claude · Codex · Antigravity · Ollama](https://img.shields.io/badge/agents-Claude%20%C2%B7%20Codex%20%C2%B7%20Antigravity%20%C2%B7%20Ollama-8b949e)](#agents-sessions--modes)
 
-**Hands-free, two-way voice for your coding agent from your phone — free, open-source, no ElevenLabs.**
+**Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
 
 You speak **or type** on your phone, a coding agent (running on your Mac/Linux
 box) does the work, and the reply streams back as chat **and** spoken audio —
@@ -311,7 +311,6 @@ Details in [docs/security.md](docs/security.md).
 - [docs/configuration.md](docs/configuration.md) — full env-var reference, agents, and modes.
 - [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, and how to add an agent.
-- [docs/self-hosted-runner.md](docs/self-hosted-runner.md) — run CI on a free self-hosted runner.
 - [CHANGELOG.md](CHANGELOG.md) — release notes.
 
 ## Roadmap
@@ -325,4 +324,8 @@ Details in [docs/security.md](docs/security.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+**[PolyForm Noncommercial License 1.0.0](LICENSE)** — free to use, modify, and
+share for any **noncommercial** purpose (personal, research, education,
+nonprofit). **Commercial use is not permitted**, and the required copyright
+notice (`Copyright (c) 2026 Berkay Turancı`) must be kept on copies. Want to use
+voicebridge commercially? Contact the author for a separate license.

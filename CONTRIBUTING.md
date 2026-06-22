@@ -62,4 +62,4 @@ docs/                # architecture, configuration, security
 
 Keep PRs focused, describe the change and how you verified it, and make sure
 `npm test` passes. By contributing you agree your work is licensed under the
-project's [MIT License](LICENSE).
+project's [PolyForm Noncommercial License 1.0.0](LICENSE).

@@ -972,7 +972,7 @@ async function streamTmux(session, prompt, res, emit) {
 // Tat X — persistent live sessions (behind PERSISTENT_SESSIONS=1)
 // One long-lived `claude --print --input-format stream-json` process per session
 // keeps conversation history IN-MEMORY across turns (no per-turn --resume reload)
-// and lets slash commands run. Proven by probe; see docs/tat-x-plan.md. The
+// and lets slash commands run. Proven by probe. The
 // per-turn streamLocal path below stays as the fallback when the flag is off.
 // ---------------------------------------------------------------------------
 const LIVE_ENABLED = process.env.PERSISTENT_SESSIONS === "1";
