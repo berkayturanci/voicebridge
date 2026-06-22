@@ -10,12 +10,17 @@ All notable changes to voicebridge are documented here. This project adheres to
   pauses listening without leaving the conversation; tap the orb or 🎙️ to resume.
 - **Voice-reactive orb**: while listening, the orb grows and glows as your speech
   is picked up, with a gentle idle breathing when you're quiet.
+- **Community health files** — Code of Conduct, Security policy, issue & pull
+  request templates, CODEOWNERS, Dependabot, `.editorconfig`, and `CITATION.cff`.
 
 ### Changed
 - **License: now [PolyForm Noncommercial 1.0.0](LICENSE)** (previously MIT) —
   free for personal, research, education, and nonprofit use; commercial use
   requires a separate license, and the copyright notice must be kept on copies.
 - **CI now runs on GitHub-hosted `ubuntu-latest`** instead of a self-hosted runner.
+- **Now fully in English** — the web UI, native app, and desktop control panel,
+  plus the README hero and demo images, are all English (default language is
+  English; Turkish stays selectable as a speech/voice option).
 
 ### Fixed
 - **Replies now speak on iOS.** `speechSynthesis` is primed inside the first user

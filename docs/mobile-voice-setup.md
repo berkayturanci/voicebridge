@@ -29,7 +29,7 @@ So voicebridge works out of the box on your desktop at `localhost`, but a phone
 reaching it by LAN IP gets no microphone. voicebridge detects the missing API
 and disables the button on purpose (see the check in
 [`public/index.html`](../public/index.html) — `CONFIG.sttMode === "browser" && !SR`),
-showing the status *"Tarayıcı konuşma tanımayı desteklemiyor."*
+showing the status *"This browser doesn't support voice input."*
 
 The cleanest fix is a real HTTPS URL, and the cheapest way to get one for a
 machine on your desk is **Tailscale Serve**.

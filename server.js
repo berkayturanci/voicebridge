@@ -157,9 +157,9 @@ const AGENTS = {
     live: true, // supports the persistent --input-format stream-json live path (Tat X)
     defaultMode: "ask",
     modes: {
-      ask: { label: "Onay iste", args: [] },
-      autoEdit: { label: "Düzenlemeleri onayla", args: ["--permission-mode", "acceptEdits"] },
-      full: { label: "Tam otonom", args: ["--dangerously-skip-permissions"] },
+      ask: { label: "Ask for approval", args: [] },
+      autoEdit: { label: "Approve edits", args: ["--permission-mode", "acceptEdits"] },
+      full: { label: "Fully autonomous", args: ["--dangerously-skip-permissions"] },
     },
     // Prompt is passed positionally after -p (claude also accepts it on stdin).
     command(prompt, { cont, resume, modeArgs } = {}) {
@@ -928,14 +928,14 @@ async function streamTmux(session, prompt, res, emit) {
   const old = tmuxIdleTimers.get(session.id); if (old) { clearTimeout(old); tmuxIdleTimers.delete(session.id); }
   let name;
   try { name = await ensureTmuxClaude(session); }
-  catch (e) { emit({ type: "error", error: "tmux başlatılamadı: " + e.message }); return res.end(); }
+  catch (e) { emit({ type: "error", error: "couldn't start tmux: " + e.message }); return res.end(); }
 
   // The TUI input is single-line and submits on Enter; flatten newlines.
   const text = buildPrompt(session.voice, prompt).replace(/\s*\n\s*/g, " ").trim();
   await tmuxRun(["send-keys", "-t", name, "-l", text]);
   await sleepMs(180);
   await tmuxRun(["send-keys", "-t", name, "Enter"]);
-  emit({ type: "activity", text: "tmux: claude düşünüyor…" });
+  emit({ type: "activity", text: "tmux: claude is thinking…" });
 
   const MAXMS = (Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0) || 20 * 60 * 1000;
   const t0 = Date.now();
@@ -951,7 +951,7 @@ async function streamTmux(session, prompt, res, emit) {
   }
   if (closed) return; // barge-in — process keeps running for the next turn / attach
   const reply = extractTuiReply(await tmuxCapture(name, -250), text);
-  emit({ type: "delta", text: reply || "(yanıt yakalanamadı — Mac'te `tmux attach` ile bakabilirsin)" });
+  emit({ type: "delta", text: reply || "(couldn't capture the reply — check with `tmux attach` on your Mac)" });
   session.started = true;
   // Bind the transcript .jsonl by content — the file containing this turn's input
   // (reliable even with many .jsonl in the dir). Needed for sync/resume/handoff.
@@ -1017,7 +1017,7 @@ function streamLive(session, prompt, res, emit) {
   // phone process was gone during the handoff. (#123)
   if (session.handoff === "pc") { session.handoff = null; saveSessions(); }
   const p = getOrSpawnLive(session);
-  if (p.busy) { emit({ type: "error", error: "Bu oturum şu an meşgul (önceki tur sürüyor)." }); return res.end(); }
+  if (p.busy) { emit({ type: "error", error: "This session is busy right now (the previous turn is still running)." }); return res.end(); }
   p.busy = true;
   if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
 
@@ -1141,7 +1141,7 @@ function streamLocal(session, prompt, res, emit) {
   };
 
   // Decode stdout/stderr as UTF-8 with carry-over across chunk boundaries, so a
-  // multi-byte char (ı, ş, ç, …) split between two chunks isn't mangled into ��.
+  // multi-byte char (é, ñ, 中, …) split between two chunks isn't mangled into ��.
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
   child.stdout.on("data", (d) => {
@@ -1174,7 +1174,7 @@ function streamLocal(session, prompt, res, emit) {
     clearTimeout(timer);
     if (agent.stream === "ndjson" && buf.trim()) onLine(buf);
     if (timedOut && !gotText) {
-      emit({ type: "error", error: `${agent.label} ${Math.round(TIMEOUT_MS / 60000)} dk içinde tamamlanamadı (zaman aşımı, durduruldu). Yan etkiler (dosya değişikliği, issue vb.) yapılmış olabilir. Daha uzun görevler için sunucuda AGENT_TIMEOUT_MS değerini artırın (0 = sınırsız).` });
+      emit({ type: "error", error: `${agent.label} didn't finish within ${Math.round(TIMEOUT_MS / 60000)} min (timed out, stopped). Side effects (file changes, issues, etc.) may have occurred. For longer tasks, raise AGENT_TIMEOUT_MS on the server (0 = unlimited).` });
     } else if (code !== 0 && !gotText) {
       emit({ type: "error", error: stderr.trim() || `${agent.label} exited with code ${code}.` });
     } else {
@@ -1446,7 +1446,7 @@ function handleRequest(req, res) {
         return sendJson(res, 200, {
           ok: true, direction: "pc", claudeSessionId: id, projectDir: session.projectDir,
           resumeCmd: id ? ("claude --resume " + id) : null,
-          note: id ? null : "Bu oturum henüz bir tur çalıştırmadı; devredilecek bir Claude oturumu yok.",
+          note: id ? null : "This session hasn't run a turn yet; there's no Claude session to hand off.",
         });
       });
     }
@@ -1457,7 +1457,7 @@ function handleRequest(req, res) {
       const q = new URL(req.url, "http://x").searchParams;
       const session = resolveSession(q.get("sessionId"));
       if (!session) return sendJson(res, 404, { error: "Unknown session" });
-      if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) modunda değil." });
+      if (session.runner !== "tmux") return sendJson(res, 400, { error: "This session isn't in full (tmux) session mode." });
       const name = tmuxName(session.id);
       return tmuxHas(name).then(async (running) => {
         let rcActive = false;
@@ -1467,8 +1467,8 @@ function handleRequest(req, res) {
           attachCmd: "tmux attach -t " + name,
           remoteControlSteps: [
             "Mac terminalinde: tmux attach -t " + name,
-            "Açılan claude oturumunda: /remote-control",
-            "Claude mobil uygulamasında bu oturuma bağlan",
+            "In the opened claude session: /remote-control",
+            "Connect to this session in the Claude mobile app",
           ],
         });
       });
@@ -1482,9 +1482,9 @@ function handleRequest(req, res) {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
-        if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) değil." });
+        if (session.runner !== "tmux") return sendJson(res, 400, { error: "This session isn't a full (tmux) session." });
         const name = tmuxName(session.id);
-        if (!(await tmuxHas(name))) return sendJson(res, 400, { error: "tmux oturumu çalışmıyor." });
+        if (!(await tmuxHas(name))) return sendJson(res, 400, { error: "The tmux session isn't running." });
         const stop = data.action === "stop";
         await tmuxRun(["send-keys", "-t", name, "-l", "/remote-control"]);
         await sleepMs(150);
@@ -1502,7 +1502,7 @@ function handleRequest(req, res) {
           return sendJson(res, 200, { ok: true, action: "stop" });
         }
         await tmuxRun(["send-keys", "-t", name, "Escape"]); // bail out cleanly
-        return sendJson(res, 200, { ok: false, action: "stop", note: "Disconnect menüsü bulunamadı; Mac'te /remote-control ile kapatabilirsin." });
+        return sendJson(res, 200, { ok: false, action: "stop", note: "Disconnect menu not found; you can close it with /remote-control on your Mac." });
       });
     }
 
@@ -1516,7 +1516,7 @@ function handleRequest(req, res) {
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
-        if (session.runner !== "tmux") return sendJson(res, 400, { error: "Bu oturum tam oturum (tmux) değil." });
+        if (session.runner !== "tmux") return sendJson(res, 400, { error: "This session isn't a full (tmux) session." });
         const text = (typeof data.text === "string" ? data.text : "").replace(/\s*\n\s*/g, " ");
         (async () => {
           let name;
@@ -1555,7 +1555,7 @@ function handleRequest(req, res) {
       const session = resolveSession(q.get("sessionId"));
       if (!session) return sendJson(res, 404, { error: "Unknown session" });
       const jsonl = resolveJsonlPath(session);
-      if (!jsonl) return sendJson(res, 404, { error: "Bu oturum için transcript yok." });
+      if (!jsonl) return sendJson(res, 404, { error: "No transcript for this session." });
       res.writeHead(200, {
         "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no",

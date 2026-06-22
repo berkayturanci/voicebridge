@@ -107,15 +107,15 @@ function createWindow() {
 function updateTrayMenu() {
   if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: running() ? "● Çalışıyor" : "○ Durdu", enabled: false },
+    { label: running() ? "● Running" : "○ Stopped", enabled: false },
     { type: "separator" },
-    { label: "Kontrol paneli", click: createWindow },
-    { label: "Tarayıcıda aç", enabled: running(), click: () => shell.openExternal(webUrl()) },
+    { label: "Control panel", click: createWindow },
+    { label: "Open in browser", enabled: running(), click: () => shell.openExternal(webUrl()) },
     { type: "separator" },
-    { label: running() ? "Durdur" : "Başlat", click: () => (running() ? stopBridge() : startBridge()) },
-    { label: "Yeniden başlat", enabled: running(), click: restartBridge },
+    { label: running() ? "Stop" : "Start", click: () => (running() ? stopBridge() : startBridge()) },
+    { label: "Restart", enabled: running(), click: restartBridge },
     { type: "separator" },
-    { label: "Çıkış", click: () => { stopBridge(); app.quit(); } },
+    { label: "Quit", click: () => { stopBridge(); app.quit(); } },
   ]));
 }
 

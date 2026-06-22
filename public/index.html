@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -172,111 +172,111 @@
 </head>
 <body>
   <header>
-    <button id="backBtn" title="Sohbetler" aria-label="Sohbetler">←</button>
+    <button id="backBtn" title="Chats" aria-label="Chats">←</button>
     <span class="dot"></span>
-    <select id="session" aria-label="Oturum"></select>
-    <button id="newSession" title="Yeni oturum">＋</button>
+    <select id="session" aria-label="Session"></select>
+    <button id="newSession" title="New session">＋</button>
     <span class="spacer"></span>
-    <button id="talkBtn" title="Konuşma modu" aria-label="Konuşma modu">📞</button>
-    <button id="settingsBtn" title="Ayarlar" aria-label="Ayarlar">⚙</button>
+    <button id="talkBtn" title="Conversation mode" aria-label="Conversation mode">📞</button>
+    <button id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
   </header>
 
   <div id="logs">
-    <button id="jump" aria-label="En alta git">↓ en son</button>
+    <button id="jump" aria-label="Jump to bottom">↓ latest</button>
   </div>
 
   <footer>
     <div id="status"></div>
     <div class="chips" id="chips"></div>
     <div class="composer">
-      <textarea id="composer" rows="1" placeholder="Yaz ya da konuş…" enterkeyhint="send"></textarea>
-      <button id="cmdBtn" class="iconbtn" aria-label="Komutlar" title="Komutlar">⌘</button>
-      <button id="send" class="iconbtn" aria-label="Gönder">➤</button>
-      <button id="mic" class="iconbtn" aria-label="Konuş">🎤</button>
+      <textarea id="composer" rows="1" placeholder="Type or speak…" enterkeyhint="send"></textarea>
+      <button id="cmdBtn" class="iconbtn" aria-label="Commands" title="Commands">⌘</button>
+      <button id="send" class="iconbtn" aria-label="Send">➤</button>
+      <button id="mic" class="iconbtn" aria-label="Speak">🎤</button>
     </div>
   </footer>
 
   <div id="login">
     <div class="card">
-      <h3>🔒 Giriş</h3>
-      <p style="margin:0;color:var(--muted);font-size:13px;">Bu köprü bir erişim token'ı ile korunuyor.</p>
-      <label>Token <input id="loginToken" type="password" autocomplete="current-password" placeholder="Erişim token'ı" /></label>
+      <h3>🔒 Sign in</h3>
+      <p style="margin:0;color:var(--muted);font-size:13px;">This bridge is protected by an access token.</p>
+      <label>Token <input id="loginToken" type="password" autocomplete="current-password" placeholder="Access token" /></label>
       <div class="err" id="loginErr"></div>
-      <button id="loginBtn" type="button">Giriş yap</button>
+      <button id="loginBtn" type="button">Sign in</button>
     </div>
   </div>
 
   <div id="home">
     <div class="home-head">
-      <h2>Sohbetler</h2>
-      <button id="homeNew" title="Yeni oturum" aria-label="Yeni oturum">＋ Yeni</button>
+      <h2>Chats</h2>
+      <button id="homeNew" title="New session" aria-label="New session">＋ New</button>
     </div>
     <div id="homeList"></div>
   </div>
 
   <div id="talk">
-    <button id="talkExit" aria-label="Bitir">✕</button>
-    <button id="talkMute" aria-label="Mikrofonu sessize al">🎙️</button>
+    <button id="talkExit" aria-label="End">✕</button>
+    <button id="talkMute" aria-label="Mute mic">🎙️</button>
     <div class="orb" id="talkOrb"></div>
-    <div id="talkState">Hazır</div>
+    <div id="talkState">Ready</div>
     <div id="talkHeard"></div>
-    <div id="talkHint">Konuş; durunca otomatik gönderilir. Cevap bitince tekrar dinler. Sol üstteki 🎙️ ile mikrofonu geçici sessize alabilirsin.</div>
+    <div id="talkHint">Speak; it sends automatically when you pause. It listens again after each reply. Tap 🎙️ at the top-left to mute the mic temporarily.</div>
   </div>
 
   <div id="palette">
     <div class="card">
-      <div class="srow"><h3>Komutlar</h3><button id="paletteClose" aria-label="Kapat">✕</button></div>
-      <input id="paletteSearch" placeholder="Ara…" autocomplete="off" />
+      <div class="srow"><h3>Commands</h3><button id="paletteClose" aria-label="Close">✕</button></div>
+      <input id="paletteSearch" placeholder="Search…" autocomplete="off" />
       <div id="paletteList"></div>
     </div>
   </div>
 
   <div id="settings">
     <div class="card">
-      <div class="srow"><h3>Ayarlar</h3><button id="settingsClose" aria-label="Kapat">✕</button></div>
-      <label class="opt">Tema <button id="theme" title="Tema" aria-label="Tema">🌗</button></label>
-      <label class="opt">Yazı boyutu <input type="range" id="fontSize" min="13" max="24" step="1" /></label>
-      <label class="opt">Dil
+      <div class="srow"><h3>Settings</h3><button id="settingsClose" aria-label="Close">✕</button></div>
+      <label class="opt">Theme <button id="theme" title="Theme" aria-label="Theme">🌗</button></label>
+      <label class="opt">Text size <input type="range" id="fontSize" min="13" max="24" step="1" /></label>
+      <label class="opt">Language
         <select id="lang">
-          <option value="tr-TR">Türkçe</option>
           <option value="en-US">English</option>
+          <option value="tr-TR">Türkçe</option>
         </select>
       </label>
-      <label class="opt">Mod <select id="mode"></select></label>
-      <label class="opt">Eller serbest <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
-      <label class="opt">Sesli uyarı <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
-      <label class="opt">Kısa ses <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
-      <label class="opt">Bildirim <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
-      <label class="opt">Ses <select id="ttsVoice"></select></label>
-      <label class="opt">Hız <input type="range" id="rate" min="0.6" max="1.6" step="0.1" /></label>
-      <label class="opt">Sessizlik (otomatik gönder) <input type="range" id="talkSilence" min="0.6" max="2.5" step="0.1" /></label>
+      <label class="opt">Mode <select id="mode"></select></label>
+      <label class="opt">Hands-free <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
+      <label class="opt">Voice alert <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
+      <label class="opt">Brief voice <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
+      <label class="opt">Notifications <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
+      <label class="opt">Voice <select id="ttsVoice"></select></label>
+      <label class="opt">Rate <input type="range" id="rate" min="0.6" max="1.6" step="0.1" /></label>
+      <label class="opt">Silence (auto-send) <input type="range" id="talkSilence" min="0.6" max="2.5" step="0.1" /></label>
       <div class="row">
-        <button id="renameSession">✎ Adlandır</button>
-        <button id="delSession">🗑 Sil</button>
-        <button id="reset" class="primary">Yeni sohbet</button>
+        <button id="renameSession">✎ Rename</button>
+        <button id="delSession">🗑 Delete</button>
+        <button id="reset" class="primary">New chat</button>
       </div>
     </div>
   </div>
 
   <div id="modal">
     <div class="card">
-      <h3>Yeni oturum</h3>
-      <label>Favori <span style="display:flex;gap:8px;">
+      <h3>New session</h3>
+      <label>Favorite <span style="display:flex;gap:8px;">
         <select id="ns-fav" style="flex:1"></select>
-        <button id="ns-fav-del" type="button" title="Favoriyi sil">🗑</button>
+        <button id="ns-fav-del" type="button" title="Delete favorite">🗑</button>
       </span></label>
-      <label>İsim <input id="ns-name" placeholder="ör. Backend refactor" /></label>
+      <label>Name <input id="ns-name" placeholder="e.g. Backend refactor" /></label>
       <label>Agent <select id="ns-agent"></select></label>
-      <label id="ns-runner-row" style="display:none">Çalışma yeri <select id="ns-runner"></select></label>
+      <label id="ns-runner-row" style="display:none">Run location <select id="ns-runner"></select></label>
       <label id="ns-omodel-row" style="display:none">Ollama model <select id="ns-omodel"></select></label>
-      <label>Mod <select id="ns-mode"></select></label>
-      <label class="opt">Proje klasörü <button id="ns-browse" type="button">📁 Gözat</button></label>
+      <label>Mode <select id="ns-mode"></select></label>
+      <label class="opt">Project folder <button id="ns-browse" type="button">📁 Browse</button></label>
       <textarea id="ns-dir" rows="2" placeholder="/Users/you/project"></textarea>
       <div id="ns-tree" style="display:none"></div>
       <div class="row">
-        <button id="ns-save">★ Kaydet</button>
-        <button id="ns-cancel">İptal</button>
-        <button id="ns-create" class="primary">Oluştur</button>
+        <button id="ns-save">★ Save</button>
+        <button id="ns-cancel">Cancel</button>
+        <button id="ns-create" class="primary">Create</button>
       </div>
     </div>
   </div>
@@ -318,7 +318,7 @@
     if (t === "system") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = t;
     themeBtn.textContent = t === "light" ? "☀️" : t === "dark" ? "🌙" : "🌗";
-    themeBtn.title = "Tema: " + t;
+    themeBtn.title = "Theme: " + t;
   }
 
   // ---------- Eyes-free audio cues (WebAudio earcons) ----------
@@ -354,7 +354,7 @@
     if (!prefs.notify || !("Notification" in window) || Notification.permission !== "granted") return;
     const isQ = /\?["')\]]*\s*$/.test(text.trim());
     if (!document.hidden && !isQ) return;
-    const title = "voicebridge — " + sessionName + (isQ ? " soru sordu" : " hazır");
+    const title = "voicebridge — " + sessionName + (isQ ? " asked a question" : " ready");
     const opts = { body: text.slice(0, 140), icon: "/icon.svg" };
     // Prefer the service worker (more reliable when backgrounded on mobile).
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
@@ -386,10 +386,10 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const STANDALONE = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   const noVoiceMsg = () => !window.isSecureContext
-    ? "Sesli giriş HTTPS ister — `tailscale serve` ile https:// adresinden aç (http'de mikrofon yok). Yazabilirsin."
+    ? "Voice input needs HTTPS — open the https:// address via `tailscale serve` (no mic over http). You can still type."
     : STANDALONE
-    ? "Sesli giriş için uygulamayı Safari sekmesinde aç (kurulu uygulamada mikrofon yok). Yine de yazabilirsin."
-    : "Bu tarayıcı sesli girişi desteklemiyor — yazabilirsin (iOS'ta Safari sekmesi).";
+    ? "For voice input, open the app in a Safari tab (no mic in the installed app). You can still type."
+    : "This browser doesn't support voice input — you can type (use a Safari tab on iOS).";
   let recognizing = false;
 
   const S = new Map();   // sessionId -> { meta, logEl, turn }
@@ -417,14 +417,14 @@
     return new Promise((resolve) => {
       const submit = async () => {
         const t = (inp.value || "").trim();
-        if (!t) { err.textContent = "Token gerekli."; return; }
-        btn.disabled = true; err.textContent = "Kontrol ediliyor…";
+        if (!t) { err.textContent = "Token required."; return; }
+        btn.disabled = true; err.textContent = "Checking…";
         if (await tokenValid(t)) {
           token = t; localStorage.setItem("vb_token", token);
           ov.classList.remove("open"); btn.disabled = false;
           inp.removeEventListener("keydown", onKey); btn.removeEventListener("click", submit);
           resolve();
-        } else { err.textContent = "Token geçersiz."; btn.disabled = false; }
+        } else { err.textContent = "Invalid token."; btn.disabled = false; }
       };
       const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } };
       btn.addEventListener("click", submit); inp.addEventListener("keydown", onKey);
@@ -434,7 +434,7 @@
   async function ensureToken(force) {
     if (CONFIG.authRequired && (!token || force)) {
       if (force) { token = ""; localStorage.removeItem("vb_token"); }
-      await showLogin(force ? "Oturum süresi doldu — tekrar giriş yap." : "");
+      await showLogin(force ? "Session expired — sign in again." : "");
     }
   }
 
@@ -520,11 +520,11 @@
         const wrap = document.createElement("div");
         wrap.className = "codewrap";
         const btn = document.createElement("button");
-        btn.className = "copybtn"; btn.type = "button"; btn.textContent = "Kopyala";
+        btn.className = "copybtn"; btn.type = "button"; btn.textContent = "Copy";
         btn.addEventListener("click", () => {
-          const done = (txt) => { btn.textContent = txt; setTimeout(() => (btn.textContent = "Kopyala"), 1200); };
+          const done = (txt) => { btn.textContent = txt; setTimeout(() => (btn.textContent = "Copy"), 1200); };
           (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject())
-            .then(() => done("Kopyalandı")).catch(() => done("Hata"));
+            .then(() => done("Copied")).catch(() => done("Error"));
         });
         wrap.appendChild(btn); wrap.appendChild(buildPre(code, lang));
         const lines = code.replace(/\n$/, "").split("\n").length;
@@ -532,7 +532,7 @@
           wrap.classList.add("collapsed");
           const tog = document.createElement("button");
           tog.className = "togglebtn"; tog.type = "button";
-          const setLabel = () => { tog.textContent = wrap.classList.contains("collapsed") ? ("⌄ tümünü göster (" + lines + " satır)") : "⌃ gizle"; };
+          const setLabel = () => { tog.textContent = wrap.classList.contains("collapsed") ? ("⌄ show all (" + lines + " lines)") : "⌃ hide"; };
           tog.addEventListener("click", () => { wrap.classList.toggle("collapsed"); setLabel(); });
           setLabel();
           wrap.appendChild(tog);
@@ -569,8 +569,8 @@
     if (Array.isArray(saved) && saved.length) {
       saved.forEach((m) => { st.messages.push(m); renderMsgEl(st, m); });
     } else {
-      const where = meta.runner === "cloud" ? " · ☁️ Bulut" : "";
-      addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nYaz ya da konuş.`, "sys");
+      const where = meta.runner === "cloud" ? " · ☁️ Cloud" : "";
+      addMsg(meta.id, `${meta.name} · ${meta.agentLabel} · ${modeLabel(meta.agent, meta.mode)}${where}\nType or speak.`, "sys");
     }
     return st;
   }
@@ -615,9 +615,9 @@
   function sessionPreview(st) {
     for (let i = st.messages.length - 1; i >= 0; i--) {
       const m = st.messages[i];
-      if ((m.cls === "me" || m.cls === "claude") && m.text) return (m.cls === "me" ? "Sen: " : "") + m.text.replace(/\s+/g, " ").slice(0, 90);
+      if ((m.cls === "me" || m.cls === "claude") && m.text) return (m.cls === "me" ? "You: " : "") + m.text.replace(/\s+/g, " ").slice(0, 90);
     }
-    return "Henüz mesaj yok";
+    return "No messages yet";
   }
   function renderHome() {
     homeListEl.innerHTML = "";
@@ -626,7 +626,7 @@
       card.className = "scard"; card.type = "button";
       card.innerHTML = '<div class="sc-name"></div><div class="sc-meta"></div><div class="sc-prev"></div>';
       card.querySelector(".sc-name").textContent = st.meta.name;
-      const where = st.meta.runner === "cloud" ? " · ☁️ Bulut" : "";
+      const where = st.meta.runner === "cloud" ? " · ☁️ Cloud" : "";
       card.querySelector(".sc-meta").textContent = st.meta.agentLabel + " · " + modeLabel(st.meta.agent, st.meta.mode) + where;
       card.querySelector(".sc-prev").textContent = sessionPreview(st);
       card.addEventListener("click", () => openChat(st.meta.id));
@@ -657,8 +657,8 @@
     const st = active();
     micBtn.classList.remove("listening", "thinking");
     if (recognizing) { micBtn.classList.add("listening"); micBtn.textContent = "🎤"; }
-    else if (st && st.turn.busy) { micBtn.classList.add("thinking"); micBtn.textContent = "⏹"; micBtn.setAttribute("aria-label", "Dur"); }
-    else { micBtn.textContent = "🎤"; micBtn.setAttribute("aria-label", "Konuş"); }
+    else if (st && st.turn.busy) { micBtn.classList.add("thinking"); micBtn.textContent = "⏹"; micBtn.setAttribute("aria-label", "Stop"); }
+    else { micBtn.textContent = "🎤"; micBtn.setAttribute("aria-label", "Speak"); }
     const busy = !!(st && st.turn.busy);
     sendBtn.disabled = busy;
     chipsEl.querySelectorAll(".chip").forEach((c) => { c.disabled = busy; });
@@ -667,7 +667,7 @@
   // ---------- Speech synthesis ----------
   let speakBuf = "", speaking = false; const speakQueue = [];
   function cleanForSpeech(t) {
-    return t.replace(/```[\s\S]*?```/g, " kod bloğu. ").replace(/`([^`]*)`/g, "$1")
+    return t.replace(/```[\s\S]*?```/g, " code block. ").replace(/`([^`]*)`/g, "$1")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_#>`|]/g, "").trim();
   }
   function langKey() { return langSel.value.split("-")[0]; }
@@ -695,7 +695,7 @@
   function populateVoices() {
     const want = langKey();
     ttsVoiceSel.innerHTML = "";
-    const auto = document.createElement("option"); auto.value = ""; auto.textContent = "Otomatik"; ttsVoiceSel.appendChild(auto);
+    const auto = document.createElement("option"); auto.value = ""; auto.textContent = "Automatic"; ttsVoiceSel.appendChild(auto);
     voicesFor(want).forEach((v) => { const o = document.createElement("option"); o.value = v.name; o.textContent = v.name.replace(/\s*\(.*\)$/, ""); ttsVoiceSel.appendChild(o); });
     ttsVoiceSel.value = (prefs.voices || {})[want] || "";
   }
@@ -727,21 +727,21 @@
     if (st.turn.abort) { try { st.turn.abort.abort(); } catch (_) {} }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false; st.turn.busy = false;
-    refreshMic(); setStatus("Durduruldu.");
+    refreshMic(); setStatus("Stopped.");
   }
 
   // ---------- Ask the agent and stream the reply ----------
   async function ask(sessionId, text) {
     const st = S.get(sessionId); if (!st || st.turn.busy) return;
     st.turn.busy = true; st.turn.stopped = false; st.turn.abort = new AbortController();
-    if (sessionId === activeId) { refreshMic(); setStatus("Düşünüyor…"); speakBuf = ""; speakQueue.length = 0; }
+    if (sessionId === activeId) { refreshMic(); setStatus("Thinking…"); speakBuf = ""; speakQueue.length = 0; }
     const bubble = addMsg(sessionId, "", "claude"); let full = "";
     try {
       const r = await fetch("/api/ask", {
         method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice }), signal: st.turn.abort.signal,
       });
-      if (r.status === 401) { ensureToken(true); throw new Error("Token geçersiz — tekrar giriş yap."); }
+      if (r.status === 401) { ensureToken(true); throw new Error("Invalid token — sign in again."); }
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
       for (;;) {
         const { value, done } = await reader.read();
@@ -757,11 +757,11 @@
             full += ev.text; bubble.textContent = full;
             if (sessionId === activeId) {
               if (pinned) st.logEl.scrollTop = st.logEl.scrollHeight; else updateJump();
-              setStatus("Cevap veriyor… (durdurmak için ⏹)"); feedSpeech(ev.text);
+              setStatus("Replying… (tap ⏹ to stop)"); feedSpeech(ev.text);
             }
           } else if (ev.type === "activity") {
             addMsg(sessionId, "⚙︎ " + ev.text, "act");
-          } else if (ev.type === "error") { throw new Error(ev.error || "Sunucu hatası"); }
+          } else if (ev.type === "error") { throw new Error(ev.error || "Server error"); }
         }
       }
       if (full) renderInto(bubble, full); else bubble.textContent = emptyReplyHint(st.meta.agent);
@@ -781,9 +781,9 @@
   }
 
   function emptyReplyHint(agent) {
-    if (agent === "antigravity") return "(boş cevap — agy farklı çağrı isteyebilir; sunucuda AGY_PROMPT_ARG=1 deneyin)";
-    if (agent === "ollama") return "(boş cevap — model çekildi mi? `ollama pull <model>` ve OLLAMA_MODEL'i kontrol edin)";
-    return "(boş cevap)";
+    if (agent === "antigravity") return "(empty reply — agy may need a different invocation; try AGY_PROMPT_ARG=1 on the server)";
+    if (agent === "ollama") return "(empty reply — is the model pulled? check `ollama pull <model>` and OLLAMA_MODEL)";
+    return "(empty reply)";
   }
 
   // ---------- Text composer ----------
@@ -796,11 +796,11 @@
   }
   // ---------- Quick command shortcuts (canned prompts) ----------
   const QUICK = [
-    { label: "Ne değişti?", prompt: "Summarize what changed in the working tree (git status and diff), briefly." },
-    { label: "Testler", prompt: "Run the test suite and tell me concisely whether it passes; if not, what failed." },
+    { label: "What changed?", prompt: "Summarize what changed in the working tree (git status and diff), briefly." },
+    { label: "Tests", prompt: "Run the test suite and tell me concisely whether it passes; if not, what failed." },
     { label: "Commit & push", prompt: "Commit the current changes with a clear message and push to the current branch." },
-    { label: "Düzelt", prompt: "Find the failing test or error and fix it, then re-run the tests." },
-    { label: "Özetle", prompt: "Give me a one-paragraph summary of the current state of this project." },
+    { label: "Fix", prompt: "Find the failing test or error and fix it, then re-run the tests." },
+    { label: "Summarize", prompt: "Give me a one-paragraph summary of the current state of this project." },
   ];
   function quickSend(text) {
     const st = active();
@@ -831,8 +831,8 @@
     if (recognizing || (st && st.turn.busy) || !SR) return;
     rec = new SR();
     rec.lang = langSel.value; rec.interimResults = false; rec.maxAlternatives = 1;
-    rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Dinliyorum…"); cue("listen"); };
-    rec.onerror = (e) => { recognizing = false; rec = null; refreshMic(); setStatus(e.error === "not-allowed" ? "Mikrofon izni gerekli (https şart)." : "Hata: " + e.error); };
+    rec.onstart = () => { recognizing = true; refreshMic(); setStatus("Listening…"); cue("listen"); };
+    rec.onerror = (e) => { recognizing = false; rec = null; refreshMic(); setStatus(e.error === "not-allowed" ? "Microphone permission required (https required)." : "Error: " + e.error); };
     rec.onend = () => { recognizing = false; rec = null; refreshMic(); }; // drop the recognizer so iOS releases the mic
     rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) { addMsg(activeId, t, "me"); ask(activeId, t); } };
     try { rec.start(); } catch (_) {}
@@ -849,16 +849,16 @@
       mediaRec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop()); recognizing = false; refreshMic();
         const blob = new Blob(chunks, { type: mediaRec.mimeType || "audio/webm" });
-        setStatus("Yazıya çevriliyor…");
+        setStatus("Transcribing…");
         try {
           const r = await fetch("/api/stt", { method: "POST", headers: authHeaders({ "Content-Type": blob.type }), body: blob });
           const data = await r.json();
-          if (!r.ok) throw new Error(data.error || "STT hatası");
-          setStatus(""); if (data.text) { addMsg(activeId, data.text, "me"); ask(activeId, data.text); } else setStatus("Ses anlaşılmadı.");
+          if (!r.ok) throw new Error(data.error || "STT error");
+          setStatus(""); if (data.text) { addMsg(activeId, data.text, "me"); ask(activeId, data.text); } else setStatus("Couldn't understand the audio.");
         } catch (e) { setStatus("⚠️ " + e.message); }
       };
-      mediaRec.start(); recognizing = true; refreshMic(); setStatus("Kaydediyorum… (bitince dokun)"); cue("listen");
-    } catch (e) { setStatus("Mikrofon açılamadı: " + e.message); }
+      mediaRec.start(); recognizing = true; refreshMic(); setStatus("Recording… (tap when done)"); cue("listen");
+    } catch (e) { setStatus("Couldn't open the microphone: " + e.message); }
   }
   function stopWhisper() { if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop(); }
 
@@ -895,7 +895,7 @@
     if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
     ensureToken(); ensureAudio();
     talking = true; talkEl.classList.add("open"); talkHeard.textContent = "";
-    talkMuted = false; muteBtn.classList.remove("on"); muteBtn.textContent = "🎙️"; muteBtn.setAttribute("aria-label", "Mikrofonu sessize al");
+    talkMuted = false; muteBtn.classList.remove("on"); muteBtn.textContent = "🎙️"; muteBtn.setAttribute("aria-label", "Mute mic");
     startTalkListen();
   }
   function exitTalking() {
@@ -908,8 +908,8 @@
   }
   function startTalkListen() {
     if (!talking) return;
-    if (talkMuted) { setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)"); talkHeard.textContent = ""; return; }
-    talkFinal = ""; setTalkState("listening", "Dinliyorum…"); talkHeard.textContent = ""; orbMeterStart();
+    if (talkMuted) { setTalkState("muted", "Muted — tap 🎙️ to unmute (or tap the orb)"); talkHeard.textContent = ""; return; }
+    talkFinal = ""; setTalkState("listening", "Listening…"); talkHeard.textContent = ""; orbMeterStart();
     trec = new SR();
     trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
     trec.onresult = (ev) => {
@@ -934,13 +934,13 @@
     talkTurn(text);
   }
   async function talkTurn(text) {
-    setTalkState("thinking", "Düşünüyor…"); talkHeard.textContent = text;
+    setTalkState("thinking", "Thinking…"); talkHeard.textContent = text;
     addMsg(activeId, text, "me");
     const reply = await ask(activeId, text);
     if (!talking) return;
     // empty reply (e.g. Antigravity flakiness): say so out loud instead of silently re-listening
-    if (!reply || !reply.trim()) { feedSpeech("Cevap alınamadı, tekrar söyler misin?"); flushSpeech(); }
-    setTalkState("speaking", "Konuşuyor… (kesmek için dokun)");
+    if (!reply || !reply.trim()) { feedSpeech("No reply received, could you say that again?"); flushSpeech(); }
+    setTalkState("speaking", "Speaking… (tap to interrupt)");
     await new Promise((res) => { const t = setInterval(() => { if (!talking || (!speaking && !speakQueue.length)) { clearInterval(t); res(); } }, 200); });
     if (talking) startTalkListen();
   }
@@ -969,12 +969,12 @@
     talkMuted = m;
     muteBtn.classList.toggle("on", m);
     muteBtn.textContent = m ? "🔇" : "🎙️";
-    muteBtn.setAttribute("aria-label", m ? "Mikrofonu aç" : "Mikrofonu sessize al");
+    muteBtn.setAttribute("aria-label", m ? "Unmute mic" : "Mute mic");
     if (m) {
       clearTimeout(talkSilence); orbMeterStop();
       // abort() (not stop()) so iOS releases the mic immediately — no lingering "in use" state.
       if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
-      if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Sessiz — açmak için 🎙️ (ya da daireye dokun)");
+      if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Muted — tap 🎙️ to unmute (or tap the orb)");
     } else if (talking && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
       startTalkListen();
     }
@@ -988,7 +988,7 @@
     q = (q || "").toLowerCase();
     paletteListEl.innerHTML = "";
     const items = paletteItems.filter((it) => it.label.toLowerCase().includes(q));
-    if (!items.length) { paletteListEl.textContent = paletteItems.length ? "Eşleşme yok." : "Bu projede komut bulunamadı."; return; }
+    if (!items.length) { paletteListEl.textContent = paletteItems.length ? "No matches." : "No commands found in this project."; return; }
     let lastG = null;
     items.forEach((it) => {
       if (it.group !== lastG) { const h = document.createElement("div"); h.className = "pal-g"; h.textContent = it.group; paletteListEl.appendChild(h); lastG = it.group; }
@@ -1000,7 +1000,7 @@
   async function openPalette() {
     if (!activeId) return;
     ensureToken();
-    paletteItems = []; paletteListEl.textContent = "Yükleniyor…"; paletteSearch.value = "";
+    paletteItems = []; paletteListEl.textContent = "Loading…"; paletteSearch.value = "";
     paletteEl.classList.add("open");
     try {
       const data = await (await fetch("/api/commands?sessionId=" + encodeURIComponent(activeId), { headers: authHeaders() })).json();
@@ -1024,7 +1024,7 @@
   resetBtn.addEventListener("click", async () => {
     try { await fetch("/api/reset", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ sessionId: activeId }) }); } catch (_) {}
     const st = active(); if (st) { st.logEl.innerHTML = ""; st.messages = []; persistHistory(st); }
-    addMsg(activeId, "Yeni sohbet başladı.", "sys");
+    addMsg(activeId, "New chat started.", "sys");
     settingsEl.classList.remove("open"); // reveal the fresh chat
   });
 
@@ -1032,22 +1032,22 @@
 
   $("renameSession").addEventListener("click", async () => {
     const st = active(); if (!st) return;
-    const name = (prompt("Yeni isim:", st.meta.name) || "").trim();
+    const name = (prompt("New name:", st.meta.name) || "").trim();
     if (!name || name === st.meta.name) return;
     try {
       const r = await fetch("/api/sessions/" + activeId, { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ name }) });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Olmadı");
+      if (!r.ok) throw new Error(data.error || "Failed");
       st.meta = data.session; rebuildSessionSelect(); settingsEl.classList.remove("open");
     } catch (e) { alert("⚠️ " + e.message); }
   });
   $("delSession").addEventListener("click", async () => {
-    if (activeId === defaultSessionId) { alert("Varsayılan oturum silinemez."); return; }
+    if (activeId === defaultSessionId) { alert("The default session can't be deleted."); return; }
     const st = active(); if (!st) return;
-    if (!confirm(`"${st.meta.name}" oturumu silinsin mi?`)) return;
+    if (!confirm(`Delete the "${st.meta.name}" session?`)) return;
     try {
       const r = await fetch("/api/sessions/" + activeId, { method: "DELETE", headers: authHeaders() });
-      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Olmadı"); }
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Failed"); }
       st.logEl.remove(); S.delete(activeId);
       try { localStorage.removeItem("vb_hist_" + activeId); } catch (_) {}
       activeId = defaultSessionId && S.has(defaultSessionId) ? defaultSessionId : (S.keys().next().value || null);
@@ -1084,7 +1084,7 @@
   const allFavs = () => serverFavs().concat(localFavs());
   function renderFavSelect() {
     nsFav.innerHTML = "";
-    const ph = document.createElement("option"); ph.value = ""; ph.textContent = "— favori seç —"; nsFav.appendChild(ph);
+    const ph = document.createElement("option"); ph.value = ""; ph.textContent = "— select favorite —"; nsFav.appendChild(ph);
     allFavs().forEach((f, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = (i < serverFavs().length ? "🌐 " : "★ ") + (f.name || f.projectDir); nsFav.appendChild(o); });
     nsFav.value = "";
   }
@@ -1097,10 +1097,10 @@
     $("ns-dir").value = f.projectDir || ""; fitNsDir();
     fillModeSelect(nsMode, nsAgent.value, f.mode);
   }
-  const RUNNER_LABEL = { local: "💻 Yerel", cloud: "☁️ Bulut" };
+  const RUNNER_LABEL = { local: "💻 Local", cloud: "☁️ Cloud" };
   function openModal() {
     nsAgent.innerHTML = "";
-    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label + (a.available === false ? " — bulunamadı" : ""); nsAgent.appendChild(o); });
+    (CONFIG.agents || []).forEach((a) => { const o = document.createElement("option"); o.value = a.id; o.textContent = a.label + (a.available === false ? " — not found" : ""); nsAgent.appendChild(o); });
     const runners = CONFIG.runners || ["local"];
     const nsRunner = $("ns-runner"); nsRunner.innerHTML = "";
     runners.forEach((rn) => { const o = document.createElement("option"); o.value = rn; o.textContent = RUNNER_LABEL[rn] || rn; nsRunner.appendChild(o); });
@@ -1116,7 +1116,7 @@
     const row = $("ns-omodel-row"), sel = $("ns-omodel");
     if (nsAgent.value !== "ollama") { row.style.display = "none"; return; }
     row.style.display = "flex";
-    sel.innerHTML = '<option value="">(varsayılan)</option>';
+    sel.innerHTML = '<option value="">(default)</option>';
     try {
       const { models } = await (await fetch("/api/ollama/models", { headers: authHeaders() })).json();
       (models || []).forEach((m) => { const o = document.createElement("option"); o.value = m; o.textContent = m; sel.appendChild(o); });
@@ -1138,7 +1138,7 @@
       $("ns-dir").value = data.path || ""; fitNsDir();
       nsTree.innerHTML = "";
       const cur = document.createElement("div"); cur.className = "cur"; cur.textContent = data.path || ""; nsTree.appendChild(cur);
-      if (data.parent) { const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.textContent = "⬆ üst"; b.addEventListener("click", () => browseTo(data.parent)); nsTree.appendChild(b); }
+      if (data.parent) { const b = document.createElement("button"); b.type = "button"; b.className = "up"; b.textContent = "⬆ up"; b.addEventListener("click", () => browseTo(data.parent)); nsTree.appendChild(b); }
       (data.dirs || []).forEach((d) => {
         const b = document.createElement("button"); b.type = "button"; b.textContent = "📁 " + d;
         b.addEventListener("click", () => browseTo((data.path.endsWith("/") ? data.path : data.path + "/") + d));
@@ -1153,7 +1153,7 @@
   });
   nsFav.addEventListener("change", applyFav);
   $("ns-save").addEventListener("click", () => {
-    const dir = $("ns-dir").value.replace(/[\r\n]+/g, "").trim(); if (!dir) { alert("Önce proje klasörü gir."); return; }
+    const dir = $("ns-dir").value.replace(/[\r\n]+/g, "").trim(); if (!dir) { alert("Enter a project folder first."); return; }
     const fav = { name: $("ns-name").value.trim() || dir, agent: nsAgent.value, mode: nsMode.value, projectDir: dir };
     const lf = localFavs();
     const existing = lf.findIndex((f) => f.projectDir === dir && f.agent === fav.agent);
@@ -1162,7 +1162,7 @@
   });
   $("ns-fav-del").addEventListener("click", () => {
     const i = parseInt(nsFav.value, 10);
-    if (isNaN(i) || i < serverFavs().length) { alert("Sadece kendi favorilerini silebilirsin."); return; }
+    if (isNaN(i) || i < serverFavs().length) { alert("You can only delete your own favorites."); return; }
     localFavs().splice(i - serverFavs().length, 1); savePrefs(); renderFavSelect();
   });
   newSessionBtn.addEventListener("click", openModal);
@@ -1173,7 +1173,7 @@
     try {
       const r = await fetch("/api/sessions", { method: "POST", headers: authHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Oluşturulamadı");
+      if (!r.ok) throw new Error(data.error || "Couldn't create");
       addSessionState(data.session); rebuildSessionSelect(); modal.classList.remove("open"); openChat(data.session.id);
     } catch (e) { alert("⚠️ " + e.message); }
   });

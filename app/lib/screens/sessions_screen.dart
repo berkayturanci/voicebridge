@@ -134,12 +134,12 @@ class _SessionsScreenState extends State<SessionsScreen>
           IconButton(
             onPressed: _refresh,
             icon: const Icon(Icons.refresh),
-            tooltip: 'Yenile',
+            tooltip: 'Refresh',
           ),
           IconButton(
             onPressed: _openSettings,
             icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Ayarlar',
+            tooltip: 'Settings',
           ),
           const SizedBox(width: 4),
         ],
@@ -147,7 +147,7 @@ class _SessionsScreenState extends State<SessionsScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: const Icon(Icons.add),
-        label: const Text('Yeni sohbet'),
+        label: const Text('New chat'),
       ),
       body: RefreshIndicator(
         color: VbColors.accent,
@@ -166,9 +166,9 @@ class _SessionsScreenState extends State<SessionsScreen>
       return _StateView(
         icon: Icons.cloud_off_rounded,
         iconColor: VbColors.danger,
-        title: 'Köprüye ulaşılamadı',
+        title: "Can't reach the bridge",
         message: _error!,
-        actionLabel: 'Köprü ayarları',
+        actionLabel: 'Bridge settings',
         onAction: _openSettings,
       );
     }
@@ -176,9 +176,9 @@ class _SessionsScreenState extends State<SessionsScreen>
       return _StateView(
         icon: Icons.forum_outlined,
         iconColor: VbColors.accent,
-        title: 'Henüz oturum yok',
-        message: 'Yeni bir sohbet başlatarak Claude Code ile konuşmaya başla.',
-        actionLabel: 'Yeni sohbet',
+        title: 'No sessions yet',
+        message: 'Start a new chat to begin talking to Claude Code.',
+        actionLabel: 'New chat',
         onAction: _create,
       );
     }
@@ -255,7 +255,7 @@ class _SessionsScreenState extends State<SessionsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        s.name.isEmpty ? 'İsimsiz oturum' : s.name,
+                        s.name.isEmpty ? 'Untitled session' : s.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -416,7 +416,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   String? _mode;
   String _projectDir = '';
   bool _busy = false;
-  bool _fullSession = false; // Tat Y: run a full interactive claude in tmux
+  bool _fullSession = false; // Toggle: run a full interactive claude in tmux
 
   List<dynamic> get _modes {
     final a = widget.agents.firstWhere((e) => e['id'] == _agent,
@@ -446,7 +446,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
     setState(() => _busy = true);
     try {
       final s = await widget.api.createSession(
-        name: _name.text.trim().isEmpty ? 'Yeni sohbet' : _name.text.trim(),
+        name: _name.text.trim().isEmpty ? 'New chat' : _name.text.trim(),
         agent: _agent ?? 'claude',
         mode: _mode ?? '',
         projectDir: _projectDir.isEmpty ? null : _projectDir,
@@ -495,7 +495,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                       size: 20, color: VbColors.accent),
                 ),
                 const SizedBox(width: 12),
-                const Text('Yeni oturum',
+                const Text('New session',
                     style: TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w700,
@@ -503,11 +503,11 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
               ],
             ),
             const SizedBox(height: 20),
-            _fieldLabel('İsim'),
+            _fieldLabel('Name'),
             const SizedBox(height: 7),
             TextField(
               controller: _name,
-              decoration: const InputDecoration(hintText: 'Yeni sohbet'),
+              decoration: const InputDecoration(hintText: 'New chat'),
             ),
             const SizedBox(height: 16),
             _fieldLabel('Agent'),
@@ -522,7 +522,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                     value: a['id'] as String,
                     enabled: a['available'] == true,
                     child: Text('${a['label']}'
-                        '${a['available'] == true ? '' : ' (kurulu değil)'}'),
+                        '${a['available'] == true ? '' : ' (not installed)'}'),
                   ),
               ],
               onChanged: (v) => setState(() {
@@ -532,7 +532,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
               }),
             ),
             const SizedBox(height: 16),
-            _fieldLabel('Mod'),
+            _fieldLabel('Mode'),
             const SizedBox(height: 7),
             DropdownButtonFormField<String>(
               value: _mode,
@@ -546,7 +546,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
               onChanged: (v) => setState(() => _mode = v),
             ),
             const SizedBox(height: 16),
-            _fieldLabel('Proje klasörü'),
+            _fieldLabel('Project folder'),
             const SizedBox(height: 7),
             InkWell(
               onTap: _busy ? null : _browse,
@@ -556,7 +556,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                   suffixIcon: Icon(Icons.folder_open_outlined),
                 ),
                 child: Text(
-                  _projectDir.isEmpty ? '(varsayılan)' : _projectDir,
+                  _projectDir.isEmpty ? '(default)' : _projectDir,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -586,13 +586,13 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Tam oturum (tmux)',
+                              Text('Full session (tmux)',
                                   style: TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.w600,
                                       color: VbColors.textPrimary)),
                               const SizedBox(height: 2),
-                              Text("Mac'ten de gir, /remote-control çalışır",
+                              Text("You can also join from the Mac — /remote-control works",
                                   style: TextStyle(
                                       fontSize: 11.5,
                                       color: VbColors.textMuted)),
@@ -619,7 +619,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2.2, color: Color(0xFF06210C)))
                   : const Icon(Icons.check_rounded),
-              label: Text(_busy ? 'Oluşturuluyor…' : 'Oluştur'),
+              label: Text(_busy ? 'Creating…' : 'Create'),
             ),
           ],
         ),
@@ -659,7 +659,7 @@ class _Grabber extends StatelessWidget {
 }
 
 /// A simple folder browser backed by GET /api/browse. Tap a folder to descend,
-/// use ⬆ for the parent, and "Bu klasörü seç" to return the current path.
+/// use ⬆ for the parent, and "Select this folder" to return the current path.
 class _BrowseScreen extends StatefulWidget {
   final Api api;
   final String start;
@@ -707,7 +707,7 @@ class _BrowseScreenState extends State<_BrowseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_path.isEmpty ? 'Klasör seç' : _path,
+        title: Text(_path.isEmpty ? 'Select folder' : _path,
             style: const TextStyle(fontSize: 14)),
         actions: [
           if (_parent != null)
@@ -719,7 +719,7 @@ class _BrowseScreenState extends State<_BrowseScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _path.isEmpty ? null : () => Navigator.pop(context, _path),
         icon: const Icon(Icons.check_rounded),
-        label: const Text('Bu klasörü seç'),
+        label: const Text('Select this folder'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -780,7 +780,7 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                       Padding(
                         padding: EdgeInsets.all(40),
                         child: Center(
-                          child: Text('Alt klasör yok',
+                          child: Text('No subfolders',
                               style: TextStyle(color: VbColors.textMuted)),
                         ),
                       ),

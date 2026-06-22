@@ -89,15 +89,15 @@
 
   <!-- chat: user bubble -->
   <rect x="892" y="150" width="160" height="32" rx="15" fill="#1f6feb"/>
-  <text x="908" y="171" fill="#fff" font-size="13">login’e doğrulama ekle</text>
+  <text x="908" y="171" fill="#fff" font-size="13">add auth to login</text>
 
   <!-- chat: agent bubble -->
   <rect x="836" y="196" width="210" height="112" rx="15" fill="#161b22" stroke="#21262d"/>
-  <text x="852" y="219" fill="#e6edf3" font-size="13">Email + şifre kontrolü ekledim:</text>
+  <text x="852" y="219" fill="#e6edf3" font-size="13">Added an email + password check:</text>
   <rect x="852" y="230" width="178" height="40" rx="8" fill="#0d1117" stroke="#30363d"/>
   <text x="862" y="246" font-family="ui-monospace, monospace" font-size="11" fill="#7ee787">if (!email) throw</text>
-  <text x="862" y="262" font-family="ui-monospace, monospace" font-size="11" fill="#7ee787">  Error("email gerekli")</text>
-  <text x="852" y="296" fill="#e6edf3" font-size="13">18 test geçti, push edildi. ✅</text>
+  <text x="862" y="262" font-family="ui-monospace, monospace" font-size="11" fill="#7ee787">  Error("email required")</text>
+  <text x="852" y="296" fill="#e6edf3" font-size="13">18 tests passed, pushed. ✅</text>
 
   <!-- secured-connection badge straddling the phone edge -->
   <g>
@@ -109,7 +109,7 @@
   <!-- composer -->
   <line x1="824" y1="486" x2="1062" y2="486" stroke="#21262d"/>
   <rect x="836" y="500" width="150" height="40" rx="12" fill="#0d1117" stroke="#30363d"/>
-  <text x="850" y="525" fill="#8b949e" font-size="13">Yaz ya da konuş…</text>
+  <text x="850" y="525" fill="#8b949e" font-size="13">Type or speak…</text>
   <circle cx="1004" cy="520" r="17" fill="#1f6feb"/>
   <text x="1004" y="525" fill="#fff" font-size="15" text-anchor="middle">➤</text>
   <!-- mic (listening) with sound waves -->
