@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "electron": "^30.0.0",
-    "electron-builder": "^24.13.0"
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "dev.voicebridge.desktop",
