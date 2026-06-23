@@ -18,3 +18,34 @@ jobs:
       - run: node --check examples/cloud-runner/server.js
       - run: npm test
       - run: npm run smoke
+
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      # Errors-only gate: fails on real API breakage (removed/changed symbols) from
+      # dependency bumps, not on the app's pre-existing lint debt (infos/warnings).
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      # Package an unpacked Linux build: validates electron / electron-builder bumps
+      # actually install and package (no AppImage/system libs needed for `dir`).
+      - run: npx --no-install electron-builder --linux dir
