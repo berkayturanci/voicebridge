@@ -171,6 +171,41 @@ const AGENTS = {
     },
     parseLine: parseClaudeLine,
     parseEvents: parseClaudeEvents,
+    tmux: {
+      generatingRe: /esc to interrupt|Cogitating|Thinking|Working…|Pondering|Forging/i,
+      readyRe: /Claude Code v|❯/,
+      launchArgs(session, name) {
+        if (!session.claudeSessionId) session.claudeSessionId = crypto.randomUUID();
+        const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
+        session.tmuxJsonl = path.join(dir, session.claudeSessionId + ".jsonl");
+        saveSessions();
+        return fs.existsSync(session.tmuxJsonl)
+          ? "claude --resume " + session.claudeSessionId
+          : "claude --session-id " + session.claudeSessionId;
+      },
+      extractReply(pane, promptEcho) {
+        const lines = pane.split("\n");
+        const key = (promptEcho || "").trim().slice(0, 24);
+        let start = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const t = lines[i].trim();
+          if (t.startsWith("❯") && key && t.includes(key)) { start = i; break; }
+        }
+        if (start < 0) for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim().startsWith("⏺")) { start = i - 1; break; } }
+        const out = [];
+        for (let i = start + 1; i < lines.length; i++) {
+          const t = lines[i].trim();
+          if (!t) { out.push(""); continue; }
+          if (/^[╭╰│]/.test(t)) continue;
+          if (/^─{5,}$/.test(t)) break;
+          if (t.startsWith("❯")) break;
+          if (/^✻/.test(t)) continue;
+          if (/^⎿/.test(t)) continue;
+          out.push(lines[i].replace(/^\s*⏺\s?/, "").replace(/^\s{0,3}/, ""));
+        }
+        return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      }
+    }
   },
   codex: {
     label: "Codex",
@@ -190,6 +225,25 @@ const AGENTS = {
       const resume = cont ? splitArgs(process.env.CODEX_CONTINUE_ARGS) : [];
       return { argv: ["exec", ...resume, ...(modeArgs || [])], stdin: prompt };
     },
+    tmux: {
+      generatingRe: /Thinking|Working|Generating/i,
+      readyRe: /Codex v|>$/,
+      launchArgs(session, name) {
+        return "codex interactive";
+      },
+      extractReply(pane, promptEcho) {
+        const lines = pane.split("\n");
+        const out = [];
+        let capture = false;
+        for (const line of lines) {
+          const t = line.trim();
+          if (t.startsWith(">") && capture) break;
+          if (capture) out.push(line);
+          if (t.startsWith(">") && t.includes((promptEcho || "").trim().slice(0, 20))) capture = true;
+        }
+        return out.join("\n").trim();
+      }
+    }
   },
   antigravity: {
     label: "Antigravity",
@@ -212,6 +266,25 @@ const AGENTS = {
       if (process.env.AGY_PROMPT_ARG) { argv.push(prompt); return { argv, stdin: null }; }
       return { argv, stdin: prompt };
     },
+    tmux: {
+      generatingRe: /Thinking|Working/i,
+      readyRe: /agy|>/,
+      launchArgs(session, name) {
+        return "agy";
+      },
+      extractReply(pane, promptEcho) {
+        const lines = pane.split("\n");
+        const out = [];
+        let capture = false;
+        for (const line of lines) {
+          const t = line.trim();
+          if (t.startsWith("agy>") && capture) break;
+          if (capture) out.push(line);
+          if (t.startsWith("agy>") && t.includes((promptEcho || "").trim().slice(0, 20))) capture = true;
+        }
+        return out.join("\n").trim();
+      }
+    }
   },
   ollama: {
     label: "Ollama (yerel)",
@@ -874,60 +947,27 @@ function killTmux(sessionId) {
   tmuxRun(["kill-session", "-t", tmuxName(sessionId)]);
 }
 
-async function ensureTmuxClaude(session) {
+async function ensureTmuxAgent(session) {
   const name = tmuxName(session.id);
   if (await tmuxHas(name)) return name;
-  // Deterministic transcript: give claude an explicit --session-id so we KNOW its
-  // .jsonl path (no content-match guessing). Resume that same id after a
-  // kill/idle/restart so context survives. DEFAULT mode (claude is in auto mode);
-  // no --dangerously-skip-permissions.
-  if (!session.claudeSessionId) session.claudeSessionId = crypto.randomUUID();
-  const dir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(session.projectDir));
-  session.tmuxJsonl = path.join(dir, session.claudeSessionId + ".jsonl");
-  saveSessions();
-  const launch = fs.existsSync(session.tmuxJsonl)
-    ? ("claude --resume " + session.claudeSessionId)
-    : ("claude --session-id " + session.claudeSessionId);
+  const agent = AGENTS[session.agent] || AGENTS.claude;
+  if (!agent.tmux) throw new Error("Tmux runner not supported for agent: " + session.agent);
+  
+  const launch = agent.tmux.launchArgs(session, name);
   await tmuxRun(["new-session", "-d", "-s", name, "-x", "220", "-y", "50", "-c", session.projectDir, launch]);
   for (let i = 0; i < 40; i++) { // wait for the welcome box / input prompt to render
     await sleepMs(500);
-    if (/Claude Code v|❯/.test(await tmuxCapture(name))) { await sleepMs(900); break; }
+    if (agent.tmux.readyRe.test(await tmuxCapture(name))) { await sleepMs(900); break; }
   }
   return name;
 }
 
-// Turn a captured claude TUI pane into the clean assistant reply: drop the welcome
-// box, ─── input borders, the ❯ echo, ✻ Cogitated and ⎿ chrome; keep the ⏺ body.
-function extractTuiReply(pane, promptEcho) {
-  const lines = pane.split("\n");
-  const key = (promptEcho || "").trim().slice(0, 24);
-  let start = -1;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const t = lines[i].trim();
-    if (t.startsWith("❯") && key && t.includes(key)) { start = i; break; }
-  }
-  if (start < 0) for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim().startsWith("⏺")) { start = i - 1; break; } }
-  const out = [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const t = lines[i].trim();
-    if (!t) { out.push(""); continue; }
-    if (/^[╭╰│]/.test(t)) continue;          // welcome box
-    if (/^─{5,}$/.test(t)) break;             // bottom input border → reply ended
-    if (t.startsWith("❯")) break;             // empty input prompt → ended
-    if (/^✻/.test(t)) continue;               // "Cogitated for Xs"
-    if (/^⎿/.test(t)) continue;               // hook/tool-result chrome
-    out.push(lines[i].replace(/^\s*⏺\s?/, "").replace(/^\s{0,3}/, ""));
-  }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
 
-const TMUX_GENERATING_RE = /esc to interrupt|Cogitating|Thinking|Working…|Pondering|Forging/i;
-
-// Drive one turn through the tmux-hosted interactive claude.
+// Drive one turn through the tmux-hosted interactive agent.
 async function streamTmux(session, prompt, res, emit) {
   const old = tmuxIdleTimers.get(session.id); if (old) { clearTimeout(old); tmuxIdleTimers.delete(session.id); }
   let name;
-  try { name = await ensureTmuxClaude(session); }
+  try { name = await ensureTmuxAgent(session); }
   catch (e) { emit({ type: "error", error: "couldn't start tmux: " + e.message }); return res.end(); }
 
   // The TUI input is single-line and submits on Enter; flatten newlines.
@@ -935,22 +975,24 @@ async function streamTmux(session, prompt, res, emit) {
   await tmuxRun(["send-keys", "-t", name, "-l", text]);
   await sleepMs(180);
   await tmuxRun(["send-keys", "-t", name, "Enter"]);
-  emit({ type: "activity", text: "tmux: claude is thinking…" });
+  emit({ type: "activity", text: "tmux: " + session.agent + " is thinking…" });
 
   const MAXMS = (Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0) || 20 * 60 * 1000;
   const t0 = Date.now();
   let prev = "", stable = 0, sawGen = false, closed = false;
   res.on("close", () => { closed = true; }); // barge-in: leave the tmux session alive
+  const agent = AGENTS[session.agent] || AGENTS.claude;
+  const genRe = agent.tmux.generatingRe;
   while (!closed && Date.now() - t0 < MAXMS) {
     await sleepMs(1400);
     const cur = await tmuxCapture(name);
-    if (TMUX_GENERATING_RE.test(cur)) sawGen = true;
+    if (genRe.test(cur)) sawGen = true;
     if (cur === prev) stable++; else stable = 0;
     prev = cur;
-    if (stable >= 2 && !TMUX_GENERATING_RE.test(cur) && (sawGen || stable >= 4)) break;
+    if (stable >= 2 && !genRe.test(cur) && (sawGen || stable >= 4)) break;
   }
   if (closed) return; // barge-in — process keeps running for the next turn / attach
-  const reply = extractTuiReply(await tmuxCapture(name, -250), text);
+  const reply = agent.tmux.extractReply(await tmuxCapture(name, -250), text);
   emit({ type: "delta", text: reply || "(couldn't capture the reply — check with `tmux attach` on your Mac)" });
   session.started = true;
   // Bind the transcript .jsonl by content — the file containing this turn's input
@@ -1520,7 +1562,7 @@ function handleRequest(req, res) {
         const text = (typeof data.text === "string" ? data.text : "").replace(/\s*\n\s*/g, " ");
         (async () => {
           let name;
-          try { name = await ensureTmuxClaude(session); }
+          try { name = await ensureTmuxAgent(session); }
           catch (err) { return sendJson(res, 500, { error: "tmux: " + err.message }); }
           if (text.length) { await tmuxRun(["send-keys", "-t", name, "-l", text]); await sleepMs(150); }
           await tmuxRun(["send-keys", "-t", name, "Enter"]);
