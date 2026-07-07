@@ -104,7 +104,7 @@ session is recreated on boot).
 | Method & path | Purpose |
 |---------------|---------|
 | `GET /api/health` | Public. `{ ok, version, uptime, sessions }` for liveness/uptime checks. |
-| `GET /api/config` | Public. STT mode, whether auth is required, the agent list (with modes), the default project dir and session id. |
+| `GET /api/config` | Public bootstrap: STT mode, whether auth is required, the agent list (with modes), and runner types. With a valid token, also includes default project/session/favorites. |
 | `GET /api/browse` | List subdirectories of a path (folder picker). `runner=cloud` proxies to the cloud runner's `GET /browse` for remote dirs. |
 | `GET /api/commands` | A session project's commands (`.claude/commands` + npm scripts) for the palette. |
 | `GET /api/sessions` | List sessions. |
@@ -116,5 +116,6 @@ session is recreated on boot).
 | `GET /api/ollama/models` | List models from the configured Ollama server (`OLLAMA_URL`). |
 | `POST /api/push/subscribe` | Register a Web Push subscription (https endpoints only). |
 
-All `/api/*` routes except `/api/config` and `/api/health` require the access
-token when `ACCESS_TOKEN` is set.
+All `/api/*` routes except `/api/health`, `/api/push/key`, and the public
+bootstrap subset of `/api/config` require the access token when `ACCESS_TOKEN`
+is set.

@@ -22,7 +22,7 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `AGY_CONTINUE_ARGS` | _(none)_ | Opt-in Antigravity resume: argv added on continued turns. Best-effort. |
 | `AGY_ARGS` | `--print` | Override Antigravity's base args if your `agy` build differs. |
 | `AGY_PROMPT_ARG` | _(unset)_ | If set (e.g. `1`), pass the prompt as a positional argument instead of stdin. Try this if `agy` returns an empty reply. |
-| `ACCESS_TOKEN` | _(none)_ | If set, every `/api/*` route (except `/api/config`) requires `Authorization: Bearer <token>`. |
+| `ACCESS_TOKEN` | _(none)_ | If set, protected `/api/*` routes require `Authorization: Bearer <token>`. `/api/health`, `/api/push/key`, and the public bootstrap subset of `/api/config` remain public. |
 | `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
 | `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
 | `FAVORITES` | _(none)_ | JSON array of favorite projects to prefill the new-session dialog, e.g. `[{"name":"App","projectDir":"/Users/me/app","agent":"claude","mode":"full"}]`. Users can also save their own favorites locally. |

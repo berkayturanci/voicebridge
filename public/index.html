@@ -1203,10 +1203,13 @@
   populateVoices();
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
+    await ensureToken();
+    if (CONFIG.authRequired && token) {
+      try { CONFIG = Object.assign({}, CONFIG, await (await fetch("/api/config", { headers: authHeaders() })).json()); } catch (_) {}
+    }
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
     if (CONFIG.sttMode === "browser" && !SR) { micBtn.classList.add("na"); setStatus(noVoiceMsg()); }
     if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }
-    await ensureToken();
     let list = { sessions: [], defaultSessionId: null };
     try { list = await (await fetch("/api/sessions", { headers: authHeaders() })).json(); } catch (_) {}
     (list.sessions || []).forEach(addSessionState);

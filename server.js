@@ -1316,6 +1316,7 @@ function handleRequest(req, res) {
 
   // Public: client configuration (no secrets).
   if (req.method === "GET" && urlPath === "/api/config") {
+    const includePrivateConfig = !ACCESS_TOKEN || authorized(req);
     return sendJson(res, 200, {
       sttMode: STT_MODE,
       authRequired: !!ACCESS_TOKEN,
@@ -1324,9 +1325,11 @@ function handleRequest(req, res) {
         defaultMode: AGENTS[id].defaultMode, available: agentAvailable(id),
         modes: Object.keys(AGENTS[id].modes).map((m) => ({ id: m, label: AGENTS[id].modes[m].label })),
       })),
-      defaultProjectDir: DEFAULT_PROJECT_DIR,
-      defaultSessionId,
-      favorites: FAVORITES,
+      ...(includePrivateConfig ? {
+        defaultProjectDir: DEFAULT_PROJECT_DIR,
+        defaultSessionId,
+        favorites: FAVORITES,
+      } : {}),
       runners: ["local"].concat((process.env.CLOUD_RUNNER_URL || "") ? ["cloud"] : []),
     });
   }

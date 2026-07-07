@@ -20,7 +20,21 @@ test.after(() => new Promise((r) => server.close(r)));
 test("/api/config stays public and reports authRequired", async () => {
   const { status, data } = await request(server, "GET", "/api/config");
   assert.strictEqual(status, 200);
-  assert.strictEqual(JSON.parse(data).authRequired, true);
+  const cfg = JSON.parse(data);
+  assert.strictEqual(cfg.authRequired, true);
+  assert.ok(!("defaultProjectDir" in cfg));
+  assert.ok(!("defaultSessionId" in cfg));
+  assert.ok(!("favorites" in cfg));
+  assert.ok(Array.isArray(cfg.agents));
+});
+
+test("/api/config returns private convenience fields only when authorized", async () => {
+  const { status, data } = await request(server, "GET", "/api/config", null, { Authorization: "Bearer secret-token" });
+  assert.strictEqual(status, 200);
+  const cfg = JSON.parse(data);
+  assert.strictEqual(cfg.defaultSessionId, boot.id);
+  assert.strictEqual(typeof cfg.defaultProjectDir, "string");
+  assert.ok(Array.isArray(cfg.favorites));
 });
 
 test("protected endpoints reject missing/wrong token", async () => {
