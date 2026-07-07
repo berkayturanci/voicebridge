@@ -29,6 +29,7 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `CLOUD_RUNNER_URL` | _(none)_ | If set, enables **cloud** sessions: turns are proxied here instead of spawning a local CLI. The endpoint must speak the same NDJSON protocol. |
 | `CLOUD_RUNNER_TOKEN` | _(none)_ | Optional `Authorization: Bearer` token sent to the cloud runner. |
 | `AGENT_TIMEOUT_MS` | `1200000` | Per-turn cap for local and persistent live agent turns. `0` disables the cap. A timed-out persistent live turn kills that live child and the next turn respawns it from the saved Claude session. |
+| `TMUX_CAPTURE_LINES` | `1000` | Scrollback lines captured when extracting the final tmux runner reply. Raise this for unusually long interactive Claude replies. |
 | `SESSIONS_FILE` | _(none)_ | If set, sessions (name/agent/dir/mode/voice/runner) are saved here and restored on restart, e.g. `~/.voicebridge/sessions.json`. Unset = in-memory only. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | _(none)_ | Enable real Web Push (OS notifications even when the app is closed). Generate with `node scripts/gen-vapid-keys.js` (needs the optional `web-push` dependency). |
 | `VAPID_SUBJECT` | `mailto:voicebridge@localhost` | Contact URI sent with push (a `mailto:` or `https:`). |

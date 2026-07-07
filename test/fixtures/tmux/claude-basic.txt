@@ -1,0 +1,9 @@
+╭─ Claude Code v1.0
+│ Welcome
+╰
+❯ Summarize status
+✻ Cogitated for 2s
+⏺ Sure. Phase one is steady.
+  Second line kept.
+────────────────────────────────
+❯
