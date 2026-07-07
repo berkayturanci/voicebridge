@@ -14,6 +14,7 @@ import '../api.dart';
 import '../models.dart';
 import '../settings.dart';
 import '../theme.dart';
+import '../voice_errors.dart';
 
 /// One conversation: streaming text + native voice (talking mode).
 class ChatScreen extends StatefulWidget {
@@ -46,6 +47,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
   Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
+  DateTime? _lastVoiceErrorAt;
+  String? _lastVoiceErrorText;
 
   // Autonomy mode — starts from the session's, but changeable from settings.
   // Sent with every turn (the bridge also updates the stored session mode).
@@ -78,7 +81,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
     });
     _tts.setErrorHandler((msg) {
-      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+      _markNotSpeaking();
+      _voiceFailure(ttsFailureMessage(msg));
     });
     // iOS audio session — configured ONCE here (not before every utterance).
     // Re-applying the category per reply churns the live AVAudioSession route
@@ -302,11 +306,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (picked == null) return;
     await p.setString(_voiceKey, picked['name']!);
+    var spoke = false;
     try {
       await _tts.setVoice({'name': picked['name']!, 'locale': picked['locale']!});
-      await _speak('Hello, I\'ll speak with this voice from now on.'); // hear it right away
-    } catch (_) {}
-    if (mounted) _toast('Voice selected: ${picked['name']}');
+      spoke = await _speak('Hello, I\'ll speak with this voice from now on.'); // hear it right away
+    } catch (e) {
+      _voiceFailure(ttsFailureMessage(e));
+    }
+    if (mounted && spoke) _toast('Voice selected: ${picked['name']}');
   }
 
   // The autonomy modes this agent supports (label + id), for the settings sheet.
@@ -380,24 +387,64 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  void _markNotListening() {
+    if (mounted) setState(() => _listening = false);
+  }
+
+  void _markNotSpeaking() {
+    if (mounted) {
+      setState(() {
+        _ttsMsg = null;
+        _ttsSpeaking = false;
+      });
+    }
+  }
+
+  void _voiceFailure(String message) {
+    if (!mounted) {
+      debugPrint('voicebridge voice error after dispose: $message');
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastVoiceErrorText == message &&
+        _lastVoiceErrorAt != null &&
+        now.difference(_lastVoiceErrorAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastVoiceErrorAt = now;
+    _lastVoiceErrorText = message;
+    debugPrint('voicebridge voice error: $message');
+    _cue('error');
+    _toast(message);
+  }
+
   Future<bool> _ensureStt() async {
     if (_sttReady) return true;
-    _sttReady = await _stt.initialize(
-      // Small fallback: promote the last partial to a final if iOS ends listening
-      // without emitting its own — enough that the hands-free loop never stalls,
-      // but well below the old 2000ms window that caused premature first-turn submits.
-      finalTimeout: const Duration(milliseconds: 800),
-      onStatus: (s) {
-        if (s == 'done' || s == 'notListening') {
-          if (mounted) setState(() => _listening = false);
-        }
-      },
-      onError: (e) {
-        if (mounted) setState(() => _listening = false);
-      },
-    );
-    if (!_sttReady && mounted) {
-      _toast('No microphone permission, or speech recognition is unavailable.');
+    try {
+      _sttReady = await _stt.initialize(
+        // Small fallback: promote the last partial to a final if iOS ends listening
+        // without emitting its own — enough that the hands-free loop never stalls,
+        // but well below the old 2000ms window that caused premature first-turn submits.
+        finalTimeout: const Duration(milliseconds: 800),
+        onStatus: (s) {
+          if (s == 'done' || s == 'notListening') {
+            _markNotListening();
+          }
+        },
+        onError: (e) {
+          _markNotListening();
+          _voiceFailure(sttFailureMessage(e.errorMsg));
+        },
+      );
+    } catch (e) {
+      _sttReady = false;
+      _markNotListening();
+      _voiceFailure(sttFailureMessage(e));
+      return false;
+    }
+    if (!_sttReady) {
+      _markNotListening();
+      _voiceFailure(sttUnavailableMessage);
     }
     return _sttReady;
   }
@@ -434,7 +481,10 @@ class _ChatScreenState extends State<ChatScreen> {
   // ---- Voice ----
   Future<void> _listen() async {
     if (_talkMuted) return;
-    if (!await _ensureStt()) return;
+    if (!await _ensureStt()) {
+      _markNotListening();
+      return;
+    }
     if (_stt.isListening) return; // guard against a double-start after the TTS handoff
 
     setState(() => _listening = true);
@@ -448,34 +498,41 @@ class _ChatScreenState extends State<ChatScreen> {
     const shortPause = Duration(milliseconds: 2000);
     var tightened = false;
 
-    await _stt.listen(
-      localeId: _locale,
-      listenFor: const Duration(seconds: 30),
-      pauseFor: longPause,
-      listenOptions: SpeechListenOptions(
-        listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
-        partialResults: true,
-        onDevice: false, // en uses server recognition
-        autoPunctuation: true,
-        cancelOnError: false,
-      ),
-      onResult: (r) {
-        if (!tightened && r.recognizedWords.trim().isNotEmpty) {
-          tightened = true;
-          try {
-            if (_stt.isListening) _stt.changePauseFor(shortPause);
-          } catch (_) {/* listen already ended between the partial and this callback */}
-        }
-        if (r.finalResult) {
-          final t = r.recognizedWords.trim();
-          setState(() => _listening = false);
-          if (t.isNotEmpty) {
-            if (_talking) _cue('sent');
-            _send(t);
+    try {
+      await _stt.listen(
+        localeId: _locale,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: longPause,
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
+          partialResults: true,
+          onDevice: false, // en uses server recognition
+          autoPunctuation: true,
+          cancelOnError: false,
+        ),
+        onResult: (r) {
+          if (!tightened && r.recognizedWords.trim().isNotEmpty) {
+            tightened = true;
+            try {
+              if (_stt.isListening) _stt.changePauseFor(shortPause);
+            } catch (e) {
+              debugPrint('voicebridge STT pause update ignored: $e');
+            }
           }
-        }
-      },
-    );
+          if (r.finalResult) {
+            final t = r.recognizedWords.trim();
+            setState(() => _listening = false);
+            if (t.isNotEmpty) {
+              if (_talking) _cue('sent');
+              _send(t);
+            }
+          }
+        },
+      );
+    } catch (e) {
+      _markNotListening();
+      _voiceFailure(sttFailureMessage(e));
+    }
   }
 
   // Longest auto-read (talking loop) before we shorten to the lead (#124).
@@ -504,16 +561,32 @@ class _ChatScreenState extends State<ChatScreen> {
     return '$lead … (long reply, full text on screen)';
   }
 
-  Future<void> _speak(String text, {bool summarize = false}) async {
+  Future<bool> _speak(String text, {bool summarize = false}) async {
     final clean = _forSpeech(text, summarize: summarize);
-    if (clean.isEmpty) return;
+    if (clean.isEmpty) return true;
     // The audio session is configured ONCE in initState and kept alive by
     // mixWithOthers, so we do NOT stop()/re-assert the category/sleep before every
     // utterance — that churn is what made speech choppy. Just release the mic so it
     // isn't holding the input route. (The mic→TTS session re-assert that keeps
     // replies audible happens once on the handoff in _send.)
-    try { await _stt.stop(); } catch (_) {}
-    await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
+    try {
+      await _stt.stop();
+    } catch (e) {
+      debugPrint('voicebridge STT stop before TTS failed: $e');
+    }
+    try {
+      final result = await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
+      if (result == 0 || result == false) {
+        _markNotSpeaking();
+        _voiceFailure(ttsFailureMessage('TTS engine rejected speak request'));
+        return false;
+      }
+      return true;
+    } catch (e) {
+      _markNotSpeaking();
+      _voiceFailure(ttsFailureMessage(e));
+      return false;
+    }
   }
 
   // Per-message "Read aloud" toggle (the bubble button). _ttsMsg tracks which
@@ -852,8 +925,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _toast(String m) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
 
   @override
   Widget build(BuildContext context) {

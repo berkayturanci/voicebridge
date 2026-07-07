@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
@@ -197,7 +199,8 @@ class Api {
       return ((data['groups'] as List?) ?? const [])
           .map((e) => (e as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('voicebridge commands failed: $e');
       return [];
     }
   }
@@ -260,7 +263,8 @@ class Api {
         Map<String, dynamic> ev;
         try {
           ev = jsonDecode(line) as Map<String, dynamic>;
-        } catch (_) {
+        } catch (e) {
+          debugPrint('voicebridge ask stream ignored malformed event: $e');
           continue;
         }
         switch (ev['type']) {
@@ -283,7 +287,8 @@ class Api {
   String? _err(String body) {
     try {
       return (jsonDecode(body) as Map<String, dynamic>)['error'] as String?;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('voicebridge error body parse failed: $e');
       return null;
     }
   }
@@ -315,6 +320,12 @@ class SessionWatch {
         client.close();
         return;
       }
+      if (resp.statusCode >= 400) {
+        debugPrint('voicebridge session watch failed (${resp.statusCode})');
+        client.close();
+        _retry();
+        return;
+      }
       var buf = '';
       resp.stream.transform(utf8.decoder).listen((chunk) {
         buf += chunk;
@@ -329,10 +340,16 @@ class SessionWatch {
             if (o['type'] == 'turn') {
               onTurn((o['role'] ?? '') as String, (o['text'] ?? '') as String);
             }
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('voicebridge session watch ignored malformed event: $e');
+          }
         }
-      }, onError: (_) => _retry(), onDone: _retry, cancelOnError: true);
-    }).catchError((_) {
+      }, onError: (e) {
+        debugPrint('voicebridge session watch stream failed: $e');
+        _retry();
+      }, onDone: _retry, cancelOnError: true);
+    }).catchError((e) {
+      debugPrint('voicebridge session watch connect failed: $e');
       _retry();
     });
   }
@@ -341,7 +358,9 @@ class SessionWatch {
     if (_closed) return;
     try {
       _client?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('voicebridge session watch close before retry failed: $e');
+    }
     Future.delayed(const Duration(milliseconds: 1500), _connect);
   }
 
@@ -349,6 +368,8 @@ class SessionWatch {
     _closed = true;
     try {
       _client?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('voicebridge session watch close failed: $e');
+    }
   }
 }
