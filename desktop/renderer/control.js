@@ -1,12 +1,29 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 
-function setRunning(running) {
+function setRunning(value) {
+  const status = typeof value === "object" && value !== null ? value : { running: !!value };
+  const running = !!status.running;
+  const processRunning = !!status.processRunning;
   const pill = $("pill");
-  pill.textContent = running ? "● Running" : "○ Stopped";
-  pill.classList.toggle("on", running);
-  $("toggle").textContent = running ? "Stop" : "Start";
+  pill.classList.remove("on", "warn", "err");
+  if (running) {
+    pill.textContent = "● Running";
+    pill.classList.add("on");
+  } else if (status.status === "starting") {
+    pill.textContent = "◌ Starting";
+    pill.classList.add("warn");
+  } else if (status.status === "error") {
+    pill.textContent = "⚠ Error";
+    pill.classList.add("err");
+  } else {
+    pill.textContent = "○ Stopped";
+  }
+  $("toggle").textContent = processRunning ? "Stop" : "Start";
   $("open").disabled = !running;
+  const err = $("bridgeError");
+  err.textContent = status.error || "";
+  err.classList.toggle("on", !!status.error);
 }
 
 function appendLog(line) {
@@ -24,7 +41,7 @@ async function refresh() {
   $("url").textContent = s.url;
   $("log").textContent = (s.logs || []).join("\n") + (s.logs && s.logs.length ? "\n" : "");
   $("log").scrollTop = $("log").scrollHeight;
-  setRunning(s.running);
+  setRunning(s);
   refreshInfo();
 }
 
@@ -73,14 +90,14 @@ $("apply").addEventListener("click", async () => {
 });
 $("toggle").addEventListener("click", async () => {
   const s = await window.vb.getStatus();
-  if (s.running) await window.vb.stop();
+  if (s.processRunning) await window.vb.stop();
   else { await window.vb.saveSettings(currentSettings()); await window.vb.start(); }
   setTimeout(refresh, 400);
 });
 $("open").addEventListener("click", () => window.vb.openWeb());
 
 window.vb.onLog(appendLog);
-window.vb.onStatus((running) => { setRunning(running); refresh(); });
+window.vb.onStatus((status) => { setRunning(status); refresh(); });
 
 refresh();
 setInterval(refreshInfo, 4000); // keep the agents/sessions panel live
