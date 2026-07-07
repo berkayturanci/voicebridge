@@ -17,8 +17,9 @@ so understand the trust boundaries before exposing it.
 
 ## Access token
 
-Set `ACCESS_TOKEN` to require `Authorization: Bearer <token>` on every `/api/*`
-route except the public `/api/config`:
+Set `ACCESS_TOKEN` to require `Authorization: Bearer <token>` on protected
+`/api/*` routes. `/api/health`, `/api/push/key`, and the public bootstrap
+subset of `/api/config` remain available before authentication:
 
 ```bash
 export ACCESS_TOKEN="$(openssl rand -hex 16)"
@@ -78,13 +79,28 @@ commands you trust.
   and traversal attempts return `403`/`404` without leaking source.
 - **Token comparison** is constant-time (`crypto.timingSafeEqual`).
 
+## Public Endpoints
+
+When `ACCESS_TOKEN` is set, these `/api/*` endpoints are intentionally public:
+
+- `GET /api/health`: liveness/readiness only (`ok`, version, uptime, session
+  count).
+- `GET /api/push/key`: whether Web Push is enabled and the VAPID public key.
+- `GET /api/config`: public client bootstrap data only: STT mode, whether auth
+  is required, available agents/modes, and runner types.
+
+Authenticated `GET /api/config` additionally returns convenience fields that may
+contain host-local paths or session ids: `defaultProjectDir`,
+`defaultSessionId`, and `favorites`. These are intentionally omitted from the
+unauthenticated response.
+
 ## Audit notes (trust model)
 
-- `/api/*` (except `/api/health` and `/api/config`) require the access token when
-  `ACCESS_TOKEN` is set; **set a token whenever the bridge is reachable beyond
-  loopback.** A holder of the token is trusted — they can drive the agent, and
-  `/api/browse` lists directory **names** anywhere readable by the server process
-  (a folder picker; it does not read file contents).
+- `/api/*` (except the public endpoints listed above) require the access token
+  when `ACCESS_TOKEN` is set; **set a token whenever the bridge is reachable
+  beyond loopback.** A holder of the token is trusted — they can drive the agent,
+  and `/api/browse` lists directory **names** anywhere readable by the server
+  process (a folder picker; it does not read file contents).
 - The page ships inline scripts, so the CSP allows `script-src 'unsafe-inline'`.
   This is low-risk here because replies are rendered as DOM nodes (never
   `innerHTML` with model/user text) and `connect-src` is `'self'`, so an injected
