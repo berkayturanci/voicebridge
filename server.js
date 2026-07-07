@@ -1049,7 +1049,9 @@ function streamLive(session, prompt, res, emit) {
   };
   const failAndRespawnNextTurn = (errMsg) => {
     endHttp(errMsg);
-    killLive(session.id);
+    if (liveProcs.get(session.id) === p) liveProcs.delete(session.id);
+    if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
+    try { p.child.kill("SIGTERM"); } catch (_) {}
     release(false);
   };
   // Settle the HTTP response (emit done/error once). Independent of release: on
