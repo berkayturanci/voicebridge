@@ -40,6 +40,21 @@ middleman.
 If the client disconnects (the **Stop** button aborts the `fetch`), the bridge
 kills the spawned child via the response `close` handler.
 
+## Shutdown Behavior
+
+The bridge handles `SIGINT` and `SIGTERM` as graceful shutdown signals. Shutdown
+is idempotent: the first signal starts cleanup, later signals are ignored while
+cleanup is in progress. The server closes its HTTP listener, closes active HTTP
+connections when the Node runtime supports it, and sends `SIGTERM` to every
+persistent live child in `liveProcs`. A short grace timer forces process exit if
+the HTTP server or a wedged child prevents normal shutdown.
+
+tmux runner sessions are intentionally not killed by bridge shutdown. A tmux
+session is an attachable Mac-side workspace (`tmux attach -t vb_<session>`) and
+may be useful after a phone disconnect or bridge restart. Session deletion and
+tmux idle timers still clean up tmux sessions through `killTmux`; process
+shutdown only reaps live child processes.
+
 ## Agent adapters
 
 Each agent is one entry in the `AGENTS` map in `server.js`:

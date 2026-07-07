@@ -977,6 +977,7 @@ async function streamTmux(session, prompt, res, emit) {
 // ---------------------------------------------------------------------------
 const LIVE_ENABLED = process.env.PERSISTENT_SESSIONS === "1";
 const LIVE_IDLE_MS = Number(process.env.LIVE_IDLE_MS ?? 30 * 60 * 1000) || 0;
+const SHUTDOWN_GRACE_MS = Number(process.env.SHUTDOWN_GRACE_MS ?? 5000) || 5000;
 function agentTimeoutMs() {
   return Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0;
 }
@@ -989,8 +990,15 @@ function killLive(sessionId) {
   const p = liveProcs.get(sessionId);
   if (!p) return;
   liveProcs.delete(sessionId);
+  if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
   try { p.child.stdin.end(); } catch (_) {}
   try { p.child.kill("SIGTERM"); } catch (_) {}
+}
+
+function killAllLive() {
+  for (const id of Array.from(liveProcs.keys())) {
+    try { killLive(id); } catch (_) {}
+  }
 }
 
 function getOrSpawnLive(session) {
@@ -1676,6 +1684,47 @@ function printPhoneQr(url) {
   }
 }
 
+function closeServerForShutdown(server) {
+  return new Promise((resolve) => {
+    if (!server || typeof server.close !== "function") return resolve();
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    try {
+      server.close(done);
+      if (typeof server.closeIdleConnections === "function") server.closeIdleConnections();
+      if (typeof server.closeAllConnections === "function") server.closeAllConnections();
+    } catch (_) {
+      done();
+    }
+  });
+}
+
+function createShutdownHandler(server, opts = {}) {
+  const exit = opts.exit || process.exit.bind(process);
+  const logger = opts.logger || console;
+  const graceMs = Number(opts.graceMs ?? SHUTDOWN_GRACE_MS) || SHUTDOWN_GRACE_MS;
+  let shuttingDown = false;
+  return function shutdown(signal = "shutdown") {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    try { logger.log(`voicebridge shutting down (${signal})...`); } catch (_) {}
+    killAllLive();
+    const forceTimer = setTimeout(() => {
+      try { logger.error(`voicebridge shutdown timed out after ${graceMs}ms; exiting.`); } catch (_) {}
+      exit(1);
+    }, graceMs);
+    if (typeof forceTimer.unref === "function") forceTimer.unref();
+    closeServerForShutdown(server).then(() => {
+      clearTimeout(forceTimer);
+      exit(0);
+    });
+  };
+}
+
 function start() {
   // Persist sessions by default (real server only — tests never call start()),
   // so a restart keeps the same session IDs and the phone's history still matches.
@@ -1690,6 +1739,9 @@ function start() {
   }
   const boot = sessions.get(defaultSessionId);
   const server = buildServer();
+  const shutdown = createShutdownHandler(server);
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
   server.listen(PORT, HOST, () => {
     console.log(`voicebridge listening on http://${HOST}:${PORT}`);
     console.log(`default session: ${boot.name} · ${AGENTS[boot.agent].label} · ${boot.projectDir}`);
@@ -1737,6 +1789,12 @@ module.exports = {
   buildServer,
   handleRequest,
   start,
+  _internals: {
+    createShutdownHandler,
+    killAllLive,
+    killLive,
+    liveProcs,
+  },
   get defaultSessionId() { return defaultSessionId; },
   set defaultSessionId(v) { defaultSessionId = v; },
 };
