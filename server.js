@@ -977,6 +977,12 @@ async function streamTmux(session, prompt, res, emit) {
 // ---------------------------------------------------------------------------
 const LIVE_ENABLED = process.env.PERSISTENT_SESSIONS === "1";
 const LIVE_IDLE_MS = Number(process.env.LIVE_IDLE_MS ?? 30 * 60 * 1000) || 0;
+function agentTimeoutMs() {
+  return Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0;
+}
+function agentTimeoutMessage(agentLabel, timeoutMs) {
+  return `${agentLabel} didn't finish within ${Math.round(timeoutMs / 60000)} min (timed out, stopped). Side effects (file changes, issues, etc.) may have occurred. For longer tasks, raise AGENT_TIMEOUT_MS on the server (0 = unlimited).`;
+}
 const liveProcs = new Map(); // sessionId -> { child, buf, busy, idleTimer }
 
 function killLive(sessionId) {
@@ -1021,22 +1027,30 @@ function streamLive(session, prompt, res, emit) {
   p.busy = true;
   if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
 
+  const agent = AGENTS[session.agent] || { label: "Live agent" };
   let replyText = "";
   let finished = false;
   let stderr = "";
+  let timeoutTimer = null;
 
   let released = false;   // process turn fully drained to its `result` (busy freed)
 
   // Free the process for the next turn. Only safe once this turn's `result` has
   // been consumed — otherwise leftover stdout corrupts the next turn's framing.
-  const release = () => {
+  const release = (rearmIdle = true) => {
     if (released) return;
     released = true;
+    if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
     p.child.stdout.removeListener("data", onData);
     p.child.stderr.removeListener("data", onErr);
     p.child.removeListener("exit", onExit);
     p.busy = false;
-    if (LIVE_IDLE_MS > 0) p.idleTimer = setTimeout(() => killLive(session.id), LIVE_IDLE_MS);
+    if (rearmIdle && LIVE_IDLE_MS > 0) p.idleTimer = setTimeout(() => killLive(session.id), LIVE_IDLE_MS);
+  };
+  const failAndRespawnNextTurn = (errMsg) => {
+    endHttp(errMsg);
+    killLive(session.id);
+    release(false);
   };
   // Settle the HTTP response (emit done/error once). Independent of release: on
   // barge-in the response settles immediately while the process keeps draining.
@@ -1081,6 +1095,12 @@ function streamLive(session, prompt, res, emit) {
   p.child.stdout.on("data", onData);
   p.child.stderr.on("data", onErr);
   p.child.on("exit", onExit);
+  const TIMEOUT_MS = agentTimeoutMs();
+  if (TIMEOUT_MS > 0) {
+    timeoutTimer = setTimeout(() => {
+      failAndRespawnNextTurn(agentTimeoutMessage(agent.label, TIMEOUT_MS));
+    }, TIMEOUT_MS);
+  }
   // Barge-in: HTTP response closed mid-turn. We must NOT kill the persistent
   // process (in-memory history must survive) and must NOT free it until this
   // turn's `result` arrives — so we stop emitting now and keep draining (onLine
@@ -1089,7 +1109,7 @@ function streamLive(session, prompt, res, emit) {
   res.on("close", () => { finished = true; });
 
   const userLine = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: buildPrompt(session.voice, prompt) }] } }) + "\n";
-  try { p.child.stdin.write(userLine); } catch (e) { finish(e.message); }
+  try { p.child.stdin.write(userLine); } catch (e) { failAndRespawnNextTurn(e.message); }
 }
 
 // Local runner: spawn the agent CLI on this machine.
@@ -1121,7 +1141,7 @@ function streamLocal(session, prompt, res, emit) {
   // Per-turn cap so a runaway agent can't hold the host forever. Generous by
   // default for real coding tasks; set AGENT_TIMEOUT_MS (ms) to tune, 0 = no cap.
   let timedOut = false;
-  const TIMEOUT_MS = Number(process.env.AGENT_TIMEOUT_MS ?? 20 * 60 * 1000) || 0;
+  const TIMEOUT_MS = agentTimeoutMs();
   const timer = TIMEOUT_MS > 0
     ? setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, TIMEOUT_MS)
     : null;
@@ -1174,7 +1194,7 @@ function streamLocal(session, prompt, res, emit) {
     clearTimeout(timer);
     if (agent.stream === "ndjson" && buf.trim()) onLine(buf);
     if (timedOut && !gotText) {
-      emit({ type: "error", error: `${agent.label} didn't finish within ${Math.round(TIMEOUT_MS / 60000)} min (timed out, stopped). Side effects (file changes, issues, etc.) may have occurred. For longer tasks, raise AGENT_TIMEOUT_MS on the server (0 = unlimited).` });
+      emit({ type: "error", error: agentTimeoutMessage(agent.label, TIMEOUT_MS) });
     } else if (code !== 0 && !gotText) {
       emit({ type: "error", error: stderr.trim() || `${agent.label} exited with code ${code}.` });
     } else {
