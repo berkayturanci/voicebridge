@@ -55,6 +55,12 @@ may be useful after a phone disconnect or bridge restart. Session deletion and
 tmux idle timers still clean up tmux sessions through `killTmux`; process
 shutdown only reaps live child processes.
 
+tmux replies are scraped from the pane after the TUI becomes stable. The final
+capture uses a bounded scrollback window (`TMUX_CAPTURE_LINES`) and strips ANSI
+control sequences before extracting the latest assistant reply. If the pane only
+contains a partial or malformed turn, the bridge returns an `{type:"error"}`
+event instead of fabricating a fallback reply.
+
 ## Agent adapters
 
 Each agent is one entry in the `AGENTS` map in `server.js`:

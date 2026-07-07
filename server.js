@@ -853,6 +853,7 @@ function streamCloud(session, prompt, res, emit) {
 // are scraped from the pane. Spike-proven; see #128-132.
 // ---------------------------------------------------------------------------
 const TMUX_IDLE_MS = Number(process.env.TMUX_IDLE_MS ?? 60 * 60 * 1000) || 0;
+const TMUX_CAPTURE_LINES = Number(process.env.TMUX_CAPTURE_LINES ?? 1000) || 1000;
 const tmuxIdleTimers = new Map(); // sessionId -> idle kill timer
 
 function tmuxName(id) { return "vb_" + String(id).replace(/[^a-zA-Z0-9_]/g, "_"); }
@@ -896,10 +897,19 @@ async function ensureTmuxClaude(session) {
   return name;
 }
 
+function stripAnsi(text) {
+  return String(text || "")
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1B[PX^_].*?\x1B\\/gs, "")
+    .replace(/\x1B[@-_]/g, "")
+    .replace(/\r/g, "");
+}
+
 // Turn a captured claude TUI pane into the clean assistant reply: drop the welcome
 // box, ─── input borders, the ❯ echo, ✻ Cogitated and ⎿ chrome; keep the ⏺ body.
 function extractTuiReply(pane, promptEcho) {
-  const lines = pane.split("\n");
+  const lines = stripAnsi(pane).split("\n");
   const key = (promptEcho || "").trim().slice(0, 24);
   let start = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -908,7 +918,9 @@ function extractTuiReply(pane, promptEcho) {
   }
   if (start < 0) for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim().startsWith("⏺")) { start = i - 1; break; } }
   const out = [];
+  let sawAssistant = false;
   for (let i = start + 1; i < lines.length; i++) {
+    const raw = lines[i];
     const t = lines[i].trim();
     if (!t) { out.push(""); continue; }
     if (/^[╭╰│]/.test(t)) continue;          // welcome box
@@ -916,12 +928,22 @@ function extractTuiReply(pane, promptEcho) {
     if (t.startsWith("❯")) break;             // empty input prompt → ended
     if (/^✻/.test(t)) continue;               // "Cogitated for Xs"
     if (/^⎿/.test(t)) continue;               // hook/tool-result chrome
-    out.push(lines[i].replace(/^\s*⏺\s?/, "").replace(/^\s{0,3}/, ""));
+    if (!sawAssistant && tmuxStillGenerating(t)) continue;
+    if (/^\s*⏺/.test(raw)) sawAssistant = true;
+    out.push(raw.replace(/^\s*⏺\s?/, "").replace(/^\s{0,3}/, ""));
   }
+  if (!sawAssistant) return "";
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 const TMUX_GENERATING_RE = /esc to interrupt|Cogitating|Thinking|Working…|Pondering|Forging/i;
+function tmuxStillGenerating(pane) {
+  return TMUX_GENERATING_RE.test(stripAnsi(pane));
+}
+
+function tmuxCaptureErrorMessage(reason) {
+  return "couldn't capture tmux reply: " + reason + ". Attach with `tmux attach` on your Mac to inspect the live session.";
+}
 
 // Drive one turn through the tmux-hosted interactive claude.
 async function streamTmux(session, prompt, res, emit) {
@@ -944,14 +966,22 @@ async function streamTmux(session, prompt, res, emit) {
   while (!closed && Date.now() - t0 < MAXMS) {
     await sleepMs(1400);
     const cur = await tmuxCapture(name);
-    if (TMUX_GENERATING_RE.test(cur)) sawGen = true;
+    if (tmuxStillGenerating(cur)) sawGen = true;
     if (cur === prev) stable++; else stable = 0;
     prev = cur;
-    if (stable >= 2 && !TMUX_GENERATING_RE.test(cur) && (sawGen || stable >= 4)) break;
+    if (stable >= 2 && !tmuxStillGenerating(cur) && (sawGen || stable >= 4)) break;
   }
   if (closed) return; // barge-in — process keeps running for the next turn / attach
-  const reply = extractTuiReply(await tmuxCapture(name, -250), text);
-  emit({ type: "delta", text: reply || "(couldn't capture the reply — check with `tmux attach` on your Mac)" });
+  if (Date.now() - t0 >= MAXMS && tmuxStillGenerating(prev)) {
+    emit({ type: "error", error: agentTimeoutMessage("Claude tmux", MAXMS) });
+    return res.end();
+  }
+  const reply = extractTuiReply(await tmuxCapture(name, -Math.abs(TMUX_CAPTURE_LINES)), text);
+  if (!reply) {
+    emit({ type: "error", error: tmuxCaptureErrorMessage("pane did not contain a completed assistant reply") });
+    return res.end();
+  }
+  emit({ type: "delta", text: reply });
   session.started = true;
   // Bind the transcript .jsonl by content — the file containing this turn's input
   // (reliable even with many .jsonl in the dir). Needed for sync/resume/handoff.
@@ -1791,9 +1821,14 @@ module.exports = {
   start,
   _internals: {
     createShutdownHandler,
+    extractTuiReply,
     killAllLive,
     killLive,
     liveProcs,
+    stripAnsi,
+    tmuxCaptureErrorMessage,
+    tmuxStillGenerating,
+    TMUX_GENERATING_RE,
   },
   get defaultSessionId() { return defaultSessionId; },
   set defaultSessionId(v) { defaultSessionId = v; },
