@@ -142,6 +142,16 @@ test("empty prompt and unknown session are rejected", async () => {
   assert.strictEqual((await request(server, "POST", "/api/ask", { text: "hi", sessionId: "nope" })).status, 404);
 });
 
+test("oversize request bodies return 413 instead of a generic bad request", async () => {
+  const ask = await request(server, "POST", "/api/ask", "x".repeat(64 * 1024 + 1));
+  assert.strictEqual(ask.status, 413);
+  assert.strictEqual(JSON.parse(ask.data).error, "Payload too large");
+
+  const tmux = await request(server, "POST", "/api/tmux-rc", "x".repeat(4 * 1024 + 1));
+  assert.strictEqual(tmux.status, 413);
+  assert.strictEqual(JSON.parse(tmux.data).error, "Payload too large");
+});
+
 test("/api/reset clears the rolling-conversation flag", async () => {
   await request(server, "POST", "/api/ask", { text: "hi", sessionId: boot.id });
   assert.strictEqual(srv.sessions.get(boot.id).started, true);

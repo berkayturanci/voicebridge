@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
+    "lint": "eslint server.js test/*.js examples/**/*.js desktop/main.js desktop/preload.js desktop/lib/*.js desktop/renderer/*.js desktop/test/*.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "smoke": "bash scripts/smoke.sh"
   },
@@ -20,5 +21,11 @@
   },
   "optionalDependencies": {
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.4"
   }
 }

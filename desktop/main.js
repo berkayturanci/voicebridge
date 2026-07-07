@@ -10,7 +10,7 @@ const { fork } = require("child_process");
 const crypto = require("crypto");
 const http = require("http");
 const path = require("path");
-const fs = require("fs");
+const { loadSettings, saveSettings, webUrl: buildWebUrl } = require("./lib/settings");
 
 const isPackaged = app.isPackaged;
 const bridgeEntry = isPackaged
@@ -26,20 +26,7 @@ let child = null;
 const logs = [];
 const LOG_MAX = 500;
 
-function loadSettings() {
-  try {
-    return JSON.parse(fs.readFileSync(settingsFile, "utf8"));
-  } catch (_) {
-    return { port: 8787, host: "127.0.0.1", token: "" };
-  }
-}
-function saveSettings(s) {
-  try {
-    fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
-    fs.writeFileSync(settingsFile, JSON.stringify(s, null, 2));
-  } catch (_) {}
-}
-let settings = loadSettings();
+let settings = loadSettings(settingsFile);
 
 function pushLog(line) {
   const text = String(line).replace(/\n$/, "");
@@ -87,8 +74,7 @@ function restartBridge() {
   setTimeout(startBridge, 300);
 }
 function webUrl() {
-  const host = settings.host === "0.0.0.0" ? "127.0.0.1" : settings.host || "127.0.0.1";
-  return `http://${host}:${settings.port || 8787}/${settings.token ? "?token=" + encodeURIComponent(settings.token) : ""}`;
+  return buildWebUrl(settings);
 }
 
 function createWindow() {
@@ -162,7 +148,7 @@ ipcMain.handle("bridge:info", async () => {
 });
 ipcMain.handle("settings:save", (_e, partial) => {
   settings = { ...settings, ...partial };
-  saveSettings(settings);
+  try { saveSettings(settingsFile, settings); } catch (_) {}
   return settings;
 });
 ipcMain.handle("bridge:status", () => ({
