@@ -18,8 +18,8 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `OLLAMA_BIN` | `ollama` | Path to the Ollama executable. |
 | `OLLAMA_MODEL` | `llama3.2` | Default model for `ollama` sessions (must be pulled, e.g. `ollama pull llama3.2`). |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama HTTP API base. Ollama sessions stream via `/api/chat` and keep per-session history (continuity); models are listed from `/api/tags`. |
-| `CODEX_CONTINUE_ARGS` | _(none)_ | Opt-in Codex resume: argv added on continued turns (e.g. `resume --last`). When set, Codex sessions keep context. Best-effort — verify your build's resume flag. |
-| `AGY_CONTINUE_ARGS` | _(none)_ | Opt-in Antigravity resume: argv added on continued turns. Best-effort. |
+| `CODEX_CONTINUE_ARGS` | _(none)_ | Optional Codex resume override. By default continued Codex turns use `codex exec resume <id> -` when a session id is known, or `codex exec resume --last -` otherwise. |
+| `AGY_CONTINUE_ARGS` | _(none)_ | Optional Antigravity resume override. By default continued turns use `--conversation <id>` when a conversation id is known, or `--continue` otherwise. |
 | `AGY_ARGS` | `--print` | Override Antigravity's base args if your `agy` build differs. |
 | `AGY_PROMPT_ARG` | _(unset)_ | If set (e.g. `1`), pass the prompt as a positional argument instead of stdin. Try this if `agy` returns an empty reply. |
 | `ACCESS_TOKEN` | _(none)_ | If set, protected `/api/*` routes require `Authorization: Bearer <token>`. `/api/health`, `/api/push/key`, and the public bootstrap subset of `/api/config` remain public. |
@@ -30,7 +30,7 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `CLOUD_RUNNER_TOKEN` | _(none)_ | Optional `Authorization: Bearer` token sent to the cloud runner. |
 | `AGENT_TIMEOUT_MS` | `1200000` | Per-turn cap for local and persistent live agent turns. `0` disables the cap. A timed-out persistent live turn kills that live child and the next turn respawns it from the saved Claude session. |
 | `TMUX_CAPTURE_LINES` | `1000` | Scrollback lines captured when extracting the final tmux runner reply. Raise this for unusually long interactive Claude replies. |
-| `SESSIONS_FILE` | _(none)_ | If set, sessions (name/agent/dir/mode/voice/runner) are saved here and restored on restart, e.g. `~/.voicebridge/sessions.json`. Unset = in-memory only. |
+| `SESSIONS_FILE` | _(none)_ | If set, sessions (name/agent/dir/mode/voice/runner plus agent continuity state) are saved here and restored on restart, e.g. `~/.voicebridge/sessions.json`. Unset = in-memory only. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | _(none)_ | Enable real Web Push (OS notifications even when the app is closed). Generate with `node scripts/gen-vapid-keys.js` (needs the optional `web-push` dependency). |
 | `VAPID_SUBJECT` | `mailto:voicebridge@localhost` | Contact URI sent with push (a `mailto:` or `https:`). |
 
@@ -69,18 +69,19 @@ runner is configured). A ready-to-run reference runner lives in
 | Agent | CLI invocation | Prompt delivery | Output | Continuity |
 |-------|----------------|-----------------|--------|------------|
 | `claude` | `claude -p --output-format stream-json --verbose` | positional arg | NDJSON (parsed) | `--continue` (yes) |
-| `codex` | `codex exec` | stdin | plain text | opt-in (`CODEX_CONTINUE_ARGS`) |
-| `antigravity` | `agy --print` | stdin | plain text | opt-in (`AGY_CONTINUE_ARGS`) |
+| `codex` | `codex exec` / `codex exec resume` | stdin | plain text | yes (`resume <id>` or `resume --last`) |
+| `antigravity` | `agy --print` | stdin | plain text | yes (`--conversation <id>` or `--continue`) |
 | `ollama` | HTTP `/api/chat` (local) | JSON body | NDJSON | yes (per-session history) |
 
 The **Ollama** backend is fully local — the model runs on your machine, so
 nothing (not even the prompt) leaves it. Install [Ollama](https://ollama.com),
 `ollama pull llama3.2`, and pick the **Ollama (yerel)** agent.
 
-The Claude backend is fully implemented and tested. The Codex and Antigravity
-backends mirror the invocations used by
-[ai-jury](https://github.com/berkayturanci/ai-jury); verify them on a machine
-that has those CLIs installed.
+The Claude backend is fully implemented and tested. Codex and Antigravity use
+the current non-interactive CLI resume flags and keep session continuity across
+bridge restarts when the CLI exposes enough state. If the CLI does not print a
+stable id, voicebridge falls back to that CLI's "most recent conversation"
+resume behavior.
 
 ## Modes
 
@@ -94,10 +95,10 @@ runs commands without asking.
 | Claude | `autoEdit` | `--permission-mode acceptEdits` | Auto-accepts edits. |
 | Claude | `full` | `--dangerously-skip-permissions` | No prompts at all. |
 | Codex | `safe` | `-s read-only` | Read-only sandbox. |
-| Codex | `auto` (default) | `--full-auto` | Workspace-write, no approvals. |
+| Codex | `auto` (default) | `-s workspace-write -c approval_policy="never"` | Workspace-write, no approvals. |
 | Codex | `full` | `--dangerously-bypass-approvals-and-sandbox` | No sandbox, no approvals. |
 | Antigravity | `safe` (default) | `--sandbox` | Sandboxed. |
-| Antigravity | `full` | `--yolo` | No restrictions. |
+| Antigravity | `full` | `--dangerously-skip-permissions` | No restrictions. |
 
 Modes are chosen in the new-session dialog and can be changed per session from
 the footer selector (`/api/ask` carries the mode and switches it on the fly).

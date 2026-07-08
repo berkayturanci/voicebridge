@@ -145,6 +145,20 @@ function parseClaudeEvents(line) {
   return out;
 }
 
+function extractAgentConversationId(text) {
+  const s = String(text || "");
+  const patterns = [
+    /"session[_-]?id"\s*:\s*"([^"]+)"/i,
+    /"conversation[_-]?id"\s*:\s*"([^"]+)"/i,
+    /\b(?:session|conversation|thread)\s*(?:id)?\s*[:=]\s*([A-Za-z0-9._:-]{6,})/i,
+  ];
+  for (const re of patterns) {
+    const m = s.match(re);
+    if (m && m[1]) return m[1];
+  }
+  return "";
+}
+
 // Per-agent "mode" = how much autonomy the agent has. The flags mirror
 // ai-jury's privilege handling. Full-auto modes skip approval prompts — handy
 // hands-free, risky otherwise.
@@ -175,43 +189,48 @@ const AGENTS = {
   codex: {
     label: "Codex",
     bin: () => process.env.CODEX_BIN || "codex",
-    // Resume is opt-in: set CODEX_CONTINUE_ARGS (e.g. "resume --last") once you
-    // know your codex build's resume flag. Default off — each turn is fresh.
-    get supportsContinue() { return splitArgs(process.env.CODEX_CONTINUE_ARGS).length > 0; },
+    supportsContinue: true,
     stream: "text",
     defaultMode: "auto",
     modes: {
       safe: { label: "Salt-okunur", args: ["-s", "read-only"] },
-      auto: { label: "Otomatik (yazma)", args: ["--full-auto"] },
+      auto: { label: "Otomatik (yazma)", args: ["-s", "workspace-write", "-c", "approval_policy=\"never\""] },
       full: { label: "Tam otonom", args: ["--dangerously-bypass-approvals-and-sandbox"] },
     },
-    // `codex exec` reads the prompt from stdin in non-interactive runs.
-    command(prompt, { cont, modeArgs } = {}) {
-      const resume = cont ? splitArgs(process.env.CODEX_CONTINUE_ARGS) : [];
-      return { argv: ["exec", ...resume, ...(modeArgs || [])], stdin: prompt };
+    // `codex exec` reads fresh prompts from stdin; continued turns use the
+    // official `codex exec resume ... -` form so the resumed prompt still comes
+    // from stdin. CODEX_CONTINUE_ARGS remains as a compatibility override.
+    command(prompt, { cont, resume, modeArgs } = {}) {
+      const legacy = cont && splitArgs(process.env.CODEX_CONTINUE_ARGS);
+      if (legacy && legacy.length) return { argv: ["exec", ...legacy, ...(modeArgs || [])], stdin: prompt };
+      if (resume) return { argv: ["exec", "resume", ...(modeArgs || []), resume, "-"], stdin: prompt };
+      if (cont) return { argv: ["exec", "resume", ...(modeArgs || []), "--last", "-"], stdin: prompt };
+      return { argv: ["exec", ...(modeArgs || [])], stdin: prompt };
     },
+    extractConversationId: extractAgentConversationId,
   },
   antigravity: {
     label: "Antigravity",
     bin: () => process.env.AGY_BIN || "agy",
-    // Resume is opt-in via AGY_CONTINUE_ARGS. Default off.
-    get supportsContinue() { return splitArgs(process.env.AGY_CONTINUE_ARGS).length > 0; },
+    supportsContinue: true,
     stream: "text",
     defaultMode: "safe",
     modes: {
       safe: { label: "Sandbox", args: ["--sandbox"] },
-      full: { label: "Tam otonom", args: ["--yolo"] },
+      full: { label: "Tam otonom", args: ["--dangerously-skip-permissions"] },
     },
     // `agy --print` reads the prompt from stdin by default. CLIs vary, so the
     // base args (AGY_ARGS, default "--print") and prompt delivery (AGY_PROMPT_ARG=1
     // passes the prompt as a positional argument instead of stdin) are overridable.
-    command(prompt, { cont, modeArgs } = {}) {
+    command(prompt, { cont, resume, modeArgs } = {}) {
       const base = process.env.AGY_ARGS ? splitArgs(process.env.AGY_ARGS) : ["--print"];
-      const resume = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
-      const argv = [...base, ...resume, ...(modeArgs || [])];
+      const legacy = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
+      const continuity = legacy.length ? legacy : resume ? ["--conversation", resume] : cont ? ["--continue"] : [];
+      const argv = [...base, ...continuity, ...(modeArgs || [])];
       if (process.env.AGY_PROMPT_ARG) { argv.push(prompt); return { argv, stdin: null }; }
       return { argv, stdin: prompt };
     },
+    extractConversationId: extractAgentConversationId,
   },
   ollama: {
     label: "Ollama (yerel)",
@@ -512,7 +531,7 @@ function findJsonlByContent(projectDir, needle) {
 
 function maxSessions() { return parseInt(process.env.MAX_SESSIONS || "200", 10); }
 
-function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId } = {}) {
+function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId, agentSessionId } = {}) {
   if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
@@ -534,6 +553,8 @@ function createSession({ name, agent, projectDir, mode, voice, runner, model, cl
     // When set, the FIRST turn resumes this existing Claude Code session
     // (claude -p --resume <id>) instead of starting fresh.
     claudeSessionId: (claudeSessionId && String(claudeSessionId).trim()) || undefined,
+    // Generic per-agent conversation id/thread id for CLIs that expose one.
+    agentSessionId: (agentSessionId && String(agentSessionId).trim()) || undefined,
     started: false,
   };
   sessions.set(id, s);
@@ -545,6 +566,7 @@ function publicSession(s) {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
     projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
     claudeSessionId: s.claudeSessionId || null,
+    agentSessionId: s.agentSessionId || null,
     handoff: s.handoff || null, // "pc" while handed off to the terminal (#123)
   };
 }
@@ -577,6 +599,7 @@ function saveSessions(file) {
       defaultId: defaultSessionId,
       sessions: Array.from(sessions.values()).map((s) => ({
         id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model, claudeSessionId: s.claudeSessionId,
+        agentSessionId: s.agentSessionId, started: s.started,
       })),
     };
     fs.writeFileSync(file, JSON.stringify(data));
@@ -596,7 +619,10 @@ function loadSessions(file) {
       voice: !!s.voice, runner: (s.runner === "cloud" || s.runner === "tmux") ? s.runner : "local",
       model: (s.model && String(s.model).trim()) || undefined,
       claudeSessionId: (s.claudeSessionId && String(s.claudeSessionId).trim()) || undefined,
-      started: false,
+      agentSessionId: (s.agentSessionId && String(s.agentSessionId).trim()) || undefined,
+      // Claude attached sessions need one explicit --resume turn after restart;
+      // non-Claude agents can continue immediately via their adapter.
+      started: !!s.started && !(s.agent === "claude" && s.claudeSessionId),
     });
   }
   if (typeof data.seq === "number") sessionSeq = Math.max(sessionSeq, data.seq);
@@ -1176,9 +1202,11 @@ function streamLocal(session, prompt, res, emit) {
   if (LIVE_ENABLED && AGENTS[session.agent] && AGENTS[session.agent].live) return streamLive(session, prompt, res, emit);
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
-  // First turn of an attached session resumes that Claude session id; afterwards
-  // --continue keeps it going (it's now the most-recent conversation).
-  const resume = (!session.started && session.claudeSessionId) ? session.claudeSessionId : null;
+  // Claude attached sessions resume by Claude's id on the first turn. Other
+  // agents use their own persisted conversation/thread id when one is known.
+  const resume = session.agent === "claude"
+    ? ((!session.started && session.claudeSessionId) ? session.claudeSessionId : null)
+    : (session.agentSessionId || null);
   const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
   const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, resume, modeArgs });
 
@@ -1203,6 +1231,7 @@ function streamLocal(session, prompt, res, emit) {
     : null;
   let buf = "";
   let stderr = "";
+  let stdoutSeen = "";
   let gotText = false;
   let replyText = ""; // accumulated for the optional push-on-question
 
@@ -1222,6 +1251,7 @@ function streamLocal(session, prompt, res, emit) {
   child.stderr.setEncoding("utf8");
   child.stdout.on("data", (d) => {
     const s = d.toString();
+    stdoutSeen += s;
     if (agent.stream === "ndjson") {
       buf += s;
       let idx;
@@ -1254,7 +1284,10 @@ function streamLocal(session, prompt, res, emit) {
     } else if (code !== 0 && !gotText) {
       emit({ type: "error", error: stderr.trim() || `${agent.label} exited with code ${code}.` });
     } else {
+      const id = agent.extractConversationId ? agent.extractConversationId(stdoutSeen + "\n" + stderr) : "";
+      if (id && session.agentSessionId !== id) session.agentSessionId = id;
       session.started = true;
+      saveSessions();
       emit({ type: "done" });
       if (looksLikeQuestion(replyText)) {
         sendPush({ title: "voicebridge — " + session.name + " soru sordu", body: replyText.trim().slice(-160), sessionId: session.id });
@@ -1712,7 +1745,7 @@ function buildServer() {
   return http.createServer((req, res) => {
     try {
       handleRequest(req, res);
-    } catch (e) {
+    } catch (_) {
       try { sendJson(res, 500, { error: "Internal error" }); } catch (_) {}
     }
   });
@@ -1846,6 +1879,7 @@ module.exports = {
   start,
   _internals: {
     createShutdownHandler,
+    extractAgentConversationId,
     extractTuiReply,
     killAllLive,
     killLive,

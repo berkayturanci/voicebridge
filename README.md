@@ -45,11 +45,11 @@ like a phone call with your agent, with a keyboard when you want one.
 >
 > Agent support: the **Claude** backend is fully implemented and tested. The
 > **Codex** (`codex exec`) and **Antigravity** (`agy --print`) backends use the
-> same invocations as [ai-jury](https://github.com/berkayturanci/ai-jury) and
-> stream their plain-text stdout; verify them on your own machine. Conversation
-> continuity is built-in for Claude (`--continue`) and opt-in for Codex /
-> Antigravity via `CODEX_CONTINUE_ARGS` / `AGY_CONTINUE_ARGS` (see
-> [docs/configuration.md](docs/configuration.md)).
+> same secure stdin prompt style as [ai-jury](https://github.com/berkayturanci/ai-jury)
+> and stream their plain-text stdout. Conversation continuity is built-in for
+> Claude (`--continue`), Codex (`codex exec resume`), and Antigravity
+> (`--conversation` / `--continue`); see
+> [docs/configuration.md](docs/configuration.md) for override hooks.
 
 ---
 
@@ -231,8 +231,8 @@ caveat that the agent then edits/runs without asking.
 | Agent | Modes (flag) |
 |-------|--------------|
 | Claude | `ask` (none) · `autoEdit` (`--permission-mode acceptEdits`) · `full` (`--dangerously-skip-permissions`) |
-| Codex | `safe` (`-s read-only`) · `auto` (`--full-auto`) · `full` (`--dangerously-bypass-approvals-and-sandbox`) |
-| Antigravity | `safe` (`--sandbox`) · `full` (`--yolo`) |
+| Codex | `safe` (`-s read-only`) · `auto` (`-s workspace-write -c approval_policy="never"`) · `full` (`--dangerously-bypass-approvals-and-sandbox`) |
+| Antigravity | `safe` (`--sandbox`) · `full` (`--dangerously-skip-permissions`) |
 
 > ⚠️ Full-auto modes let the agent change files and run commands without
 > prompting. Use them only on trusted projects over your private tailnet.
@@ -245,8 +245,9 @@ caveat that the agent then edits/runs without asking.
   speaker ◀─speechSynthesis── reply ◀──────────── reply  ◀──────────────  (coding agent CLI)
 ```
 
-- Each session maps to one agent + project dir. Claude keeps a rolling
-  conversation (`--continue`); **Yeni sohbet** resets it.
+- Each session maps to one agent + project dir. Claude, Codex, Antigravity, and
+  Ollama keep a rolling conversation where the underlying CLI/API supports it;
+  **Yeni sohbet** resets it.
 - For Claude the prompt is passed as a separate argv (no shell); for Codex and
   Antigravity it's piped on **stdin** — both injection-safe.
 
@@ -317,10 +318,10 @@ Details in [docs/security.md](docs/security.md).
 
 - Fully-local STT: stream mic audio over WebSocket to a local `whisper.cpp`
   server instead of the browser recognizer.
-- Per-agent conversation continuity for Codex / Antigravity (resume support).
 - A real screen recording to sit beside the UI illustration.
 - ✅ Streaming replies, a Stop button, multiple agents, multiple sessions, a
-  type-or-speak chat UI, per-agent autonomy modes, and a startup QR code.
+  type-or-speak chat UI, per-agent autonomy modes, persisted Codex/Antigravity
+  continuity, and a startup QR code.
 
 ## License
 

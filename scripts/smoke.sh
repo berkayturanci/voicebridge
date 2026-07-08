@@ -22,7 +22,7 @@ process.stdout.write(JSON.stringify({type:"result",subtype:"success"})+"\n");
 EOF
 chmod +x "$TMP/claude"
 
-CLAUDE_BIN="$TMP/claude" PORT="$PORT" HOST=127.0.0.1 node server.js >"$TMP/server.log" 2>&1 &
+CLAUDE_BIN="$TMP/claude" SESSIONS_FILE="$TMP/sessions.json" PORT="$PORT" HOST=127.0.0.1 node server.js >"$TMP/server.log" 2>&1 &
 SRV=$!
 trap 'kill "$SRV" 2>/dev/null; rm -rf "$TMP"' EXIT
 
