@@ -31,6 +31,8 @@
 "use strict";
 
 const http = require("http");
+const net = require("net");
+const tls = require("tls");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -65,6 +67,7 @@ const DEFAULT_AGENT = process.env.AGENT || "claude";
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "";
 const STT_MODE = (process.env.STT_MODE || "browser").toLowerCase();
 const STT_CMD = process.env.STT_CMD || "";
+const STT_STREAM_URL = process.env.STT_STREAM_URL || "";
 const PUBLIC_DIR = path.join(__dirname, "public");
 let PKG_VERSION = "0.0.0";
 try { PKG_VERSION = require("./package.json").version || PKG_VERSION; } catch (_) {}
@@ -1325,6 +1328,194 @@ function transcribe(audioBuf, contentType, cb) {
   });
 }
 
+function wsAcceptKey(key) {
+  return crypto.createHash("sha1")
+    .update(String(key || "") + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+    .digest("base64");
+}
+
+function wsEncode(data, { opcode = 1, mask = false } = {}) {
+  const payload = Buffer.isBuffer(data) ? data : Buffer.from(String(data));
+  const len = payload.length;
+  const header = [];
+  header.push(0x80 | (opcode & 0x0f));
+  if (len < 126) header.push((mask ? 0x80 : 0) | len);
+  else if (len <= 0xffff) header.push((mask ? 0x80 : 0) | 126, (len >> 8) & 0xff, len & 0xff);
+  else {
+    header.push((mask ? 0x80 : 0) | 127, 0, 0, 0, 0, (len / 0x1000000) & 0xff, (len >> 16) & 0xff, (len >> 8) & 0xff, len & 0xff);
+  }
+  let h = Buffer.from(header);
+  if (!mask) return Buffer.concat([h, payload]);
+  const key = crypto.randomBytes(4);
+  const out = Buffer.alloc(payload.length);
+  for (let i = 0; i < payload.length; i++) out[i] = payload[i] ^ key[i % 4];
+  return Buffer.concat([h, key, out]);
+}
+
+function attachWs(socket, { incomingMasked, onMessage, onClose, onError }) {
+  let buf = Buffer.alloc(0);
+  const fail = (e) => {
+    try { onError && onError(e); } catch (_) {}
+    try { socket.destroy(); } catch (_) {}
+  };
+  const parse = () => {
+    while (buf.length >= 2) {
+      const b0 = buf[0], b1 = buf[1];
+      const opcode = b0 & 0x0f;
+      const masked = !!(b1 & 0x80);
+      let len = b1 & 0x7f, off = 2;
+      if (len === 126) {
+        if (buf.length < off + 2) return;
+        len = buf.readUInt16BE(off); off += 2;
+      } else if (len === 127) {
+        if (buf.length < off + 8) return;
+        const high = buf.readUInt32BE(off), low = buf.readUInt32BE(off + 4); off += 8;
+        if (high !== 0) return fail(new Error("WebSocket frame too large"));
+        len = low;
+      }
+      if (masked !== !!incomingMasked) return fail(new Error("Bad WebSocket mask"));
+      let key = null;
+      if (masked) {
+        if (buf.length < off + 4) return;
+        key = buf.subarray(off, off + 4); off += 4;
+      }
+      if (buf.length < off + len) return;
+      let payload = buf.subarray(off, off + len);
+      buf = buf.subarray(off + len);
+      if (masked) {
+        const unmasked = Buffer.alloc(payload.length);
+        for (let i = 0; i < payload.length; i++) unmasked[i] = payload[i] ^ key[i % 4];
+        payload = unmasked;
+      }
+      if (opcode === 0x8) { try { onClose && onClose(); } catch (_) {} return; }
+      if (opcode === 0x9) { try { socket.write(wsEncode(payload, { opcode: 0x0a, mask: !incomingMasked })); } catch (_) {} continue; }
+      if (opcode === 0x1 || opcode === 0x2) onMessage(payload, opcode);
+    }
+  };
+  socket.on("data", (d) => { buf = Buffer.concat([buf, d]); parse(); });
+  socket.on("close", () => { try { onClose && onClose(); } catch (_) {} });
+  socket.on("error", fail);
+  return { push: (d) => { buf = Buffer.concat([buf, d]); parse(); } };
+}
+
+function wsConnect(rawUrl, cb) {
+  let u;
+  try { u = new URL(rawUrl); } catch (e) { return cb(e); }
+  if (u.protocol !== "ws:" && u.protocol !== "wss:") return cb(new Error("STT_STREAM_URL must be ws:// or wss://"));
+  const secure = u.protocol === "wss:";
+  const port = Number(u.port || (secure ? 443 : 80));
+  const key = crypto.randomBytes(16).toString("base64");
+  const socket = secure ? tls.connect({ host: u.hostname, port, servername: u.hostname }) : net.connect({ host: u.hostname, port });
+  let head = Buffer.alloc(0), settled = false, ws = null;
+  const done = (err, client) => {
+    if (settled) return;
+    settled = true;
+    socket.removeAllListeners("connect");
+    if (err) { try { socket.destroy(); } catch (_) {} return cb(err); }
+    cb(null, client);
+  };
+  socket.on("connect", () => {
+    const target = (u.pathname || "/") + (u.search || "");
+    socket.write([
+      `GET ${target} HTTP/1.1`,
+      `Host: ${u.host}`,
+      "Upgrade: websocket",
+      "Connection: Upgrade",
+      `Sec-WebSocket-Key: ${key}`,
+      "Sec-WebSocket-Version: 13",
+      "\r\n",
+    ].join("\r\n"));
+  });
+  socket.on("data", function onHead(d) {
+    if (settled) return;
+    head = Buffer.concat([head, d]);
+    const idx = head.indexOf("\r\n\r\n");
+    if (idx < 0) return;
+    socket.removeListener("data", onHead);
+    const text = head.subarray(0, idx).toString("utf8");
+    if (!/^HTTP\/1\.[01] 101\b/.test(text)) return done(new Error("STT stream upstream rejected WebSocket"));
+    const rest = head.subarray(idx + 4);
+    const api = {
+      send: (data, opcode = 1) => socket.write(wsEncode(data, { opcode, mask: true })),
+      close: () => { try { socket.end(wsEncode(Buffer.alloc(0), { opcode: 0x8, mask: true })); } catch (_) {} },
+      onMessage: null,
+      onClose: null,
+    };
+    ws = attachWs(socket, {
+      incomingMasked: false,
+      onMessage: (payload, opcode) => { if (api.onMessage) api.onMessage(payload, opcode); },
+      onClose: () => { if (api.onClose) api.onClose(); },
+      onError: (e) => { if (api.onClose) api.onClose(e); },
+    });
+    if (rest.length) ws.push(rest);
+    done(null, api);
+  });
+  socket.on("error", (e) => done(e));
+}
+
+function authorizedWs(req, parsed) {
+  if (!ACCESS_TOKEN) return true;
+  const h = req.headers.authorization || "";
+  if (h === "Bearer " + ACCESS_TOKEN) return true;
+  return parsed.searchParams.get("token") === ACCESS_TOKEN;
+}
+
+function handleSttStreamUpgrade(req, socket, head) {
+  const parsed = new URL(req.url || "/", "http://x");
+  if (parsed.pathname !== "/api/stt-stream") return false;
+  const reject = (code, msg) => {
+    try { socket.write(`HTTP/1.1 ${code} ${msg}\r\nConnection: close\r\n\r\n`); } catch (_) {}
+    try { socket.destroy(); } catch (_) {}
+  };
+  if (!authorizedWs(req, parsed)) { reject(401, "Unauthorized"); return true; }
+  if (STT_MODE !== "whisper-stream" || !STT_STREAM_URL) { reject(503, "STT Stream Not Configured"); return true; }
+  const key = req.headers["sec-websocket-key"];
+  if (!key) { reject(400, "Bad Request"); return true; }
+  socket.write([
+    "HTTP/1.1 101 Switching Protocols",
+    "Upgrade: websocket",
+    "Connection: Upgrade",
+    `Sec-WebSocket-Accept: ${wsAcceptKey(key)}`,
+    "\r\n",
+  ].join("\r\n"));
+
+  let upstream = null, closed = false, bytes = 0;
+  const pending = [];
+  const closeAll = () => {
+    if (closed) return;
+    closed = true;
+    try { upstream && upstream.close(); } catch (_) {}
+    try { socket.end(wsEncode(Buffer.alloc(0), { opcode: 0x8 })); } catch (_) {}
+  };
+  const sendClient = (obj) => {
+    try { socket.write(wsEncode(JSON.stringify(obj), { opcode: 1 })); } catch (_) {}
+  };
+  const clientWs = attachWs(socket, {
+    incomingMasked: true,
+    onMessage: (payload, opcode) => {
+      bytes += payload.length;
+      if (bytes > 32 * 1024 * 1024) { sendClient({ type: "error", error: "STT stream too large" }); return closeAll(); }
+      if (upstream) upstream.send(payload, opcode);
+      else pending.push({ payload, opcode });
+    },
+    onClose: closeAll,
+    onError: closeAll,
+  });
+  if (head && head.length) clientWs.push(head);
+  wsConnect(STT_STREAM_URL, (err, up) => {
+    if (closed) return;
+    if (err) { sendClient({ type: "error", error: err.message }); return closeAll(); }
+    upstream = up;
+    upstream.onMessage = (payload, opcode) => {
+      try { socket.write(wsEncode(payload, { opcode })); } catch (_) { closeAll(); }
+    };
+    upstream.onClose = closeAll;
+    for (const frame of pending.splice(0)) upstream.send(frame.payload, frame.opcode);
+    sendClient({ type: "ready" });
+  });
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Request routing
 // ---------------------------------------------------------------------------
@@ -1352,6 +1543,7 @@ function handleRequest(req, res) {
     const includePrivateConfig = !ACCESS_TOKEN || authorized(req);
     return sendJson(res, 200, {
       sttMode: STT_MODE,
+      sttStream: { enabled: STT_MODE === "whisper-stream" && !!STT_STREAM_URL },
       authRequired: !!ACCESS_TOKEN,
       agents: Object.keys(AGENTS).map((id) => ({
         id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
@@ -1742,13 +1934,21 @@ function handleRequest(req, res) {
 
 function buildServer() {
   // Defense in depth: never let a synchronous throw in a handler crash the process.
-  return http.createServer((req, res) => {
+  const server = http.createServer((req, res) => {
     try {
       handleRequest(req, res);
     } catch (_) {
       try { sendJson(res, 500, { error: "Internal error" }); } catch (_) {}
     }
   });
+  server.on("upgrade", (req, socket, head) => {
+    try {
+      if (!handleSttStreamUpgrade(req, socket, head)) socket.destroy();
+    } catch (_) {
+      try { socket.destroy(); } catch (_) {}
+    }
+  });
+  return server;
 }
 
 // The URL to open on the phone. Prefer the real public URL (e.g. the Tailscale
@@ -1836,6 +2036,7 @@ function start() {
     console.log(`sessions: ${sessions.size}${sessionsFile() ? "  (persisted)" : ""}`);
     console.log(`agents: ${Object.keys(AGENTS).join(", ")}`);
     console.log(`STT mode: ${STT_MODE}${ACCESS_TOKEN ? "  (access token required)" : ""}`);
+    if (STT_MODE === "whisper-stream") console.log(`STT stream: ${STT_STREAM_URL || "(not configured)"}`);
     const loopback = HOST === "127.0.0.1" || HOST === "::1" || HOST === "localhost";
     if (!loopback && !ACCESS_TOKEN) {
       console.warn("\n⚠️  WARNING: bound to a non-loopback address WITHOUT ACCESS_TOKEN.");
@@ -1888,6 +2089,8 @@ module.exports = {
     tmuxCaptureErrorMessage,
     tmuxStillGenerating,
     TMUX_GENERATING_RE,
+    wsAcceptKey,
+    wsEncode,
   },
   get defaultSessionId() { return defaultSessionId; },
   set defaultSessionId(v) { defaultSessionId = v; },

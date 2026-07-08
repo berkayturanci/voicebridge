@@ -390,6 +390,14 @@
     : STANDALONE
     ? "For voice input, open the app in a Safari tab (no mic in the installed app). You can still type."
     : "This browser doesn't support voice input — you can type (use a Safari tab on iOS).";
+  const streamVoiceReady = () => "WebSocket" in window && navigator.mediaDevices && "MediaRecorder" in window;
+  const streamVoiceMsg = () => !window.isSecureContext
+    ? "Local streaming STT needs HTTPS for microphone access — open the https:// address."
+    : !streamVoiceReady()
+    ? "This browser can't stream microphone audio; you can still type."
+    : !(CONFIG.sttStream && CONFIG.sttStream.enabled)
+    ? "Local streaming STT isn't configured on the bridge."
+    : "";
   let recognizing = false;
 
   const S = new Map();   // sessionId -> { meta, logEl, turn }
@@ -862,15 +870,103 @@
   }
   function stopWhisper() { if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop(); }
 
+  // ---------- Local streaming STT (browser -> bridge WebSocket -> local transcriber) ----------
+  let streamRec = null, streamTracks = [], streamSock = null, streamText = "", streamKind = "mic";
+  function sttStreamUrl() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const u = new URL(proto + "//" + location.host + "/api/stt-stream");
+    if (CONFIG.authRequired && token) u.searchParams.set("token", token);
+    return u.toString();
+  }
+  function parseSttStreamMessage(raw) {
+    let msg = {};
+    try { msg = typeof raw === "string" ? JSON.parse(raw) : JSON.parse(String(raw)); } catch (_) { msg = { text: String(raw || "") }; }
+    const text = (msg.text || msg.transcript || msg.partial || msg.final || "").toString().trim();
+    const done = msg.type === "final" || msg.type === "done" || msg.isFinal === true || msg.final === true;
+    return { type: msg.type || "", text, done, error: msg.error || "" };
+  }
+  function streamMimeType() {
+    const choices = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    return choices.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+  }
+  async function startStreamSTT(kind) {
+    if (recognizing || !streamVoiceReady()) { setStatus(streamVoiceMsg()); return; }
+    if (!(CONFIG.sttStream && CONFIG.sttStream.enabled)) { setStatus(streamVoiceMsg()); return; }
+    streamKind = kind || "mic"; streamText = "";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamTracks = Array.from(stream.getTracks());
+      const mimeType = streamMimeType();
+      streamRec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      streamSock = new WebSocket(sttStreamUrl());
+      streamSock.binaryType = "arraybuffer";
+      streamRec.ondataavailable = (e) => { if (e.data && e.data.size && streamSock && streamSock.readyState === WebSocket.OPEN) streamSock.send(e.data); };
+      streamSock.onopen = () => {
+        streamSock.send(JSON.stringify({ type: "start", mimeType: streamRec.mimeType || mimeType || "audio/webm", lang: langSel.value }));
+        streamRec.start(500);
+        recognizing = true; refreshMic(); cue("listen");
+        if (streamKind === "talk") { setTalkState("listening", "Listening…"); talkHeard.textContent = ""; orbMeterStart(); }
+        else setStatus("Listening locally…");
+      };
+      streamSock.onmessage = (ev) => {
+        const m = parseSttStreamMessage(ev.data);
+        if (m.error) {
+          setStatus("⚠️ " + m.error);
+          if (streamKind === "talk") setTalkState("muted", "STT error — tap 🎙️ to retry");
+          stopStreamSTT(false);
+          return;
+        }
+        if (m.text) {
+          streamText = m.text;
+          if (streamKind === "talk") {
+            talkHeard.textContent = streamText; orbBump();
+            clearTimeout(talkSilence); talkSilence = setTimeout(onTalkSilence, talkSilenceMs());
+          } else {
+            composer.value = streamText; autoGrow();
+          }
+        }
+        if (m.done && streamKind !== "talk") stopStreamSTT(true);
+      };
+      streamSock.onerror = () => setStatus("⚠️ Local streaming STT connection failed.");
+      streamSock.onclose = () => {
+        const wasRecognizing = recognizing;
+        streamTracks.forEach((t) => t.stop()); streamTracks = [];
+        streamRec = null; streamSock = null; recognizing = false; refreshMic();
+        if (streamKind !== "talk" && wasRecognizing && streamText.trim()) submitStreamText();
+      };
+    } catch (e) {
+      streamTracks.forEach((t) => t.stop()); streamTracks = [];
+      streamRec = null; streamSock = null; recognizing = false; refreshMic();
+      setStatus("Couldn't open local streaming STT: " + e.message);
+    }
+  }
+  function submitStreamText() {
+    const text = streamText.trim();
+    streamText = ""; composer.value = ""; autoGrow(); setStatus("");
+    if (text) { addMsg(activeId, text, "me"); ask(activeId, text); }
+    else setStatus("Couldn't understand the audio.");
+  }
+  function stopStreamSTT(submit) {
+    const text = streamText.trim();
+    try { if (streamSock && streamSock.readyState === WebSocket.OPEN) streamSock.send(JSON.stringify({ type: "end" })); } catch (_) {}
+    try { if (streamRec && streamRec.state !== "inactive") streamRec.stop(); } catch (_) {}
+    streamTracks.forEach((t) => t.stop()); streamTracks = [];
+    try { if (streamSock) setTimeout(() => { try { streamSock.close(); } catch (_) {} }, 80); } catch (_) {}
+    streamRec = null; recognizing = false; refreshMic();
+    if (submit && streamKind !== "talk") { streamText = text; submitStreamText(); }
+  }
+
   // ---------- Mic button ----------
   micBtn.addEventListener("click", () => {
     ensureAudio();
     const st = active();
     if (st && st.turn.busy) { stopActive(); return; }
     if (CONFIG.sttMode === "browser" && !SR) { setStatus(noVoiceMsg()); composer.focus(); return; }
+    if (CONFIG.sttMode === "whisper-stream" && streamVoiceMsg()) { setStatus(streamVoiceMsg()); composer.focus(); return; }
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
     ensureToken();
     if (CONFIG.sttMode === "whisper") { if (recognizing) stopWhisper(); else startWhisper(); }
+    else if (CONFIG.sttMode === "whisper-stream") { if (recognizing) stopStreamSTT(true); else startStreamSTT("mic"); }
     else { if (recognizing) stopBrowserSTT(); else startBrowserSTT(); }
   });
 
@@ -892,7 +988,9 @@
   function orbMeterStop() { if (orbRAF) cancelAnimationFrame(orbRAF); orbRAF = 0; orbLevel = 0; talkOrb.style.transform = ""; talkOrb.style.boxShadow = ""; }
   function orbBump() { orbLevel = Math.min(1, orbLevel + 0.55); }
   function enterTalking() {
-    if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
+    if (CONFIG.sttMode === "browser" && !SR) { setStatus(noVoiceMsg()); return; }
+    if (CONFIG.sttMode === "whisper-stream" && streamVoiceMsg()) { setStatus(streamVoiceMsg()); return; }
+    if (CONFIG.sttMode !== "browser" && CONFIG.sttMode !== "whisper-stream") { setStatus("Talking mode needs browser STT or local streaming STT."); return; }
     ensureToken(); ensureAudio();
     talking = true; talkEl.classList.add("open"); talkHeard.textContent = "";
     talkMuted = false; muteBtn.classList.remove("on"); muteBtn.textContent = "🎙️"; muteBtn.setAttribute("aria-label", "Mute mic");
@@ -902,6 +1000,7 @@
     talking = false; talkMuted = false;
     clearTimeout(talkSilence); orbMeterStop();
     if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
+    stopStreamSTT(false);
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
     talkEl.classList.remove("open");
@@ -909,6 +1008,7 @@
   function startTalkListen() {
     if (!talking) return;
     if (talkMuted) { setTalkState("muted", "Muted — tap 🎙️ to unmute (or tap the orb)"); talkHeard.textContent = ""; return; }
+    if (CONFIG.sttMode === "whisper-stream") { streamText = ""; setTalkState("listening", "Listening…"); talkHeard.textContent = ""; startStreamSTT("talk"); return; }
     talkFinal = ""; setTalkState("listening", "Listening…"); talkHeard.textContent = ""; orbMeterStart();
     trec = new SR();
     trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
@@ -927,9 +1027,10 @@
     try { trec.start(); } catch (_) {}
   }
   function onTalkSilence() {
-    const text = talkFinal.trim();
+    const text = (CONFIG.sttMode === "whisper-stream" ? streamText : talkFinal).trim();
     if (!text) return; // nothing heard yet; keep listening
-    if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; } // pause during the turn (no TTS feedback)
+    if (CONFIG.sttMode === "whisper-stream") stopStreamSTT(false);
+    else if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; } // pause during the turn (no TTS feedback)
     orbMeterStop();
     talkTurn(text);
   }
@@ -953,6 +1054,7 @@
     if (talking && !talkMuted) setTalkMuted(true); // talking mode: release the recognizer
     stopBrowserSTT();                              // regular STT: release the mic
     try { stopWhisper(); } catch (_) {}            // whisper recorder: release the mic
+    try { stopStreamSTT(false); } catch (_) {}      // streaming STT: release the mic/socket
   });
   // Barge-in: tap the orb while it's speaking to cut the reply short. talkTurn
   // is awaiting the speech queue to drain, so clearing it makes it move on to
@@ -974,6 +1076,7 @@
       clearTimeout(talkSilence); orbMeterStop();
       // abort() (not stop()) so iOS releases the mic immediately — no lingering "in use" state.
       if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
+      stopStreamSTT(false);
       if (!talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) setTalkState("muted", "Muted — tap 🎙️ to unmute (or tap the orb)");
     } else if (talking && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
       startTalkListen();
@@ -1209,6 +1312,7 @@
     }
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
     if (CONFIG.sttMode === "browser" && !SR) { micBtn.classList.add("na"); setStatus(noVoiceMsg()); }
+    if (CONFIG.sttMode === "whisper-stream" && streamVoiceMsg()) { micBtn.classList.add("na"); setStatus(streamVoiceMsg()); }
     if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }
     let list = { sessions: [], defaultSessionId: null };
     try { list = await (await fetch("/api/sessions", { headers: authHeaders() })).json(); } catch (_) {}

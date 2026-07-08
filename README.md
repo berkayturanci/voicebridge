@@ -35,7 +35,8 @@ like a phone call with your agent, with a keyboard when you want one.
   optional **shared access token** — your code never touches a third-party voice
   service.
 - 🗣️ Optional **fully-local speech-to-text** via your own Whisper command
-  (`STT_MODE=whisper`), so even the transcription stays on your machine.
+  (`STT_MODE=whisper`) or a local streaming Whisper WebSocket transcriber
+  (`STT_MODE=whisper-stream`), so even the transcription stays on your machine.
 
 > Honest scope: for Claude/Codex/Antigravity the **model** runs in its vendor's
 > cloud (that's how those CLIs work); with the **Ollama** backend the model runs
@@ -138,8 +139,9 @@ That's it — talk, and Claude Code talks back. 🎧
 | `CODEX_BIN`    | `codex`              | Path to the `codex` executable                     |
 | `AGY_BIN`      | `agy`                | Path to the Antigravity executable                 |
 | `ACCESS_TOKEN` | _(none)_             | If set, `/api/*` requires `Authorization: Bearer <token>`. The page prompts for it once and stores it. |
-| `STT_MODE`     | `browser`            | `browser` (Web Speech) or `whisper` (local, server-side) |
+| `STT_MODE`     | `browser`            | `browser` (Web Speech), `whisper` (local batch), or `whisper-stream` (local streaming) |
 | `STT_CMD`      | _(none)_             | Whisper mode: shell command; `{file}` → recorded audio path; must print the transcript to stdout |
+| `STT_STREAM_URL` | _(none)_           | Whisper-stream mode: local WebSocket transcriber URL, e.g. `ws://127.0.0.1:8910/listen` |
 
 ### Optional: a shared access token
 
@@ -162,6 +164,20 @@ npm start
 
 In whisper mode the mic button is **tap-to-start / tap-to-stop** (record, then it
 transcribes). Hands-free loop is browser-mode only.
+
+For local streaming transcription, run a Whisper-compatible WebSocket transcriber
+on the Mac and point voicebridge at it:
+
+```bash
+export STT_MODE=whisper-stream
+export STT_STREAM_URL='ws://127.0.0.1:8910/listen'
+npm start
+```
+
+In whisper-stream mode the browser streams mic chunks to `/api/stt-stream`; the
+bridge proxies them to the local transcriber and relays partial/final transcript
+JSON back to the UI. Hands-free talking mode works here because partial text can
+drive the same silence timer as browser STT.
 
 ## Agents, sessions & modes
 
@@ -316,12 +332,10 @@ Details in [docs/security.md](docs/security.md).
 
 ## Roadmap
 
-- Fully-local STT: stream mic audio over WebSocket to a local `whisper.cpp`
-  server instead of the browser recognizer.
 - A real screen recording to sit beside the UI illustration.
 - ✅ Streaming replies, a Stop button, multiple agents, multiple sessions, a
   type-or-speak chat UI, per-agent autonomy modes, persisted Codex/Antigravity
-  continuity, and a startup QR code.
+  continuity, local streaming STT, and a startup QR code.
 
 ## License
 

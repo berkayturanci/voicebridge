@@ -213,9 +213,11 @@ tailscale serve --https=443 off
   exposes the bridge to the internet — set `ACCESS_TOKEN` and prefer Tailscale's
   private tailnet.
 - **Fully-local STT (Whisper):** removes the browser-speech dependency for
-  transcription; see [configuration.md](configuration.md). You still want HTTPS
-  for a good mobile experience, but the mic in whisper mode uses `getUserMedia`,
-  which is *also* gated on a secure context — so HTTPS is still required.
+  transcription; see [configuration.md](configuration.md). Batch `whisper` mode
+  records then transcribes, while `whisper-stream` streams mic chunks through the
+  bridge to a local WebSocket transcriber and supports hands-free talking mode.
+  You still want HTTPS for a good mobile experience, because both modes use
+  `getUserMedia`, which is also gated on a secure context.
 
 See also: [security.md](security.md) for the threat model and the access-token
 design.

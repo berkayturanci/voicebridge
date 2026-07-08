@@ -23,8 +23,9 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `AGY_ARGS` | `--print` | Override Antigravity's base args if your `agy` build differs. |
 | `AGY_PROMPT_ARG` | _(unset)_ | If set (e.g. `1`), pass the prompt as a positional argument instead of stdin. Try this if `agy` returns an empty reply. |
 | `ACCESS_TOKEN` | _(none)_ | If set, protected `/api/*` routes require `Authorization: Bearer <token>`. `/api/health`, `/api/push/key`, and the public bootstrap subset of `/api/config` remain public. |
-| `STT_MODE` | `browser` | `browser` (Web Speech) or `whisper` (local, server-side). |
+| `STT_MODE` | `browser` | `browser` (Web Speech), `whisper` (local batch), or `whisper-stream` (local streaming over WebSocket). |
 | `STT_CMD` | _(none)_ | Whisper mode only: shell command; `{file}` is replaced with the recorded audio path; it must print the transcript to stdout. |
+| `STT_STREAM_URL` | _(none)_ | Whisper-stream mode only: local WebSocket transcriber URL. The bridge proxies browser mic chunks to this URL and relays JSON transcript messages back to the client. |
 | `FAVORITES` | _(none)_ | JSON array of favorite projects to prefill the new-session dialog, e.g. `[{"name":"App","projectDir":"/Users/me/app","agent":"claude","mode":"full"}]`. Users can also save their own favorites locally. |
 | `CLOUD_RUNNER_URL` | _(none)_ | If set, enables **cloud** sessions: turns are proxied here instead of spawning a local CLI. The endpoint must speak the same NDJSON protocol. |
 | `CLOUD_RUNNER_TOKEN` | _(none)_ | Optional `Authorization: Bearer` token sent to the cloud runner. |
@@ -125,3 +126,18 @@ export STT_MODE=whisper
 export STT_CMD='ffmpeg -nostdin -i {file} -ar 16000 -ac 1 -f wav - 2>/dev/null | whisper-cli -m ~/models/ggml-base.bin -nt -f - 2>/dev/null'
 npm start
 ```
+
+Fully-local streaming speech-to-text via a local Whisper WebSocket transcriber:
+
+```bash
+export STT_MODE=whisper-stream
+export STT_STREAM_URL='ws://127.0.0.1:8910/listen'
+npm start
+```
+
+The streaming endpoint accepts browser `MediaRecorder` audio chunks at
+`/api/stt-stream`, forwards them to `STT_STREAM_URL`, and relays transcript JSON
+back to the page. Upstream messages may use `text`, `transcript`, or `partial`
+for interim text and `type:"final"` / `type:"done"` / `isFinal:true` for final
+text. Keep the transcriber bound to loopback and expose only voicebridge through
+Tailscale + `ACCESS_TOKEN`.

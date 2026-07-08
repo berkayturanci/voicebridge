@@ -49,7 +49,8 @@ Modes map to the agent's own approval/sandbox flags:
 
 - iOS speech **recognition** sends audio to Apple for transcription (free, not
   local). For fully-local transcription use `STT_MODE=whisper` with your own
-  Whisper command — audio then never leaves your machine.
+  Whisper command, or `STT_MODE=whisper-stream` with a local WebSocket
+  transcriber — audio then never leaves your machine.
 - Speech **synthesis** (the spoken replies) is entirely on-device.
 
 ## Injection safety
@@ -57,7 +58,8 @@ Modes map to the agent's own approval/sandbox flags:
 Prompts are passed to Claude as a separate argv element (no shell) and to Codex
 and Antigravity on stdin — never interpolated into a shell command. The whisper
 `STT_CMD` is operator-provided and runs via `/bin/sh`; only configure it with
-commands you trust.
+commands you trust. `STT_STREAM_URL` should point at a trusted local transcriber,
+preferably bound to loopback.
 
 ## Built-in limits & hardening
 
@@ -109,6 +111,9 @@ unauthenticated response.
 - Whisper STT runs the operator-provided `STT_CMD` via a shell with a
   server-generated temp path — the template and path are operator/server
   controlled, not client input.
+- Streaming Whisper STT proxies microphone chunks only to the configured
+  `STT_STREAM_URL`; keep that upstream service on loopback and expose the
+  voicebridge app itself through Tailscale plus `ACCESS_TOKEN`.
 
 ## Reporting
 
