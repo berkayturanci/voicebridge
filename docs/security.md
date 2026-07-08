@@ -38,8 +38,9 @@ Modes map to the agent's own approval/sandbox flags:
 
 - **Read-only / ask** modes keep the agent from making changes without
   confirmation. Prefer these on unfamiliar or important repositories.
-- **Full-auto** modes (`--dangerously-skip-permissions`, `--full-auto`,
-  `--dangerously-bypass-approvals-and-sandbox`, `--yolo`) let the agent edit
+- **Full-auto** modes (`--dangerously-skip-permissions`,
+  `-s workspace-write -c approval_policy="never"`,
+  `--dangerously-bypass-approvals-and-sandbox`) let the agent edit
   files and run commands **without prompting**. Convenient when you are away
   from the keyboard, dangerous everywhere else. Use them only on trusted
   projects, over your private tailnet, ideally with a token.

@@ -52,31 +52,98 @@ test("ollama adapter runs a local model with the prompt on stdin", () => {
   if (prev === undefined) delete process.env.OLLAMA_MODEL; else process.env.OLLAMA_MODEL = prev;
 });
 
-test("codex resume is opt-in via CODEX_CONTINUE_ARGS", () => {
+test("codex adapter resumes by default and keeps the legacy override", () => {
   const prev = process.env.CODEX_CONTINUE_ARGS;
-  delete process.env.CODEX_CONTINUE_ARGS;
-  assert.strictEqual(srv.AGENTS.codex.supportsContinue, false);
-  assert.deepStrictEqual(srv.AGENTS.codex.command("p", { cont: true }).argv, ["exec"]);
-  process.env.CODEX_CONTINUE_ARGS = "resume --last";
-  assert.strictEqual(srv.AGENTS.codex.supportsContinue, true);
-  assert.deepStrictEqual(
-    srv.AGENTS.codex.command("p", { cont: true, modeArgs: ["--full-auto"] }).argv,
-    ["exec", "resume", "--last", "--full-auto"]
-  );
-  if (prev === undefined) delete process.env.CODEX_CONTINUE_ARGS; else process.env.CODEX_CONTINUE_ARGS = prev;
+  try {
+    delete process.env.CODEX_CONTINUE_ARGS;
+    assert.strictEqual(srv.AGENTS.codex.supportsContinue, true);
+    assert.deepStrictEqual(srv.AGENTS.codex.command("p", { cont: true }).argv, ["exec", "resume", "--last", "-"]);
+    assert.deepStrictEqual(
+      srv.AGENTS.codex.command("p", { resume: "codex-session-1", modeArgs: srv.AGENTS.codex.modes.auto.args }).argv,
+      ["exec", "resume", "-s", "workspace-write", "-c", "approval_policy=\"never\"", "codex-session-1", "-"]
+    );
+    process.env.CODEX_CONTINUE_ARGS = "resume --last";
+    assert.deepStrictEqual(
+      srv.AGENTS.codex.command("p", { cont: true, modeArgs: srv.AGENTS.codex.modes.auto.args }).argv,
+      ["exec", "resume", "--last", "-s", "workspace-write", "-c", "approval_policy=\"never\""]
+    );
+  } finally {
+    if (prev === undefined) delete process.env.CODEX_CONTINUE_ARGS; else process.env.CODEX_CONTINUE_ARGS = prev;
+  }
 });
 
 test("codex adapter: `exec` with prompt on stdin", () => {
   const { argv, stdin } = srv.AGENTS.codex.command("do it");
   assert.deepStrictEqual(argv, ["exec"]);
   assert.strictEqual(stdin, "do it");
-  assert.strictEqual(srv.AGENTS.codex.supportsContinue, false);
+  assert.strictEqual(srv.AGENTS.codex.supportsContinue, true);
+});
+
+test("antigravity adapter resumes by default and keeps the legacy override", () => {
+  const prev = process.env.AGY_CONTINUE_ARGS;
+  const prevArgs = process.env.AGY_ARGS;
+  try {
+    delete process.env.AGY_CONTINUE_ARGS; delete process.env.AGY_ARGS;
+    assert.strictEqual(srv.AGENTS.antigravity.supportsContinue, true);
+    assert.deepStrictEqual(srv.AGENTS.antigravity.command("go", { cont: true }).argv, ["--print", "--continue"]);
+    assert.deepStrictEqual(
+      srv.AGENTS.antigravity.command("go", { resume: "agy-123", modeArgs: ["--sandbox"] }).argv,
+      ["--print", "--conversation", "agy-123", "--sandbox"]
+    );
+    process.env.AGY_CONTINUE_ARGS = "--continue";
+    assert.deepStrictEqual(
+      srv.AGENTS.antigravity.command("go", { cont: true, modeArgs: srv.AGENTS.antigravity.modes.full.args }).argv,
+      ["--print", "--continue", "--dangerously-skip-permissions"]
+    );
+  } finally {
+    if (prev === undefined) delete process.env.AGY_CONTINUE_ARGS; else process.env.AGY_CONTINUE_ARGS = prev;
+    if (prevArgs === undefined) delete process.env.AGY_ARGS; else process.env.AGY_ARGS = prevArgs;
+  }
 });
 
 test("antigravity adapter: `--print` with prompt on stdin", () => {
   const { argv, stdin } = srv.AGENTS.antigravity.command("go");
   assert.deepStrictEqual(argv, ["--print"]);
   assert.strictEqual(stdin, "go");
+});
+
+test("generic agent conversation id extraction handles common CLI text", () => {
+  assert.strictEqual(srv._internals.extractAgentConversationId('{"session_id":"abc-123"}'), "abc-123");
+  assert.strictEqual(srv._internals.extractAgentConversationId('{"conversationId":"conv_456"}'), "conv_456");
+  assert.strictEqual(srv._internals.extractAgentConversationId("thread id: th-789_xyz"), "th-789_xyz");
+  assert.strictEqual(srv._internals.extractAgentConversationId("no id here"), "");
+});
+
+test("non-Claude agent continuity state persists across bridge restart", () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const before = Array.from(srv.sessions.entries());
+  const beforeDefault = srv.defaultSessionId;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-sessions-"));
+  const file = path.join(dir, "sessions.json");
+  try {
+    srv.sessions.clear();
+    srv.defaultSessionId = null;
+    const s = srv.createSession({ agent: "codex", projectDir: process.cwd(), agentSessionId: "codex-session-1" });
+    srv.defaultSessionId = s.id;
+    s.started = true;
+    srv.saveSessions(file);
+
+    srv.sessions.clear();
+    srv.defaultSessionId = null;
+    srv.loadSessions(file);
+
+    const loaded = srv.sessions.get(s.id);
+    assert.ok(loaded);
+    assert.strictEqual(loaded.agentSessionId, "codex-session-1");
+    assert.strictEqual(loaded.started, true);
+    assert.strictEqual(srv.defaultSessionId, s.id);
+    assert.strictEqual(srv.publicSession(loaded).agentSessionId, "codex-session-1");
+  } finally {
+    srv.sessions.clear();
+    for (const [id, value] of before) srv.sessions.set(id, value);
+    srv.defaultSessionId = beforeDefault;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("parseDotEnv parses KEY=VALUE, skips comments, strips quotes", () => {
@@ -159,10 +226,14 @@ test("createSession defaults name to the agent label", () => {
 test("mode flags are threaded into each agent's argv", () => {
   const cl = srv.AGENTS.claude.command("p", { modeArgs: srv.AGENTS.claude.modes.full.args });
   assert.ok(cl.argv.includes("--dangerously-skip-permissions"));
+  const cxa = srv.AGENTS.codex.command("p", { modeArgs: srv.AGENTS.codex.modes.auto.args });
+  assert.deepStrictEqual(cxa.argv, ["exec", "-s", "workspace-write", "-c", "approval_policy=\"never\""]);
   const cx = srv.AGENTS.codex.command("p", { modeArgs: srv.AGENTS.codex.modes.full.args });
   assert.deepStrictEqual(cx.argv, ["exec", "--dangerously-bypass-approvals-and-sandbox"]);
   const ag = srv.AGENTS.antigravity.command("p", { modeArgs: srv.AGENTS.antigravity.modes.safe.args });
   assert.deepStrictEqual(ag.argv, ["--print", "--sandbox"]);
+  const agf = srv.AGENTS.antigravity.command("p", { modeArgs: srv.AGENTS.antigravity.modes.full.args });
+  assert.deepStrictEqual(agf.argv, ["--print", "--dangerously-skip-permissions"]);
 });
 
 test("resolveMode falls back to the agent default for unknown/empty modes", () => {

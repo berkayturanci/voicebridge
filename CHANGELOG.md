@@ -5,6 +5,16 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Changed
+- Codex and Antigravity sessions now resume by default with the current
+  non-interactive CLI flags and persist continuity state across bridge restarts.
+- Codex auto mode now uses the current workspace-write/no-approval invocation
+  instead of the removed `--full-auto` flag.
+- Antigravity full mode now uses the current `--dangerously-skip-permissions`
+  flag instead of the removed `--yolo` alias.
+- The smoke test now uses an isolated temporary sessions file instead of the
+  developer's persisted bridge sessions.
+
 ## [0.5.0] - 2026-06-22
 
 ### Added
