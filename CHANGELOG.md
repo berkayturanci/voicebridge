@@ -5,6 +5,8 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-11
+
 ### Added
 - Fully-local streaming STT via `/api/stt-stream`, proxying browser microphone
   chunks to a configured local Whisper WebSocket transcriber.
