@@ -4,12 +4,16 @@
 
 # voicebridge
 
-[![CI](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml)
+[![CI](https://github.com/berkayturanci/voicebridge/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/voicebridge/actions/workflows/ci.yml)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-3fb950)](package.json)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-1f6feb)](LICENSE)
 [![Agents: Claude · Codex · Antigravity · Ollama](https://img.shields.io/badge/agents-Claude%20%C2%B7%20Codex%20%C2%B7%20Antigravity%20%C2%B7%20Ollama-8b949e)](#agents-sessions--modes)
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
+
+**v0.6.0:** Codex and Antigravity sessions now resume cleanly across bridge
+restarts, and `STT_MODE=whisper-stream` adds low-latency local Whisper
+transcription for hands-free talking mode.
 
 You speak **or type** on your phone, a coding agent (running on your Mac/Linux
 box) does the work, and the reply streams back as chat **and** spoken audio —
@@ -25,8 +29,9 @@ like a phone call with your agent, with a keyboard when you want one.
   repo A", "Codex on repo B") and switch between them in the UI.
 - ⌨️🎙️ **Type or speak** — a Claude-Code-like chat with a text box *and* a mic;
   replies render with code blocks and are read aloud.
-- 🎙️ **Speech-to-text** and 🔊 **text-to-speech** run in your phone's **browser**
-  (Web Speech API) — no per-minute cloud voice cost, no API keys.
+- 🎙️ **Speech-to-text** runs in your phone's browser by default, or through your
+  own local Whisper command / streaming WebSocket transcriber; 🔊
+  **text-to-speech** stays in the browser — no per-minute voice cost.
 - ⚡ **Streaming** — the reply is spoken **sentence-by-sentence as it's generated**,
   not after the whole turn finishes, with a **Stop** button to cut it off.
 - 🧩 A **tiny Node bridge** (one dependency: `qrcode-terminal`) relays the text to
@@ -57,7 +62,7 @@ like a phone call with your agent, with a keyboard when you want one.
 ## Quickstart
 
 ```bash
-git clone <your-repo-url> voicebridge && cd voicebridge && npm install
+git clone https://github.com/berkayturanci/voicebridge.git voicebridge && cd voicebridge && npm install
 cp .env.example .env                                  # set PROJECT_DIR + ACCESS_TOKEN
 CLAUDE_BIN=$(which claude) npm start                  # prints a QR for your phone
 tailscale serve --bg --https=443 localhost:8787       # expose over HTTPS (separate terminal)
@@ -83,7 +88,7 @@ iOS) and tap 🎤 or just type. New to it? See [Requirements](#requirements),
 ### 1. On your computer
 
 ```bash
-git clone <your-repo-url> voicebridge
+git clone https://github.com/berkayturanci/voicebridge.git voicebridge
 cd voicebridge
 npm install            # qrcode-terminal (web-push is optional, for real push)
 
@@ -257,7 +262,7 @@ caveat that the agent then edits/runs without asking.
 
 ```
 [ iPhone Safari ]                         [ your Mac ]
-  mic ─Web Speech STT─▶ text ──https/Tailscale──▶ voicebridge ──spawn──▶ claude / codex / agy
+  mic ─Web Speech or Whisper STT─▶ text ──https/Tailscale──▶ voicebridge ──spawn──▶ claude / codex / agy
   speaker ◀─speechSynthesis── reply ◀──────────── reply  ◀──────────────  (coding agent CLI)
 ```
 

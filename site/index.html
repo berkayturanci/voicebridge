@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="google-site-verification" content="YOfteG6Rawd61nFnQCQY1iLQB8MbUMlJA6zIFUkJC0g" />
 <title>VoiceBridge — Hands-Free Voice for Coding Agents</title>
-<meta name="description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone. Free, source-available, no ElevenLabs." />
-<meta name="keywords" content="VoiceBridge, voice coding, hands-free coding, Claude Code, Codex, Antigravity, Ollama, voice agent, speech to code, coding assistant, source-available" />
+<meta name="description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
+<meta name="keywords" content="VoiceBridge, voice coding, hands-free coding, Claude Code, Codex, Antigravity, Ollama, Whisper, local speech to text, voice agent, speech to code, coding assistant, source-available" />
 <meta name="author" content="Berkay Turancı" />
 <meta name="theme-color" content="#0a0a0e" />
 <meta name="robots" content="index, follow" />
@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 
 <meta property="og:title" content="VoiceBridge — Hands-Free Voice for Coding Agents" />
-<meta property="og:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone. Free, source-available, no ElevenLabs." />
+<meta property="og:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://berkayturanci.github.io/voicebridge/" />
 <meta property="og:site_name" content="VoiceBridge" />
@@ -26,7 +26,7 @@
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="VoiceBridge — Hands-Free Voice for Coding Agents" />
-<meta name="twitter:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone. Free, source-available, no ElevenLabs." />
+<meta name="twitter:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
 <meta name="twitter:image" content="https://berkayturanci.github.io/voicebridge/hero.svg" />
 <meta name="twitter:image:alt" content="VoiceBridge — hands-free voice for coding agents" />
 
@@ -38,7 +38,7 @@
   "url": "https://berkayturanci.github.io/voicebridge/",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Web, iOS, Android",
-  "description": "Hands-free voice control for coding agents. Talk to Claude Code, Codex, Antigravity, and Ollama from your phone. Free, source-available, no ElevenLabs.",
+  "description": "Hands-free voice control for coding agents. Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs.",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Berkay Turancı" }
 }
@@ -429,7 +429,7 @@
       <a href="#features" class="link">Features</a>
       <a href="#how" class="link">How it works</a>
       <a href="#faq" class="link">FAQ</a>
-      <a href="https://github.com/berkayturanci/speak-with-claude-code" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+      <a href="https://github.com/berkayturanci/voicebridge" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
         <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block; vertical-align:text-bottom; margin-right:4px;"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
         GitHub
       </a>
@@ -441,19 +441,19 @@
   <div class="wrap hero-content">
     <div>
       <div class="pill">
-        <span class="dot"></span> Free · Source-Available · No API Keys
+        <span class="dot"></span> v0.6 · Local Whisper · Agent continuity
       </div>
       <h1>Hands-free voice<br/>for your <span class="grad">coding agent.</span></h1>
       <p class="hero-lead">
         Talk to Claude Code, Codex, Antigravity, or Ollama directly from your phone. 
-        It does the work and replies in chat <b>and aloud</b> — like a real phone call with your developer companion.
+        It keeps the session going across bridge restarts, does the work, and replies in chat <b>and aloud</b> — like a real phone call with your developer companion.
       </p>
       <div class="hero-cta">
         <a href="#quickstart" class="btn btn-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
           Quickstart
         </a>
-        <a href="https://github.com/berkayturanci/speak-with-claude-code" class="btn btn-secondary">
+        <a href="https://github.com/berkayturanci/voicebridge" class="btn btn-secondary">
           View Source
         </a>
       </div>
@@ -473,7 +473,7 @@
     <div class="section-header">
       <span class="eyebrow">Powerful Features</span>
       <h2>A seamless bridge between you and your code.</h2>
-      <p class="section-lead">A tiny Node bridge drives the CLI on your machine and streams everything to your phone. Zero latency, total privacy.</p>
+      <p class="section-lead">A tiny Node bridge drives the CLI on your machine and streams everything to your phone, with browser voice by default or local Whisper when you want it.</p>
     </div>
     
     <div class="grid-features">
@@ -490,7 +490,7 @@
       <div class="card">
         <div class="card-icon">🗂️</div>
         <h3>Parallel Sessions</h3>
-        <p>Run "Claude on Repo A" and "Codex on Repo B" simultaneously. Jump between ongoing persistent sessions instantly.</p>
+        <p>Run "Claude on Repo A" and "Codex on Repo B" simultaneously. Claude, Codex, and Antigravity continuity survives bridge restarts.</p>
       </div>
       <div class="card">
         <div class="card-icon">📞</div>
@@ -505,7 +505,7 @@
       <div class="card">
         <div class="card-icon">⚡</div>
         <h3>Local-First Option</h3>
-        <p>Uses built-in Browser Web Speech API for free STT/TTS. Or, configure it to use your own local Whisper instance for max accuracy.</p>
+        <p>Use built-in browser STT/TTS, batch Whisper, or streaming Whisper over a local WebSocket for hands-free talking mode without a voice vendor.</p>
       </div>
     </div>
   </div>
@@ -522,7 +522,7 @@
     <div class="flow-diagram">
 [ <span class="blue">iPhone Safari</span> ]                          [ <span class="highlight">Your Mac</span> ]
       
-mic <span style="color:#71717a">─Web Speech STT─▶</span> text <span style="color:#71717a">──https/Tailscale──▶</span> <span class="highlight">voicebridge</span> <span style="color:#71717a">──spawn──▶</span> claude / codex
+mic <span style="color:#71717a">─Web Speech or Whisper STT─▶</span> text <span style="color:#71717a">──https/Tailscale──▶</span> <span class="highlight">voicebridge</span> <span style="color:#71717a">──spawn──▶</span> claude / codex / agy
 speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span style="color:#71717a">◀──────────────</span> reply <span style="color:#71717a">◀───────────</span> (agent CLI)
     </div>
   </div>
@@ -544,7 +544,7 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
       </div>
       <div class="code-content">
         <button class="copy-btn" onclick="copyQuickstart(this)">Copy</button>
-        <pre id="qs-code"><span class="cmd">git clone</span> https://github.com/berkayturanci/speak-with-claude-code voicebridge
+        <pre id="qs-code"><span class="cmd">git clone</span> https://github.com/berkayturanci/voicebridge voicebridge
 <span class="cmd">cd</span> voicebridge && <span class="cmd">npm install</span>
 
 <span class="comment"># Optional: Set up your environment (PROJECT_DIR, ACCESS_TOKEN)</span>
@@ -574,14 +574,14 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     <details class="faq-item" open>
       <summary class="faq-summary">Is the voice feature actually free?</summary>
       <div class="faq-content">
-        Yes. Speech-to-text and text-to-speech run natively in your phone's browser using the Web Speech API. This means zero dependencies on paid services like ElevenLabs. (You only pay for your actual LLM agent usage, like your Anthropic Claude plan).
+        Yes. Browser speech-to-text and text-to-speech need no paid voice provider, and Whisper modes can keep transcription local on your own machine. You only pay for actual cloud agent usage where that agent CLI requires it.
       </div>
     </details>
     
     <details class="faq-item">
       <summary class="faq-summary">Does my code leave my machine?</summary>
       <div class="faq-content">
-        No, VoiceBridge acts only as a local proxy. Your agent (Claude, Codex, Antigravity) runs locally on your machine. Voice recording is transcribed on-device (via Apple/Google's dictation engines) and sent securely over your private Tailscale network.
+        VoiceBridge acts only as a local proxy. Your agent CLI runs on your machine, and traffic goes over your private Tailscale network. Claude, Codex, and Antigravity may still call their vendor clouds; Ollama and local Whisper can stay fully local.
       </div>
     </details>
     
@@ -595,7 +595,7 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     <details class="faq-item">
       <summary class="faq-summary">Can I use Whisper instead?</summary>
       <div class="faq-content">
-        Absolutely. If you want maximum accuracy (especially for coding syntax and punctuation), you can configure VoiceBridge to use your own local Whisper command-line tool via the `STT_MODE` and `STT_CMD` environment variables.
+        Absolutely. Use `STT_MODE=whisper` with `STT_CMD` for batch transcription, or `STT_MODE=whisper-stream` with `STT_STREAM_URL` for a local WebSocket transcriber that works with hands-free talking mode.
       </div>
     </details>
   </div>
@@ -608,9 +608,9 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
       VoiceBridge
     </div>
     <div class="footer-links">
-      <a href="https://github.com/berkayturanci/speak-with-claude-code">GitHub Repository</a>
-      <a href="https://github.com/berkayturanci/speak-with-claude-code/blob/main/docs/mobile-voice-setup.md">Mobile Setup Guide</a>
-      <a href="https://github.com/berkayturanci/speak-with-claude-code/blob/main/docs/security.md">Security Context</a>
+      <a href="https://github.com/berkayturanci/voicebridge">GitHub Repository</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mobile-voice-setup.md">Mobile Setup Guide</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/security.md">Security Context</a>
     </div>
     <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.6;">
       Licensed under PolyForm Noncommercial 1.0.0

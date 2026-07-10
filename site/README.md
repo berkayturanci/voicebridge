@@ -24,7 +24,7 @@ This repo is private, so GitHub Pages on the free plan won't serve it. Pick one:
 - **Any static host / S3 bucket** — upload the four files in `site/`.
 
 After deploying, set the repo's **About → Website** to the live URL
-(`gh repo edit berkayturanci/speak-with-claude-code --homepage https://…`).
+(`gh repo edit berkayturanci/voicebridge --homepage https://…`).
 
 ## Keeping assets in sync
 
