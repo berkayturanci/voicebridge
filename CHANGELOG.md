@@ -5,6 +5,10 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- Fully-local streaming STT via `/api/stt-stream`, proxying browser microphone
+  chunks to a configured local Whisper WebSocket transcriber.
+
 ### Changed
 - Codex and Antigravity sessions now resume by default with the current
   non-interactive CLI flags and persist continuity state across bridge restarts.
