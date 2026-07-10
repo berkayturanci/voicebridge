@@ -10,8 +10,9 @@
  * bound to an agent backend (Claude Code / Codex / Antigravity) and a project
  * directory, and keeps its own conversation; you switch between them in the UI.
  *
- * Optional: fully-local speech-to-text via your own Whisper command (STT_MODE),
- * and a shared access token (ACCESS_TOKEN) so only you can drive it.
+ * Optional: fully-local speech-to-text via your own Whisper command or
+ * streaming WebSocket transcriber (STT_MODE), and a shared access token
+ * (ACCESS_TOKEN) so only you can drive it.
  *
  * Zero runtime dependencies — Node standard library only.
  *
@@ -24,8 +25,9 @@
  *   CODEX_BIN    path to the codex executable       (default "codex")
  *   AGY_BIN      path to the antigravity executable (default "agy")
  *   ACCESS_TOKEN if set, /api/* requires Authorization: Bearer <token>
- *   STT_MODE     "browser" (default) or "whisper"
+ *   STT_MODE     "browser" (default), "whisper", or "whisper-stream"
  *   STT_CMD      shell command for whisper mode; "{file}" -> recorded audio path
+ *   STT_STREAM_URL WebSocket URL for whisper-stream mode
  */
 
 "use strict";

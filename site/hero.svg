@@ -69,7 +69,7 @@
   </g>
 
   <!-- footer line -->
-  <text x="72" y="566" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6e7681">github.com/berkayturanci/speak-with-claude-code</text>
+  <text x="72" y="566" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6e7681">github.com/berkayturanci/voicebridge</text>
   <text x="520" y="566" font-size="16" fill="#484f58">·  Noncommercial</text>
 
   <!-- ===== Right: phone mockup ===== -->
