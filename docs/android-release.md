@@ -1,7 +1,8 @@
 # Android Release
 
 Use this path to produce the signed Android App Bundle that Google Play expects.
-The app ID is `com.berkayturanci.voicebridge` and the Android target SDK is 35.
+The app ID is `com.berkayturanci.voicebridge`, the launcher/store name is
+`berkayturanci`, and the Android target SDK is 35.
 
 ## One-Time Signing Setup
 

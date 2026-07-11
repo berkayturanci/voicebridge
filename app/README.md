@@ -24,7 +24,8 @@ First-stage features:
 ## Prerequisites
 
 - A running voicebridge bridge reachable from the phone — ideally over HTTPS via
-  Tailscale: on the computer, `tailscale serve --bg 8787`.
+  Tailscale: on the computer,
+  `tailscale serve --bg --https=443 localhost:8787`.
 - [Flutter](https://docs.flutter.dev/get-started/install) (stable). For iOS you
   also need **macOS + Xcode** and (for a real device / the App Store) an Apple
   Developer account.
@@ -50,6 +51,31 @@ hand? The manual equivalents are below.
 The same codebase is a **desktop client** too (macOS / Windows / Linux) — a
 "connect-from" app for your laptop. Chat + streaming work everywhere; voice
 support depends on the platform plugins (see Desktop notes below).
+
+## Install On A Phone
+
+For development:
+
+```bash
+cd app
+flutter run -d <device-id>
+```
+
+For Android beta/store installation:
+
+1. Run the manual `Android Release` workflow.
+2. Upload the signed `app-release.aab` to Google Play Internal testing.
+3. Add testers in Play Console and install from the Play testing link.
+
+For iOS beta/store installation:
+
+1. Verify the `iOS Release` workflow is green.
+2. Archive from Xcode and upload to App Store Connect.
+3. Add internal testers in TestFlight and install from the TestFlight app.
+
+The first screen in the installed app is the PC connection screen. Start the
+bridge on the computer, expose it with Tailscale HTTPS, paste the `https://...ts.net`
+URL, add the access token if one is configured, then tap **Connect to PC**.
 
 ### iOS permissions (required for voice)
 
@@ -98,8 +124,8 @@ The app runs on the desktop from the same code. Caveats:
 
 ## First launch
 
-1. Enter the **bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token.
-2. "Test & Save" verifies it can reach `/api/config`.
+1. Enter the **PC bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token.
+2. **Connect to PC** verifies it can reach `/api/config`.
 3. You land on the session list — open one and talk.
 
 ## Notes
@@ -119,3 +145,6 @@ The app runs on the desktop from the same code. Caveats:
   [../docs/store-release.md](../docs/store-release.md),
   [../docs/store-publishing-runbook.md](../docs/store-publishing-runbook.md) and
   [../docs/store-listing.md](../docs/store-listing.md).
+- On first launch, the mobile app opens a PC connection screen. Paste the
+  Tailscale HTTPS bridge URL and optional access token, then the app tests the
+  connection before opening sessions.

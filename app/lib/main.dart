@@ -21,7 +21,7 @@ class VoiceBridgeApp extends StatelessWidget {
       builder: (_, dark, __) {
         VbColors.setPalette(dark ? VbPalette.dark : VbPalette.light);
         return MaterialApp(
-          title: 'voicebridge',
+          title: 'berkayturanci',
           debugShowCheckedModeBanner: false,
           theme: VbTheme.themed(),
           home: const _Bootstrap(),
@@ -81,7 +81,7 @@ class _BootstrapState extends State<_Bootstrap> {
                     color: Color(0xFF06210C), size: 40),
               ),
               const SizedBox(height: 22),
-              Text('voicebridge',
+              Text('berkayturanci',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,

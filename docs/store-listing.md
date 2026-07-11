@@ -4,6 +4,8 @@ This document is the working store-copy and beta-readiness source for the
 native VoiceBridge app. Re-check store-console character limits and screenshot
 device requirements immediately before submission.
 
+Store app name: `berkayturanci`
+
 ## Product Positioning
 
 VoiceBridge is a private voice remote for coding agents. It lets a developer
@@ -86,7 +88,7 @@ not mockups.
 
 Recommended sequence:
 
-1. First-run bridge connection screen.
+1. First-run PC connection screen.
 2. Session list with multiple agents.
 3. Chat screen with streamed code-aware reply.
 4. Talking mode / voice screen.

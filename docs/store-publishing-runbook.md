@@ -43,7 +43,7 @@ git push origin v0.6.1
 
 1. Create or verify the Play Console developer account.
 2. Create the app in Play Console:
-   - App name: `VoiceBridge`.
+   - App name: `berkayturanci`.
    - Default language: match the first store listing language.
    - App type: app.
    - Free or paid: choose before production, because this is hard to reverse.
@@ -78,7 +78,7 @@ Plan for closed testing if the Play Console account falls into that category.
 5. In Play Console, create an Internal testing release and upload the AAB.
 6. Add release notes and publish to internal testers.
 7. Smoke-test on physical Android devices:
-   - First launch and bridge URL entry.
+   - First launch and PC bridge URL entry.
    - Token save/load.
    - Session list.
    - Text chat streaming.
@@ -93,7 +93,7 @@ Plan for closed testing if the Play Console account falls into that category.
 
 1. Ensure the Apple Developer Program membership is active.
 2. Create or verify the App Store Connect app record:
-   - Name: `VoiceBridge`.
+   - Name: `berkayturanci`.
    - Bundle ID: `com.berkayturanci.voicebridge`.
    - SKU: `voicebridge`.
    - Platform: iOS.
@@ -122,7 +122,7 @@ open ios/Runner.xcworkspace
 4. Wait for App Store Connect processing to finish.
 5. Add the build to TestFlight internal testing.
 6. Smoke-test on physical iPhone and iPad where possible:
-   - First launch and bridge URL entry.
+   - First launch and PC bridge URL entry.
    - Token save/load.
    - Session list.
    - Text chat streaming.

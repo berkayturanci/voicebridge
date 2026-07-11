@@ -29,6 +29,7 @@ privacy metadata, and repeatable release build jobs.
 1. Verify final identifiers:
    - iOS bundle ID: `com.berkayturanci.voicebridge`.
    - Android application ID: `com.berkayturanci.voicebridge`.
+   - Store/app display name: `berkayturanci`.
 2. Add native permission strings:
    - iOS: microphone and speech recognition usage descriptions.
    - Android: `RECORD_AUDIO` plus any platform-specific network settings needed
