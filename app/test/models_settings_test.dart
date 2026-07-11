@@ -69,5 +69,19 @@ void main() {
       expect(loaded.base, 'https://mac.tailnet.ts.net');
       expect(loaded.token, 'secret-token');
     });
+
+    test('hasSeenOnboarding defaults to false and loads as false', () async {
+      final loaded = await AppSettings.load();
+      expect(loaded.hasSeenOnboarding, isFalse);
+    });
+
+    test('markOnboardingSeen persists across a reload', () async {
+      final settings = AppSettings();
+      await settings.markOnboardingSeen();
+      expect(settings.hasSeenOnboarding, isTrue);
+
+      final loaded = await AppSettings.load();
+      expect(loaded.hasSeenOnboarding, isTrue);
+    });
   });
 }
