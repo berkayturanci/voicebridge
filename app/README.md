@@ -110,5 +110,6 @@ The app runs on the desktop from the same code. Caveats:
   `.claude/commands` + npm scripts and prefills the composer.
 - **Folder browser** — the new-session sheet has a "Project folder" picker backed
   by `/api/browse`.
-- Code is written against the bridge API but **hasn't been compiled in this
-  repo's CI** (no Flutter toolchain here) — run `flutter analyze` locally.
+- CI runs `flutter analyze` and `flutter test` against the Dart client. Store
+  builds still need generated native platform projects, signing, and release
+  metadata; see [../docs/store-release.md](../docs/store-release.md).
