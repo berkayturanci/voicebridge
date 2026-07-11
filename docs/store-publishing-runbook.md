@@ -46,7 +46,10 @@ git push origin v0.6.1
    - App name: `berkayturanci`.
    - Default language: match the first store listing language.
    - App type: app.
-   - Free or paid: choose before production, because this is hard to reverse.
+   - Free or paid: **Free.** Matches the app's PolyForm Noncommercial 1.0.0
+     source license and current distribution — no IAP/subscription is
+     planned. Set the app to Free in Play Console; no pricing template
+     needed. (Decided 2026-07-12, see #213.)
 3. Confirm package name: `com.berkayturanci.voicebridge`.
 4. Enable Play App Signing and keep the upload key outside the repository.
    Follow [android-release.md](android-release.md) for key generation and
