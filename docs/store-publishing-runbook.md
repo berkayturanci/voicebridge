@@ -82,6 +82,7 @@ Plan for closed testing if the Play Console account falls into that category.
 6. Add release notes and publish to internal testers.
 7. Smoke-test on physical Android devices:
    - First launch and PC bridge URL entry.
+   - QR-code pairing from the bridge startup QR.
    - Token save/load.
    - Session list.
    - Text chat streaming.
@@ -126,6 +127,7 @@ open ios/Runner.xcworkspace
 5. Add the build to TestFlight internal testing.
 6. Smoke-test on physical iPhone and iPad where possible:
    - First launch and PC bridge URL entry.
+   - QR-code pairing from the bridge startup QR.
    - Token save/load.
    - Session list.
    - Text chat streaming.
