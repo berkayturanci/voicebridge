@@ -31,9 +31,10 @@ privacy metadata, and repeatable release build jobs.
    - Android application ID: `com.berkayturanci.voicebridge`.
    - Store/app display name: `berkayturanci`.
 2. Add native permission strings:
-   - iOS: microphone and speech recognition usage descriptions.
-   - Android: `RECORD_AUDIO` plus any platform-specific network settings needed
-     for HTTPS-only bridge URLs.
+   - iOS: microphone, speech recognition, and camera usage descriptions.
+   - Android: `RECORD_AUDIO`, `CAMERA`, and optional camera feature declaration,
+     plus any platform-specific network settings needed for HTTPS-only bridge
+     URLs.
 3. Prepare privacy disclosures:
    - Apple App Privacy answers in App Store Connect.
    - Google Play Data safety form.
