@@ -127,7 +127,7 @@ class _SessionsScreenState extends State<SessionsScreen>
                   size: 18, color: Color(0xFF06210C)),
             ),
             const SizedBox(width: 10),
-            const Text('voicebridge'),
+            const Text('berkayturanci'),
           ],
         ),
         actions: [
