@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show SocketException, TlsException;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -6,11 +7,21 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 import 'settings.dart';
 
+/// Shown for DNS/connection-refused/closed-socket failures — by far the most
+/// likely first-run mistake (PC off, Tailscale down, or a typo'd URL).
+const _kUnreachableMessage =
+    "Can't reach the bridge. Check that your computer is on, Tailscale is "
+    'running, and the URL is correct.';
+
 /// Thin client for the voicebridge HTTP API. The bridge is the backend; this
 /// app is just a native front-end, so the contract matches the web UI exactly.
 class Api {
   final AppSettings settings;
-  Api(this.settings);
+  final http.Client _client;
+
+  /// [client] is injectable for tests (e.g. `http.testing.MockClient`); real
+  /// call sites always use the default.
+  Api(this.settings, {http.Client? client}) : _client = client ?? http.Client();
 
   Map<String, String> _headers([Map<String, String>? extra]) {
     final h = <String, String>{...?extra};
@@ -20,11 +31,49 @@ class Api {
     return h;
   }
 
-  Uri _u(String path) => Uri.parse('${settings.base}$path');
+  Uri _u(String path) {
+    try {
+      return Uri.parse('${settings.base}$path');
+    } on FormatException {
+      throw Exception("That doesn't look like a valid bridge URL.");
+    }
+  }
+
+  /// Translates the network-level failures a first-run user is actually
+  /// likely to hit (unreachable host, bad TLS, connection reset) into
+  /// actionable copy instead of a raw Dart/OS exception string. HTTP-status
+  /// failures (401, 5xx, ...) are handled per-endpoint below, unchanged.
+  Future<http.Response> _guard(Future<http.Response> Function() send) async {
+    try {
+      return await send();
+    } on SocketException {
+      throw Exception(_kUnreachableMessage);
+    } on TlsException {
+      throw Exception(
+        "Couldn't establish a secure connection. Check the URL starts "
+        'with https://.',
+      );
+    } on http.ClientException {
+      throw Exception(_kUnreachableMessage);
+    }
+  }
+
+  Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) =>
+      _guard(() => _client.get(uri, headers: headers));
+
+  Future<http.Response> _post(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) =>
+      _guard(() => _client.post(uri, headers: headers, body: body));
+
+  Future<http.Response> _delete(Uri uri, {Map<String, String>? headers}) =>
+      _guard(() => _client.delete(uri, headers: headers));
 
   /// GET /api/config — used to confirm reachability and read defaults.
   Future<Map<String, dynamic>> config() async {
-    final r = await http.get(_u('/api/config'), headers: _headers());
+    final r = await _get(_u('/api/config'), headers: _headers());
     if (r.statusCode == 401) throw Exception('Token required/invalid');
     if (r.statusCode != 200) {
       throw Exception("Can't reach the bridge (${r.statusCode})");
@@ -34,7 +83,7 @@ class Api {
 
   /// POST /api/tts — bridge-side (Piper) neural TTS. Returns WAV audio bytes.
   Future<Uint8List> ttsAudio(String text) async {
-    final r = await http.post(
+    final r = await _post(
       _u('/api/tts'),
       headers: _headers({'Content-Type': 'application/json'}),
       body: jsonEncode({'text': text}),
@@ -50,7 +99,7 @@ class Api {
   /// (direction:'phone'). Returns {resumeCmd, claudeSessionId, note, direction}.
   Future<Map<String, dynamic>> handoff(String sessionId,
       {String direction = 'pc'}) async {
-    final r = await http.post(
+    final r = await _post(
       _u('/api/handoff'),
       headers: _headers({'Content-Type': 'application/json'}),
       body: jsonEncode({'sessionId': sessionId, 'direction': direction}),
@@ -64,7 +113,7 @@ class Api {
   /// GET /api/tmux-attach — full (tmux) session: returns {attachCmd, name,
   /// running, remoteControlSteps} for reaching it on the Mac / Claude app.
   Future<Map<String, dynamic>> tmuxAttach(String sessionId) async {
-    final r = await http.get(_u('/api/tmux-attach?sessionId=$sessionId'),
+    final r = await _get(_u('/api/tmux-attach?sessionId=$sessionId'),
         headers: _headers());
     if (r.statusCode != 200) {
       throw Exception(
@@ -76,7 +125,7 @@ class Api {
   /// POST /api/tmux-send — fire-and-forget input to a full (tmux) session. The
   /// watch renders the turn; this never blocks (so prompts/questions don't hang).
   Future<void> tmuxSend(String sessionId, String text) async {
-    final r = await http.post(_u('/api/tmux-send'),
+    final r = await _post(_u('/api/tmux-send'),
         headers: _headers({'Content-Type': 'application/json'}),
         body: jsonEncode({'sessionId': sessionId, 'text': text}));
     if (r.statusCode != 200) {
@@ -86,7 +135,7 @@ class Api {
 
   /// POST /api/tmux-rc — toggle Remote Control on a full (tmux) session.
   Future<Map<String, dynamic>> tmuxRc(String sessionId, String action) async {
-    final r = await http.post(_u('/api/tmux-rc'),
+    final r = await _post(_u('/api/tmux-rc'),
         headers: _headers({'Content-Type': 'application/json'}),
         body: jsonEncode({'sessionId': sessionId, 'action': action}));
     if (r.statusCode != 200) {
@@ -99,7 +148,7 @@ class Api {
   /// GET /api/session-history — full transcript as {role,text} turns + byte
   /// offset to resume a watch from (#141).
   Future<Map<String, dynamic>> sessionHistory(String sessionId) async {
-    final r = await http.get(_u('/api/session-history?sessionId=$sessionId'),
+    final r = await _get(_u('/api/session-history?sessionId=$sessionId'),
         headers: _headers());
     if (r.statusCode != 200) {
       throw Exception(
@@ -120,7 +169,7 @@ class Api {
 
   /// GET /api/sessions
   Future<List<Session>> sessions() async {
-    final r = await http.get(_u('/api/sessions'), headers: _headers());
+    final r = await _get(_u('/api/sessions'), headers: _headers());
     if (r.statusCode == 401) throw Exception('Invalid token');
     if (r.statusCode != 200) {
       throw Exception("Couldn't load sessions (${r.statusCode})");
@@ -139,7 +188,7 @@ class Api {
     String? projectDir,
     String runner = 'local',
   }) async {
-    final r = await http.post(
+    final r = await _post(
       _u('/api/sessions'),
       headers: _headers({'Content-Type': 'application/json'}),
       body: jsonEncode({
@@ -169,7 +218,7 @@ class Api {
     String?
         claudeSessionId, // "" detaches, a uuid attaches & resumes that session
   }) async {
-    final r = await http.post(
+    final r = await _post(
       _u('/api/sessions/$id'),
       headers: _headers({'Content-Type': 'application/json'}),
       body: jsonEncode({
@@ -191,7 +240,7 @@ class Api {
   Future<List<Map<String, dynamic>>> claudeSessions(String sessionId) async {
     final uri = _u('/api/claude-sessions')
         .replace(queryParameters: {'sessionId': sessionId});
-    final r = await http.get(uri, headers: _headers());
+    final r = await _get(uri, headers: _headers());
     if (r.statusCode != 200) return [];
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     return ((data['sessions'] as List?) ?? const [])
@@ -205,7 +254,7 @@ class Api {
     try {
       final uri = _u('/api/commands')
           .replace(queryParameters: {'sessionId': sessionId});
-      final r = await http.get(uri, headers: _headers());
+      final r = await _get(uri, headers: _headers());
       if (r.statusCode != 200) return [];
       final data = jsonDecode(r.body) as Map<String, dynamic>;
       return ((data['groups'] as List?) ?? const [])
@@ -226,7 +275,7 @@ class Api {
     if (runner == 'cloud') q['runner'] = 'cloud';
     final uri =
         _u('/api/browse').replace(queryParameters: q.isEmpty ? null : q);
-    final r = await http.get(uri, headers: _headers());
+    final r = await _get(uri, headers: _headers());
     if (r.statusCode != 200) {
       throw Exception("Couldn't browse (${r.statusCode})");
     }
@@ -235,7 +284,7 @@ class Api {
 
   /// DELETE /api/sessions/:id
   Future<void> deleteSession(String id) async {
-    final r = await http.delete(_u('/api/sessions/$id'), headers: _headers());
+    final r = await _delete(_u('/api/sessions/$id'), headers: _headers());
     if (r.statusCode != 200) {
       throw Exception(_err(r.body) ?? "Couldn't delete (${r.statusCode})");
     }
@@ -261,7 +310,19 @@ class Api {
       'voice': voice,
     });
 
-    final streamed = await http.Client().send(req);
+    final http.StreamedResponse streamed;
+    try {
+      streamed = await _client.send(req);
+    } on SocketException {
+      throw Exception(_kUnreachableMessage);
+    } on TlsException {
+      throw Exception(
+        "Couldn't establish a secure connection. Check the URL starts "
+        'with https://.',
+      );
+    } on http.ClientException {
+      throw Exception(_kUnreachableMessage);
+    }
     if (streamed.statusCode == 401) throw Exception('Invalid token');
     if (streamed.statusCode == 429) {
       throw Exception('Server busy, try again shortly');
