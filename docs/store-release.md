@@ -15,6 +15,10 @@ privacy metadata, and repeatable release build jobs.
   manual `Android Release` workflow.
 - iOS no-codesign release builds are verified on macOS, and the TestFlight
   archive path is documented in [ios-release.md](ios-release.md).
+- Flutter plugin release-compatibility warnings are documented in
+  [flutter-plugin-compatibility.md](flutter-plugin-compatibility.md). Direct
+  dependencies are currently up-to-date, so the remaining warnings are upstream
+  migration items to recheck before Flutter upgrades.
 - No App Store Connect metadata or submitted store screenshots are committed
   yet.
 
@@ -46,6 +50,8 @@ privacy metadata, and repeatable release build jobs.
 6. Run beta tracks before production:
    - TestFlight for iOS.
    - Internal testing / closed testing for Google Play.
+7. Recheck plugin compatibility warnings before changing Flutter stable versions;
+   see [flutter-plugin-compatibility.md](flutter-plugin-compatibility.md).
 
 ## Policy Notes To Keep Current
 
@@ -98,4 +104,5 @@ flutter analyze --no-fatal-infos --no-fatal-warnings
 flutter test
 flutter build appbundle --release
 flutter build ios --release --no-codesign # macOS/Xcode only
+flutter pub outdated
 ```
