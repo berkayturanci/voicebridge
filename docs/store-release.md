@@ -100,7 +100,7 @@ npm run smoke
 
 cd app
 flutter pub get
-flutter analyze --no-fatal-infos --no-fatal-warnings
+flutter analyze
 flutter test
 flutter build appbundle --release
 flutter build ios --release --no-codesign # macOS/Xcode only

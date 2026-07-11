@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -15,7 +14,9 @@ class Api {
 
   Map<String, String> _headers([Map<String, String>? extra]) {
     final h = <String, String>{...?extra};
-    if (settings.token.isNotEmpty) h['Authorization'] = 'Bearer ${settings.token}';
+    if (settings.token.isNotEmpty) {
+      h['Authorization'] = 'Bearer ${settings.token}';
+    }
     return h;
   }
 
@@ -25,7 +26,9 @@ class Api {
   Future<Map<String, dynamic>> config() async {
     final r = await http.get(_u('/api/config'), headers: _headers());
     if (r.statusCode == 401) throw Exception('Token required/invalid');
-    if (r.statusCode != 200) throw Exception("Can't reach the bridge (${r.statusCode})");
+    if (r.statusCode != 200) {
+      throw Exception("Can't reach the bridge (${r.statusCode})");
+    }
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
@@ -64,7 +67,8 @@ class Api {
     final r = await http.get(_u('/api/tmux-attach?sessionId=$sessionId'),
         headers: _headers());
     if (r.statusCode != 200) {
-      throw Exception(_err(r.body) ?? "Couldn't load attach info (${r.statusCode})");
+      throw Exception(
+          _err(r.body) ?? "Couldn't load attach info (${r.statusCode})");
     }
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -86,7 +90,8 @@ class Api {
         headers: _headers({'Content-Type': 'application/json'}),
         body: jsonEncode({'sessionId': sessionId, 'action': action}));
     if (r.statusCode != 200) {
-      throw Exception(_err(r.body) ?? "Remote Control didn't change (${r.statusCode})");
+      throw Exception(
+          _err(r.body) ?? "Remote Control didn't change (${r.statusCode})");
     }
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -97,7 +102,8 @@ class Api {
     final r = await http.get(_u('/api/session-history?sessionId=$sessionId'),
         headers: _headers());
     if (r.statusCode != 200) {
-      throw Exception(_err(r.body) ?? "Couldn't load history (${r.statusCode})");
+      throw Exception(
+          _err(r.body) ?? "Couldn't load history (${r.statusCode})");
     }
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -116,7 +122,9 @@ class Api {
   Future<List<Session>> sessions() async {
     final r = await http.get(_u('/api/sessions'), headers: _headers());
     if (r.statusCode == 401) throw Exception('Invalid token');
-    if (r.statusCode != 200) throw Exception("Couldn't load sessions (${r.statusCode})");
+    if (r.statusCode != 200) {
+      throw Exception("Couldn't load sessions (${r.statusCode})");
+    }
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     return (data['sessions'] as List)
         .map((e) => Session.fromJson(e as Map<String, dynamic>))
@@ -138,12 +146,14 @@ class Api {
         'name': name,
         'agent': agent,
         'mode': mode,
-        if (projectDir != null && projectDir.isNotEmpty) 'projectDir': projectDir,
+        if (projectDir != null && projectDir.isNotEmpty)
+          'projectDir': projectDir,
         'runner': runner,
       }),
     );
     if (r.statusCode != 200) {
-      throw Exception(_err(r.body) ?? "Couldn't create session (${r.statusCode})");
+      throw Exception(
+          _err(r.body) ?? "Couldn't create session (${r.statusCode})");
     }
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     return Session.fromJson(data['session'] as Map<String, dynamic>);
@@ -156,7 +166,8 @@ class Api {
     String? name,
     String? mode,
     bool? voice,
-    String? claudeSessionId, // "" detaches, a uuid attaches & resumes that session
+    String?
+        claudeSessionId, // "" detaches, a uuid attaches & resumes that session
   }) async {
     final r = await http.post(
       _u('/api/sessions/$id'),
@@ -192,7 +203,8 @@ class Api {
   /// Returns groups: [{label, items:[{label, value, hint?}]}].
   Future<List<Map<String, dynamic>>> commands(String sessionId) async {
     try {
-      final uri = _u('/api/commands').replace(queryParameters: {'sessionId': sessionId});
+      final uri = _u('/api/commands')
+          .replace(queryParameters: {'sessionId': sessionId});
       final r = await http.get(uri, headers: _headers());
       if (r.statusCode != 200) return [];
       final data = jsonDecode(r.body) as Map<String, dynamic>;
@@ -207,13 +219,17 @@ class Api {
 
   /// GET /api/browse — list subdirectories of [path] for the folder picker.
   /// Returns {path, parent, dirs:[...]}.
-  Future<Map<String, dynamic>> browse(String? path, {String runner = 'local'}) async {
+  Future<Map<String, dynamic>> browse(String? path,
+      {String runner = 'local'}) async {
     final q = <String, String>{};
     if (path != null && path.isNotEmpty) q['path'] = path;
     if (runner == 'cloud') q['runner'] = 'cloud';
-    final uri = _u('/api/browse').replace(queryParameters: q.isEmpty ? null : q);
+    final uri =
+        _u('/api/browse').replace(queryParameters: q.isEmpty ? null : q);
     final r = await http.get(uri, headers: _headers());
-    if (r.statusCode != 200) throw Exception("Couldn't browse (${r.statusCode})");
+    if (r.statusCode != 200) {
+      throw Exception("Couldn't browse (${r.statusCode})");
+    }
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
@@ -247,8 +263,12 @@ class Api {
 
     final streamed = await http.Client().send(req);
     if (streamed.statusCode == 401) throw Exception('Invalid token');
-    if (streamed.statusCode == 429) throw Exception('Server busy, try again shortly');
-    if (streamed.statusCode != 200) throw Exception('Error (${streamed.statusCode})');
+    if (streamed.statusCode == 429) {
+      throw Exception('Server busy, try again shortly');
+    }
+    if (streamed.statusCode != 200) {
+      throw Exception('Error (${streamed.statusCode})');
+    }
 
     final full = StringBuffer();
     var buf = '';

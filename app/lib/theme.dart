@@ -6,7 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// resolved value — listen to it to rebuild the app (and re-point [VbColors]).
 class VbThemeController {
   VbThemeController._();
-  static final ValueNotifier<bool> isDark = ValueNotifier<bool>(true); // resolved
+  static final ValueNotifier<bool> isDark =
+      ValueNotifier<bool>(true); // resolved
   static final ValueNotifier<String> mode = ValueNotifier<String>('system');
   static const _modeKey = 'vb_theme_mode';
   static const _legacyKey = 'vb_theme_dark'; // old light/dark bool
@@ -14,7 +15,8 @@ class VbThemeController {
   static bool _systemIsDark() =>
       WidgetsBinding.instance.platformDispatcher.platformBrightness ==
       Brightness.dark;
-  static bool _resolve(String m) => m == 'system' ? _systemIsDark() : m == 'dark';
+  static bool _resolve(String m) =>
+      m == 'system' ? _systemIsDark() : m == 'dark';
   static void _apply() =>
       VbColors.setPalette(isDark.value ? VbPalette.dark : VbPalette.light);
 
@@ -23,7 +25,8 @@ class VbThemeController {
       final p = await SharedPreferences.getInstance();
       var m = p.getString(_modeKey);
       if (m == null) {
-        final legacy = p.getBool(_legacyKey); // migrate old toggle, else default system
+        final legacy =
+            p.getBool(_legacyKey); // migrate old toggle, else default system
         m = legacy == null ? 'system' : (legacy ? 'dark' : 'light');
       }
       mode.value = m;
@@ -31,7 +34,8 @@ class VbThemeController {
     isDark.value = _resolve(mode.value);
     _apply();
     // In system mode, follow the device when it flips light/dark.
-    WidgetsBinding.instance.platformDispatcher.onPlatformBrightnessChanged = () {
+    WidgetsBinding.instance.platformDispatcher.onPlatformBrightnessChanged =
+        () {
       if (mode.value == 'system') {
         isDark.value = _systemIsDark();
         _apply();
@@ -198,7 +202,8 @@ class VbTheme {
     );
 
     return base.copyWith(
-      textTheme: _textTheme(base.textTheme, VbColors.textPrimary, VbColors.textMuted),
+      textTheme:
+          _textTheme(base.textTheme, VbColors.textPrimary, VbColors.textMuted),
       appBarTheme: AppBarTheme(
         backgroundColor: VbColors.bg,
         surfaceTintColor: Colors.transparent,
@@ -231,7 +236,8 @@ class VbTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: VbColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: TextStyle(color: VbColors.textMuted),
         labelStyle: TextStyle(color: VbColors.textMuted),
         floatingLabelStyle: TextStyle(color: VbColors.accent),
@@ -313,7 +319,7 @@ class VbTheme {
         backgroundColor: VbColors.surface,
         surfaceTintColor: Colors.transparent,
         modalBackgroundColor: VbColors.surface,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
       ),
