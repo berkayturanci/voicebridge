@@ -111,8 +111,9 @@ The app runs on the desktop from the same code. Caveats:
 - **Folder browser** — the new-session sheet has a "Project folder" picker backed
   by `/api/browse`.
 - CI runs `flutter analyze` and `flutter test` against the Dart client. Store
-  builds still need final store metadata and iOS release automation; Android
-  signed AAB release steps are documented in
+  builds still need final store metadata; Android signed AAB release steps are
+  documented in
   [../docs/android-release.md](../docs/android-release.md). See also
+  [../docs/ios-release.md](../docs/ios-release.md),
   [../docs/store-release.md](../docs/store-release.md) and
   [../docs/store-listing.md](../docs/store-listing.md).

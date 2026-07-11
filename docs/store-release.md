@@ -13,8 +13,10 @@ privacy metadata, and repeatable release build jobs.
   with stable app identifiers.
 - Android signed AAB release automation is documented and available through the
   manual `Android Release` workflow.
-- No App Store Connect metadata, iOS archive/export workflow, or submitted store
-  screenshots are committed yet.
+- iOS no-codesign release builds are verified on macOS, and the TestFlight
+  archive path is documented in [ios-release.md](ios-release.md).
+- No App Store Connect metadata or submitted store screenshots are committed
+  yet.
 
 ## Required Before App Store
 
@@ -39,7 +41,8 @@ privacy metadata, and repeatable release build jobs.
 5. Add release build workflows:
    - Android AAB build with signing injected from CI secrets; see
      [android-release.md](android-release.md).
-   - iOS archive/export path, or documented local Fastlane/Xcode release steps.
+   - iOS no-codesign CI plus documented Xcode archive/export steps; see
+     [ios-release.md](ios-release.md).
 6. Run beta tracks before production:
    - TestFlight for iOS.
    - Internal testing / closed testing for Google Play.
@@ -94,4 +97,5 @@ flutter pub get
 flutter analyze --no-fatal-infos --no-fatal-warnings
 flutter test
 flutter build appbundle --release
+flutter build ios --release --no-codesign # macOS/Xcode only
 ```
