@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart'; // defaultTargetPlatform / TargetPlatf
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // SystemSound + HapticFeedback (earcons)
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -43,10 +42,12 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _canSend = false;
   bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
   SessionWatch? _watch; // self-reconnecting live transcript watch (#141)
-  final List<String> _sentEcho = []; // optimistic sends awaiting their watch echo
+  final List<String> _sentEcho =
+      []; // optimistic sends awaiting their watch echo
   bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
-  Message? _ttsMsg; // message being read aloud via its bubble button (null = none)
+  Message?
+      _ttsMsg; // message being read aloud via its bubble button (null = none)
   DateTime? _lastVoiceErrorAt;
   String? _lastVoiceErrorText;
 
@@ -73,12 +74,24 @@ class _ChatScreenState extends State<ChatScreen> {
     // actually playing (not inferred), and so the "Read aloud" button flips back.
     // These are independent of awaitSpeakCompletion (which resolves speak() via the
     // native result), so they don't affect the talking-loop await.
-    _tts.setStartHandler(() { if (mounted) setState(() => _ttsSpeaking = true); });
+    _tts.setStartHandler(() {
+      if (mounted) setState(() => _ttsSpeaking = true);
+    });
     _tts.setCompletionHandler(() {
-      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+      if (mounted) {
+        setState(() {
+          _ttsMsg = null;
+          _ttsSpeaking = false;
+        });
+      }
     });
     _tts.setCancelHandler(() {
-      if (mounted) setState(() { _ttsMsg = null; _ttsSpeaking = false; });
+      if (mounted) {
+        setState(() {
+          _ttsMsg = null;
+          _ttsSpeaking = false;
+        });
+      }
     });
     _tts.setErrorHandler((msg) {
       _markNotSpeaking();
@@ -103,8 +116,10 @@ class _ChatScreenState extends State<ChatScreen> {
         IosTextToSpeechAudioCategory.playback,
         [
           IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-          IosTextToSpeechAudioCategoryOptions.duckOthers, // duck Spotify while speaking → conversational on CarPlay, not bleeding through (#133)
-          IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP, // stereo BT / CarPlay
+          IosTextToSpeechAudioCategoryOptions
+              .duckOthers, // duck Spotify while speaking → conversational on CarPlay, not bleeding through (#133)
+          IosTextToSpeechAudioCategoryOptions
+              .allowBluetoothA2DP, // stereo BT / CarPlay
           IosTextToSpeechAudioCategoryOptions.allowAirPlay,
         ],
         IosTextToSpeechAudioMode.voicePrompt,
@@ -121,7 +136,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _loadModes();
     SharedPreferences.getInstance().then((p) {
-      if (mounted) setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
+      if (mounted) {
+        setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
+      }
     });
   }
 
@@ -186,8 +203,8 @@ class _ChatScreenState extends State<ChatScreen> {
       await _api.tmuxSend(widget.session.id, text);
     } catch (e) {
       if (mounted) {
-        setState(() => _messages.add(
-            Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
+        setState(() => _messages.add(Message(
+            'sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
       }
     }
   }
@@ -216,6 +233,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (q.contains('enhanced')) return 2;
         return 1;
       }
+
       voices.sort((a, b) => rank(b).compareTo(rank(a)));
       return voices;
     } catch (_) {
@@ -240,10 +258,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final p = await SharedPreferences.getInstance();
     final savedName = p.getString(_voiceKey);
     final chosen = (savedName != null)
-        ? voices.firstWhere((v) => v['name'] == savedName, orElse: () => voices.first)
+        ? voices.firstWhere((v) => v['name'] == savedName,
+            orElse: () => voices.first)
         : voices.first;
     try {
-      await _tts.setVoice({'name': chosen['name']!, 'locale': chosen['locale']!});
+      await _tts
+          .setVoice({'name': chosen['name']!, 'locale': chosen['locale']!});
       debugPrint('TTS voice → ${chosen['name']} (${chosen['quality']})');
     } catch (e) {
       debugPrint('TTS setVoice failed: $e');
@@ -257,7 +277,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final voices = await _turkishVoices();
     if (!mounted) return;
     if (voices.isEmpty) {
-      _toast('No English voice installed. Download one from Settings → Accessibility → Spoken Content → Voices.');
+      _toast(
+          'No English voice installed. Download one from Settings → Accessibility → Spoken Content → Voices.');
       return;
     }
     final p = await SharedPreferences.getInstance();
@@ -270,7 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) => Container(
         decoration: BoxDecoration(
           color: VbColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         child: SafeArea(
           top: false,
@@ -308,8 +329,10 @@ class _ChatScreenState extends State<ChatScreen> {
     await p.setString(_voiceKey, picked['name']!);
     var spoke = false;
     try {
-      await _tts.setVoice({'name': picked['name']!, 'locale': picked['locale']!});
-      spoke = await _speak('Hello, I\'ll speak with this voice from now on.'); // hear it right away
+      await _tts
+          .setVoice({'name': picked['name']!, 'locale': picked['locale']!});
+      spoke = await _speak(
+          'Hello, I\'ll speak with this voice from now on.'); // hear it right away
     } catch (e) {
       _voiceFailure(ttsFailureMessage(e));
     }
@@ -342,7 +365,9 @@ class _ChatScreenState extends State<ChatScreen> {
   // Header subtitle, recomputed from the live mode (not the stale session one).
   String get _subtitle {
     final parts = <String>[];
-    if (widget.session.agentLabel.isNotEmpty) parts.add(widget.session.agentLabel);
+    if (widget.session.agentLabel.isNotEmpty) {
+      parts.add(widget.session.agentLabel);
+    }
     if (_mode.isNotEmpty) parts.add(_modeLabel(_mode));
     parts.add(widget.session.runner == 'cloud' ? '☁︎ cloud' : 'local');
     return parts.join(' · ');
@@ -372,7 +397,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final tail = _messages.length > 200
           ? _messages.sublist(_messages.length - 200)
           : _messages;
-      await p.setString(_histKey, jsonEncode(tail.map((m) => m.toJson()).toList()));
+      await p.setString(
+          _histKey, jsonEncode(tail.map((m) => m.toJson()).toList()));
     } catch (_) {}
   }
 
@@ -485,7 +511,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _markNotListening();
       return;
     }
-    if (_stt.isListening) return; // guard against a double-start after the TTS handoff
+    if (_stt.isListening) {
+      return; // guard against a double-start after the TTS handoff
+    }
 
     setState(() => _listening = true);
     if (_talking) _cue('listen'); // audible "your turn" cue in talking mode
@@ -500,11 +528,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       await _stt.listen(
-        localeId: _locale,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: longPause,
         listenOptions: SpeechListenOptions(
-          listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
+          localeId: _locale,
+          listenFor: const Duration(seconds: 30),
+          pauseFor: longPause,
+          listenMode: ListenMode
+              .dictation, // long-form; far less eager to finalize than the default
           partialResults: true,
           onDevice: false, // en uses server recognition
           autoPunctuation: true,
@@ -544,13 +573,18 @@ class _ChatScreenState extends State<ChatScreen> {
   // summarize:false to read the whole thing. Pure client-side, works offline.
   String _forSpeech(String text, {bool summarize = false}) {
     var s = text
-        .replaceAll(RegExp(r'```[\s\S]*?```'), ' (code) ') // fenced code → marker
+        .replaceAll(
+            RegExp(r'```[\s\S]*?```'), ' (code) ') // fenced code → marker
         .replaceAll('`', ''); // inline code ticks
     s = s.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), ''); // headings
-    s = s.replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), ''); // list bullets
-    s = s.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m[1]!); // bold → text
-    s = s.replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]+\)'), (m) => m[1]!); // links → text
-    s = s.replaceAll(RegExp(r'\(code\)(?:\s*\(code\))+'), '(code)'); // collapse repeats
+    s = s.replaceAll(
+        RegExp(r'^\s*[-*]\s+', multiLine: true), ''); // list bullets
+    s = s.replaceAllMapped(
+        RegExp(r'\*\*([^*]+)\*\*'), (m) => m[1]!); // bold → text
+    s = s.replaceAllMapped(
+        RegExp(r'\[([^\]]+)\]\([^)]+\)'), (m) => m[1]!); // links → text
+    s = s.replaceAll(
+        RegExp(r'\(code\)(?:\s*\(code\))+'), '(code)'); // collapse repeats
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (!summarize || s.length <= _speakMaxChars) return s;
     final head = s.substring(0, _speakMaxChars);
@@ -575,7 +609,8 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint('voicebridge STT stop before TTS failed: $e');
     }
     try {
-      final result = await _tts.speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
+      final result = await _tts
+          .speak(clean); // awaitSpeakCompletion(true) → resolves on didFinish
       if (result == 0 || result == false) {
         _markNotSpeaking();
         _voiceFailure(ttsFailureMessage('TTS engine rejected speak request'));
@@ -592,7 +627,8 @@ class _ChatScreenState extends State<ChatScreen> {
   // Per-message "Read aloud" toggle (the bubble button). _ttsMsg tracks which
   // message is playing so the button shows "Stop" and a second tap stops it.
   Future<void> _readAloud(Message m) async {
-    await _tts.stop(); // halt any current readout first (also lets you switch messages)
+    await _tts
+        .stop(); // halt any current readout first (also lets you switch messages)
     if (!mounted) return;
     setState(() => _ttsMsg = m);
     await _speak(m.text);
@@ -607,7 +643,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _toggleTalking() async {
     if (_talking) {
-      setState(() { _talking = false; _talkMuted = false; });
+      setState(() {
+        _talking = false;
+        _talkMuted = false;
+      });
       WakelockPlus.disable();
       await _stt.stop();
       await _tts.stop();
@@ -615,8 +654,12 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     if (!await _ensureStt()) return;
-    setState(() { _talking = true; _talkMuted = false; });
-    WakelockPlus.enable(); // keep the screen on so the bridge connection doesn't drop
+    setState(() {
+      _talking = true;
+      _talkMuted = false;
+    });
+    WakelockPlus
+        .enable(); // keep the screen on so the bridge connection doesn't drop
     _listen();
   }
 
@@ -627,7 +670,10 @@ class _ChatScreenState extends State<ChatScreen> {
     // Barge-in: a tap during playback stops TTS and hands the turn back to you.
     if (_ttsSpeaking) {
       await _tts.stop();
-      setState(() { _ttsSpeaking = false; _talkMuted = false; });
+      setState(() {
+        _ttsSpeaking = false;
+        _talkMuted = false;
+      });
       _listen();
       return;
     }
@@ -686,20 +732,24 @@ class _ChatScreenState extends State<ChatScreen> {
             IosTextToSpeechAudioCategory.playback,
             [
               IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-              IosTextToSpeechAudioCategoryOptions.duckOthers, // duck music while speaking (#133)
+              IosTextToSpeechAudioCategoryOptions
+                  .duckOthers, // duck music while speaking (#133)
               IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
               IosTextToSpeechAudioCategoryOptions.allowAirPlay,
             ],
             IosTextToSpeechAudioMode.voicePrompt,
           );
         }
-        await _speak(full, summarize: true); // hands-free: read the lead, not 200 lines
-        if (_talking && !_talkMuted && !_busy) _listen(); // skip if a new turn already started
+        await _speak(full,
+            summarize: true); // hands-free: read the lead, not 200 lines
+        if (_talking && !_talkMuted && !_busy) {
+          _listen(); // skip if a new turn already started
+        }
       }
     } catch (e) {
       if (_talking) _cue('error');
-      setState(() => _messages
-          .add(Message('sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
+      setState(() => _messages.add(Message(
+          'sys', '⚠️ ${e.toString().replaceFirst('Exception: ', '')}')));
       // Eyes-free recovery: a transient error shouldn't silently drop talking mode —
       // keep listening so the user can retry by voice (e.g. while driving).
       if (_talking && !_talkMuted) {
@@ -729,7 +779,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (picked != null) {
       final cmd = picked.trim();
-      if (cmd.isNotEmpty) _send(cmd); // run the command immediately on pick
+      if (cmd.isNotEmpty) {
+        _send(cmd); // run the command immediately on pick
+      }
     }
   }
 
@@ -743,8 +795,8 @@ class _ChatScreenState extends State<ChatScreen> {
         currentName: _name,
         modes: _modes,
         currentMode: _mode,
-        canAttach:
-            widget.session.agent == 'claude' && widget.session.runner == 'local',
+        canAttach: widget.session.agent == 'claude' &&
+            widget.session.runner == 'local',
         isTmux: widget.session.runner == 'tmux',
       ),
     );
@@ -765,11 +817,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final newMode = result['mode'];
     final nameChanged = newName != null && newName != _name;
     final modeChanged = newMode != null && newMode != _mode;
-    if (!nameChanged && !modeChanged) return;
+    if (!nameChanged && !modeChanged) {
+      return;
+    }
     final prevName = _name, prevMode = _mode;
     setState(() {
-      if (nameChanged) _name = newName;
-      if (modeChanged) _mode = newMode;
+      if (nameChanged) {
+        _name = newName;
+      }
+      if (modeChanged) {
+        _mode = newMode;
+      }
     });
     try {
       await _api.updateSession(
@@ -783,7 +841,12 @@ class _ChatScreenState extends State<ChatScreen> {
               ? 'Name updated'
               : 'Mode: ${_modeLabel(newMode!)}');
     } catch (e) {
-      if (mounted) setState(() { _name = prevName; _mode = prevMode; });
+      if (mounted) {
+        setState(() {
+          _name = prevName;
+          _mode = prevMode;
+        });
+      }
       _toast('Update failed: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
@@ -794,7 +857,8 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       list = await _api.claudeSessions(widget.session.id);
     } catch (e) {
-      _toast('Couldn\'t load Claude sessions: ${e.toString().replaceFirst('Exception: ', '')}');
+      _toast(
+          'Couldn\'t load Claude sessions: ${e.toString().replaceFirst('Exception: ', '')}');
       return;
     }
     if (!mounted) return;
@@ -822,7 +886,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _toBottom();
       _toast('Connected — this session continues on your next message.');
     } catch (e) {
-      _toast('Couldn\'t connect: ${e.toString().replaceFirst('Exception: ', '')}');
+      _toast(
+          'Couldn\'t connect: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
 
@@ -838,7 +903,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (!mounted) return;
     final cmd = (info['attachCmd'] as String?) ?? '';
-    final steps = (info['remoteControlSteps'] as List?)?.cast<String>() ?? const [];
+    final steps =
+        (info['remoteControlSteps'] as List?)?.cast<String>() ?? const [];
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -881,7 +947,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 border: Border.all(color: VbColors.border),
               ),
               child: SelectableText(cmd,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                  style:
+                      const TextStyle(fontFamily: 'monospace', fontSize: 13)),
             ),
             const SizedBox(height: 14),
             Text('To access it from the Claude app:',
@@ -891,7 +958,8 @@ class _ChatScreenState extends State<ChatScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text('${i + 1}. ${steps[i]}',
-                    style: TextStyle(color: VbColors.textPrimary, fontSize: 13)),
+                    style:
+                        TextStyle(color: VbColors.textPrimary, fontSize: 13)),
               ),
           ],
         ),
@@ -913,7 +981,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? 'Remote Control stopped'
                     : 'Remote Control started');
               } catch (e) {
-                _toast('Didn\'t work: ${e.toString().replaceFirst('Exception: ', '')}');
+                _toast(
+                    'Didn\'t work: ${e.toString().replaceFirst('Exception: ', '')}');
               }
             },
             child: Text(info['rcActive'] == true
@@ -941,67 +1010,67 @@ class _ChatScreenState extends State<ChatScreen> {
           onTap: _openSessionSettings,
           borderRadius: BorderRadius.circular(12),
           child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [color, Color.lerp(color, Colors.black, 0.3)!],
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, Color.lerp(color, Colors.black, 0.3)!],
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  (_name.isEmpty ? '?' : _name.trim()[0]).toUpperCase(),
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
                 ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                (_name.isEmpty ? '?' : _name.trim()[0]).toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white),
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _name.isEmpty ? 'Untitled session' : _name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _name.isEmpty ? 'Untitled session' : _name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
                     ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: VbColors.textMuted,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: VbColors.textMuted,
+                            ),
                           ),
                         ),
-                      ),
-                      Icon(Icons.expand_more_rounded,
-                          size: 15, color: VbColors.textMuted),
-                    ],
-                  ),
-                ],
+                        Icon(Icons.expand_more_rounded,
+                            size: 15, color: VbColors.textMuted),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -1025,7 +1094,9 @@ class _ChatScreenState extends State<ChatScreen> {
           AnimatedSize(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
-            child: _talking ? _talkPanel() : const SizedBox(width: double.infinity),
+            child: _talking
+                ? _talkPanel()
+                : const SizedBox(width: double.infinity),
           ),
           Expanded(
             child: _messages.isEmpty
@@ -1174,7 +1245,10 @@ class _ChatScreenState extends State<ChatScreen> {
         if (_hideActivity) continue; // toggle: drop tool/bash chatter entirely
         (run ??= <Message>[]).add(m);
       } else {
-        if (run != null) { rows.add(run); run = null; }
+        if (run != null) {
+          rows.add(run);
+          run = null;
+        }
         rows.add(m);
       }
     }
@@ -1212,18 +1286,17 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final isMe = m.role == 'me';
-    final radius = Radius.circular(VbRadius.bubble);
+    final radius = const Radius.circular(VbRadius.bubble);
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.82),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
         decoration: BoxDecoration(
-          color: isMe
-              ? VbColors.accent.withValues(alpha: 0.16)
-              : VbColors.surface,
+          color:
+              isMe ? VbColors.accent.withValues(alpha: 0.16) : VbColors.surface,
           border: Border.all(
             color: isMe
                 ? VbColors.accent.withValues(alpha: 0.38)
@@ -1366,8 +1439,8 @@ class _MessageBody extends StatelessWidget {
     if (segments.length == 1 && !segments.first.isCode) {
       return SelectableText(
         text,
-        style: TextStyle(
-            fontSize: 15, height: 1.45, color: VbColors.textPrimary),
+        style:
+            TextStyle(fontSize: 15, height: 1.45, color: VbColors.textPrimary),
       );
     }
     return Column(
@@ -1573,13 +1646,15 @@ class _ActivityGroupState extends State<_ActivityGroup> {
     final last = items.isEmpty ? '' : _clean(items.last.text);
     final header = items.length == 1
         ? last
-        : (_open ? '${items.length} actions' : '${items.length} actions · $last');
+        : (_open
+            ? '${items.length} actions'
+            : '${items.length} actions · $last');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.9),
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.9),
           child: Material(
             color: VbColors.surfaceHigh,
             borderRadius: BorderRadius.circular(VbRadius.chip),
@@ -1714,12 +1789,13 @@ class _CircleIconButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: active
-            ? VbColors.danger.withValues(alpha: 0.18)
-            : VbColors.surface,
+        color:
+            active ? VbColors.danger.withValues(alpha: 0.18) : VbColors.surface,
         shape: CircleBorder(
           side: BorderSide(
-            color: active ? VbColors.danger.withValues(alpha: 0.5) : VbColors.border,
+            color: active
+                ? VbColors.danger.withValues(alpha: 0.5)
+                : VbColors.border,
           ),
         ),
         child: InkWell(
@@ -1900,11 +1976,12 @@ class _CommandSheetState extends State<_CommandSheet> {
       }
     }
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
           color: VbColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         height: MediaQuery.of(context).size.height * 0.72,
         child: Column(
@@ -1918,8 +1995,7 @@ class _CommandSheetState extends State<_CommandSheet> {
                   const SizedBox(width: 8),
                   const Text(
                     'Commands',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -1927,7 +2003,8 @@ class _CommandSheetState extends State<_CommandSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
               child: TextField(
-                autofocus: false, // don't pop the keyboard on open (shrinks the list, hard to dismiss)
+                autofocus:
+                    false, // don't pop the keyboard on open (shrinks the list, hard to dismiss)
                 onChanged: (v) => setState(() => _q = v),
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
@@ -2022,7 +2099,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
     return Container(
       decoration: BoxDecoration(
         color: VbColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: SafeArea(
         top: false,
@@ -2060,7 +2137,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 ),
                 const SizedBox(height: 18),
                 Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  padding: const EdgeInsets.only(left: 4, bottom: 6),
                   child: Text('NAME',
                       style: TextStyle(
                           fontSize: 11,
@@ -2076,7 +2153,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 ),
                 const SizedBox(height: 18),
                 Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 4),
+                  padding: const EdgeInsets.only(left: 4, bottom: 4),
                   child: Text('AUTONOMY MODE',
                       style: TextStyle(
                           fontSize: 11,
@@ -2086,7 +2163,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 ),
                 if (widget.modes.isEmpty)
                   Padding(
-                    padding: EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     child: Text('Couldn\'t load mode info for this session.',
                         style: TextStyle(color: VbColors.textMuted)),
                   )
@@ -2107,7 +2184,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     children: [
                       Icon(Icons.info_outline_rounded,
                           size: 16, color: VbColors.textMuted),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Permission prompts can\'t open from the phone; "full-auto" mode is best for uninterrupted runs.',
@@ -2121,9 +2198,9 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   ),
                 ),
                 if (widget.canAttach) ...[
-                  SizedBox(height: 18),
+                  const SizedBox(height: 18),
                   Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    padding: const EdgeInsets.only(left: 4, bottom: 6),
                     child: Text('CLAUDE SESSION',
                         style: TextStyle(
                             fontSize: 11,
@@ -2139,7 +2216,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                       onTap: () => Navigator.pop(
                           context, <String, String>{'action': 'attach'}),
                       child: Container(
-                        padding: EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 13),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
@@ -2149,7 +2226,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                           children: [
                             Icon(Icons.history_rounded,
                                 size: 22, color: VbColors.accent),
-                            SizedBox(width: 13),
+                            const SizedBox(width: 13),
                             Expanded(
                               child: Text(
                                 'Connect to the CLI/desktop session & continue by voice',
@@ -2168,9 +2245,9 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   ),
                 ],
                 if (widget.isTmux) ...[
-                  SizedBox(height: 18),
+                  const SizedBox(height: 18),
                   Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    padding: const EdgeInsets.only(left: 4, bottom: 6),
                     child: Text('FULL SESSION',
                         style: TextStyle(
                             fontSize: 11,
@@ -2186,8 +2263,8 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                       onTap: () => Navigator.pop(
                           context, <String, String>{'action': 'tmux-attach'}),
                       child: Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 13),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: VbColors.border),
@@ -2196,9 +2273,10 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                           children: [
                             Icon(Icons.terminal_rounded,
                                 size: 22, color: VbColors.accent),
-                            SizedBox(width: 13),
+                            const SizedBox(width: 13),
                             Expanded(
-                              child: Text("Open on Mac / access from the Claude app",
+                              child: Text(
+                                  "Open on Mac / access from the Claude app",
                                   style: TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.w600,
@@ -2212,9 +2290,9 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     ),
                   ),
                 ],
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  padding: const EdgeInsets.only(left: 4, bottom: 6),
                   child: Text('VOICE',
                       style: TextStyle(
                           fontSize: 11,
@@ -2230,8 +2308,8 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     onTap: () => Navigator.pop(
                         context, <String, String>{'action': 'voice'}),
                     child: Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 13),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: VbColors.border),
@@ -2240,7 +2318,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                         children: [
                           Icon(Icons.record_voice_over_rounded,
                               size: 22, color: VbColors.accent),
-                          SizedBox(width: 13),
+                          const SizedBox(width: 13),
                           Expanded(
                             child: Text('Choose the talking voice',
                                 style: TextStyle(
@@ -2349,19 +2427,19 @@ class _ClaudeSessionsSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: VbColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       height: MediaQuery.of(context).size.height * 0.7,
       child: Column(
         children: [
           const _Grabber(),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
             child: Row(
               children: [
                 Icon(Icons.history_rounded, color: VbColors.accent),
-                SizedBox(width: 8),
-                Expanded(
+                const SizedBox(width: 8),
+                const Expanded(
                   child: Text('Claude sessions',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -2376,7 +2454,8 @@ class _ClaudeSessionsSheet extends StatelessWidget {
               itemBuilder: (_, i) {
                 final s = sessions[i];
                 final title = (s['title'] ?? '').toString().trim();
-                final ms = (s['mtime'] is num) ? (s['mtime'] as num).toInt() : 0;
+                final ms =
+                    (s['mtime'] is num) ? (s['mtime'] as num).toInt() : 0;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Material(
