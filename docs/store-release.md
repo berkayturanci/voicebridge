@@ -1,47 +1,43 @@
 # Store Release Readiness
 
 VoiceBridge can become a native App Store / Google Play app, but the repository
-is not yet store-submission ready. The committed Flutter app is source-first:
-`app/tool/setup.sh` generates the iOS and Android projects locally, then injects
-microphone and speech permissions. Store releases need those platform projects,
-signing, privacy metadata, and repeatable build jobs.
+is not yet store-submission ready. The committed Flutter app now includes the
+iOS and Android platform projects. Store releases still need signing, final
+privacy metadata, and repeatable release build jobs.
 
 ## Current Status
 
 - Web/PWA and Node bridge releases are production-shaped.
 - Flutter client source is present in `app/lib/` and has CI-backed unit coverage.
-- Native platform scaffolds (`app/ios/`, `app/android/`) are generated locally,
-  not committed.
+- Native mobile platform scaffolds (`app/ios/`, `app/android/`) are committed
+  with stable app identifiers.
 - No App Store Connect or Play Console metadata, screenshots, signing setup, or
   release build workflow is committed yet.
 
 ## Required Before App Store
 
-1. Decide whether to commit generated `app/ios/` and `app/android/`.
-   Store builds are easier to audit and reproduce when native project files are
-   versioned.
-2. Choose final identifiers:
-   - iOS bundle ID, for example `com.berkayturanci.voicebridge`.
-   - Android application ID, for example `com.berkayturanci.voicebridge`.
-3. Add native permission strings:
+1. Verify final identifiers:
+   - iOS bundle ID: `com.berkayturanci.voicebridge`.
+   - Android application ID: `com.berkayturanci.voicebridge`.
+2. Add native permission strings:
    - iOS: microphone and speech recognition usage descriptions.
    - Android: `RECORD_AUDIO` plus any platform-specific network settings needed
      for HTTPS-only bridge URLs.
-4. Prepare privacy disclosures:
+3. Prepare privacy disclosures:
    - Apple App Privacy answers in App Store Connect.
    - Google Play Data safety form.
    - Public privacy policy URL.
    - Draft answers live in [store-privacy-disclosures.md](store-privacy-disclosures.md).
-5. Prepare store assets:
+4. Prepare store assets:
    - app icon from `branding/` / `app/assets/icon/`.
    - iPhone/iPad screenshots.
    - Android phone screenshots.
    - short and long descriptions.
    - Draft copy and beta checklist live in [store-listing.md](store-listing.md).
-6. Add release build workflows:
+5. Add release build workflows:
    - Android AAB build with signing injected from CI secrets.
    - iOS archive/export path, or documented local Fastlane/Xcode release steps.
-7. Run beta tracks before production:
+6. Run beta tracks before production:
    - TestFlight for iOS.
    - Internal testing / closed testing for Google Play.
 
@@ -76,12 +72,9 @@ Create a new milestone: `Store readiness`.
 
 Recommended issue order:
 
-1. Commit generated Flutter iOS/Android platform projects with stable app IDs.
-2. Add store privacy policy and in-app privacy/about screen links.
-3. Add Android signed AAB release workflow.
-4. Add iOS release/archive documentation or Fastlane workflow.
-5. Add screenshot capture guide and store listing copy.
-6. Run TestFlight and Google Play internal testing.
+1. Add Android signed AAB release workflow.
+2. Add iOS release/archive documentation or Fastlane workflow.
+3. Run TestFlight and Google Play internal testing.
 
 ## Testing Gate For Store Work
 

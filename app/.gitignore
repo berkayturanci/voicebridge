@@ -4,11 +4,9 @@
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
-pubspec.lock
 
-# Generated platform folders (run `flutter create .` to regenerate)
-ios/
-android/
+# Mobile platform projects are committed for reproducible store builds.
+# Desktop/web platform folders can still be regenerated when needed.
 linux/
 macos/
 windows/

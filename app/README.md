@@ -31,21 +31,21 @@ First-stage features:
 
 ## Build & run
 
-This folder ships the Dart sources (`lib/`) and `pubspec.yaml`. Generate the
-platform projects, fetch packages, then run:
+This folder ships the Dart sources (`lib/`), `pubspec.yaml`, and the committed
+iOS/Android platform projects used for store builds. Refresh native permissions
+and fetch packages, then run:
 
 ```bash
 cd app
-bash tool/setup.sh                # generates ios/ android/ + injects mic/speech permissions + pub get
+bash tool/setup.sh                # refreshes ios/android permissions + pub get
 dart run flutter_launcher_icons   # apply the voicebridge app icon (from assets/icon/)
 flutter run                       # on a connected device/simulator
 flutter run -d macos        # …or a desktop target: macos | windows | linux
 ```
 
-`tool/setup.sh` runs `flutter create .` (which scaffolds `ios/ android/ …` —
-these are generated, version-specific, and not committed) and then adds the
-native permission keys for you, idempotently. Prefer doing it by hand? The
-manual equivalents are below.
+`tool/setup.sh` runs `flutter create .` only if `ios/` or `android/` is missing,
+then adds the native permission keys for you, idempotently. Prefer doing it by
+hand? The manual equivalents are below.
 
 The same codebase is a **desktop client** too (macOS / Windows / Linux) — a
 "connect-from" app for your laptop. Chat + streaming work everywhere; voice
@@ -111,6 +111,6 @@ The app runs on the desktop from the same code. Caveats:
 - **Folder browser** — the new-session sheet has a "Project folder" picker backed
   by `/api/browse`.
 - CI runs `flutter analyze` and `flutter test` against the Dart client. Store
-  builds still need generated native platform projects, signing, and release
-  metadata; see [../docs/store-release.md](../docs/store-release.md) and
+  builds still need signing, release automation, and final store metadata; see
+  [../docs/store-release.md](../docs/store-release.md) and
   [../docs/store-listing.md](../docs/store-listing.md).
