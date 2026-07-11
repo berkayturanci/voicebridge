@@ -1,0 +1,55 @@
+name: iOS Release
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ios-release.yml'
+      - 'app/**'
+      - 'docs/ios-release.md'
+      - 'docs/store-release.md'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ios-release.yml'
+      - 'app/**'
+      - 'docs/ios-release.md'
+      - 'docs/store-release.md'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: Optional Flutter build name, for example 0.6.1
+        required: false
+      version_code:
+        description: Optional Flutter build number, for example 601
+        required: false
+
+jobs:
+  no-codesign-build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      - name: Build iOS release app without signing
+        run: |
+          BUILD_ARGS=(--release --no-codesign)
+          if [ -n "${{ inputs.version_name }}" ]; then
+            BUILD_ARGS+=(--build-name "${{ inputs.version_name }}")
+          fi
+          if [ -n "${{ inputs.version_code }}" ]; then
+            BUILD_ARGS+=(--build-number "${{ inputs.version_code }}")
+          fi
+          flutter build ios "${BUILD_ARGS[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voicebridge-ios-release-app
+          path: app/build/ios/iphoneos/Runner.app
+          if-no-files-found: ignore
+          retention-days: 7
