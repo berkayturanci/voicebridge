@@ -37,6 +37,7 @@ signing, privacy metadata, and repeatable build jobs.
    - iPhone/iPad screenshots.
    - Android phone screenshots.
    - short and long descriptions.
+   - Draft copy and beta checklist live in [store-listing.md](store-listing.md).
 6. Add release build workflows:
    - Android AAB build with signing injected from CI secrets.
    - iOS archive/export path, or documented local Fastlane/Xcode release steps.

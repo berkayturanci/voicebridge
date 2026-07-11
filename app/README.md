@@ -112,4 +112,5 @@ The app runs on the desktop from the same code. Caveats:
   by `/api/browse`.
 - CI runs `flutter analyze` and `flutter test` against the Dart client. Store
   builds still need generated native platform projects, signing, and release
-  metadata; see [../docs/store-release.md](../docs/store-release.md).
+  metadata; see [../docs/store-release.md](../docs/store-release.md) and
+  [../docs/store-listing.md](../docs/store-listing.md).
