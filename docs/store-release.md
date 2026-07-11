@@ -11,8 +11,10 @@ privacy metadata, and repeatable release build jobs.
 - Flutter client source is present in `app/lib/` and has CI-backed unit coverage.
 - Native mobile platform scaffolds (`app/ios/`, `app/android/`) are committed
   with stable app identifiers.
-- No App Store Connect or Play Console metadata, screenshots, signing setup, or
-  release build workflow is committed yet.
+- Android signed AAB release automation is documented and available through the
+  manual `Android Release` workflow.
+- No App Store Connect metadata, iOS archive/export workflow, or submitted store
+  screenshots are committed yet.
 
 ## Required Before App Store
 
@@ -35,7 +37,8 @@ privacy metadata, and repeatable release build jobs.
    - short and long descriptions.
    - Draft copy and beta checklist live in [store-listing.md](store-listing.md).
 5. Add release build workflows:
-   - Android AAB build with signing injected from CI secrets.
+   - Android AAB build with signing injected from CI secrets; see
+     [android-release.md](android-release.md).
    - iOS archive/export path, or documented local Fastlane/Xcode release steps.
 6. Run beta tracks before production:
    - TestFlight for iOS.
@@ -90,4 +93,5 @@ cd app
 flutter pub get
 flutter analyze --no-fatal-infos --no-fatal-warnings
 flutter test
+flutter build appbundle --release
 ```
