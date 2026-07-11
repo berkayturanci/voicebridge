@@ -36,6 +36,7 @@ jobs:
       # dependency bumps, not on the app's pre-existing lint debt (infos/warnings).
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
+      - run: flutter build appbundle --release
 
   desktop:
     runs-on: ubuntu-latest
