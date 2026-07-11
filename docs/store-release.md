@@ -15,6 +15,8 @@ privacy metadata, and repeatable release build jobs.
   manual `Android Release` workflow.
 - iOS no-codesign release builds are verified on macOS, and the TestFlight
   archive path is documented in [ios-release.md](ios-release.md).
+- The end-to-end store publishing process is documented in
+  [store-publishing-runbook.md](store-publishing-runbook.md).
 - Flutter plugin release-compatibility warnings are documented in
   [flutter-plugin-compatibility.md](flutter-plugin-compatibility.md). Direct
   dependencies are currently up-to-date, so the remaining warnings are upstream
@@ -78,15 +80,12 @@ Official references:
 - Google Play Data safety section:
   <https://support.google.com/googleplay/android-developer/answer/10787469>
 
-## Suggested First Store Milestone
+## Publishing Runbook
 
-Create a new milestone: `Store readiness`.
-
-Recommended issue order:
-
-1. Add Android signed AAB release workflow.
-2. Add iOS release/archive documentation or Fastlane workflow.
-3. Run TestFlight and Google Play internal testing.
+Use [store-publishing-runbook.md](store-publishing-runbook.md) as the live
+release checklist. It defines the release owners, versioning rule, Google Play
+setup, Android internal testing flow, App Store Connect setup, TestFlight flow,
+reviewer notes, go/no-go checklist, and rejection handling.
 
 ## Testing Gate For Store Work
 
