@@ -116,5 +116,6 @@ The app runs on the desktop from the same code. Caveats:
   [../docs/android-release.md](../docs/android-release.md). See also
   [../docs/ios-release.md](../docs/ios-release.md),
   [../docs/flutter-plugin-compatibility.md](../docs/flutter-plugin-compatibility.md),
-  [../docs/store-release.md](../docs/store-release.md) and
+  [../docs/store-release.md](../docs/store-release.md),
+  [../docs/store-publishing-runbook.md](../docs/store-publishing-runbook.md) and
   [../docs/store-listing.md](../docs/store-listing.md).

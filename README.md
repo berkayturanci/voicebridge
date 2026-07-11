@@ -332,6 +332,7 @@ Details in [docs/security.md](docs/security.md).
 - [docs/architecture.md](docs/architecture.md) — components, request flow, and the agent-adapter design.
 - [docs/configuration.md](docs/configuration.md) — full env-var reference, agents, and modes.
 - [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.
+- [docs/store-publishing-runbook.md](docs/store-publishing-runbook.md) — App Store / Google Play beta and production release checklist.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, and how to add an agent.
 - [CHANGELOG.md](CHANGELOG.md) — release notes.
 
