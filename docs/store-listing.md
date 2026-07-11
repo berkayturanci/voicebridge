@@ -22,13 +22,20 @@ Primary audience:
 
 ## App Store Subtitle Draft
 
-Private voice for coding agents
+Voice remote for your own PC
+
+(30-char limit; previous draft, "Private voice for coding agents", read as a
+general voice-assistant pitch with no hint that a PC bridge is required —
+see #214. This draft trades a little punch for setting that expectation in
+the ~30 characters most browsers actually read before tapping install.)
 
 ## App Store Promotional Text Draft
 
-Talk to your coding agent from your phone. VoiceBridge connects to your own
-local bridge over HTTPS, supports typed or spoken prompts, and keeps replies in
-chat and audio.
+Talk to your coding agent from your phone. Requires a VoiceBridge server
+running on your own PC, connected over Tailscale HTTPS.
+
+(170-char limit; the previous draft was 171 characters — over the limit —
+and, like the subtitle, didn't mention the PC/Tailscale requirement.)
 
 ## App Store Description Draft
 
@@ -58,7 +65,10 @@ Requirements:
 
 ## Google Play Short Description Draft
 
-Talk or type to your local coding-agent bridge from your phone.
+Talk to your own PC coding agent. Requires the PC bridge running.
+
+(80-char limit; makes the PC-bridge requirement explicit in the text most
+Play Store browsers actually read — see #214.)
 
 ## Google Play Full Description Draft
 
