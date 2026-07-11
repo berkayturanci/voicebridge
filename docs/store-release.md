@@ -31,6 +31,7 @@ signing, privacy metadata, and repeatable build jobs.
    - Apple App Privacy answers in App Store Connect.
    - Google Play Data safety form.
    - Public privacy policy URL.
+   - Draft answers live in [store-privacy-disclosures.md](store-privacy-disclosures.md).
 5. Prepare store assets:
    - app icon from `branding/` / `app/assets/icon/`.
    - iPhone/iPad screenshots.

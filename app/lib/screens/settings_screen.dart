@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../settings.dart';
@@ -17,6 +18,13 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static final Uri _privacyUrl =
+      Uri.parse('https://berkayturanci.github.io/voicebridge/privacy.html');
+  static final Uri _supportUrl =
+      Uri.parse('https://github.com/berkayturanci/voicebridge/issues');
+  static final Uri _docsUrl =
+      Uri.parse('https://github.com/berkayturanci/voicebridge#readme');
+
   late final TextEditingController _url =
       TextEditingController(text: widget.settings.baseUrl);
   late final TextEditingController _token =
@@ -176,10 +184,81 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             _themeToggle(),
             const SizedBox(height: 22),
+            _label('About'),
+            const SizedBox(height: 8),
+            _aboutLinks(),
+            const SizedBox(height: 22),
             _hint(),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openUrl(Uri url) async {
+    final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't open ${url.toString()}")),
+      );
+    }
+  }
+
+  Widget _aboutLinks() {
+    return Container(
+      decoration: BoxDecoration(
+        color: VbColors.surface,
+        borderRadius: BorderRadius.circular(VbRadius.card),
+        border: Border.all(color: VbColors.border),
+      ),
+      child: Column(
+        children: [
+          _linkRow(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Privacy policy',
+            subtitle: 'How VoiceBridge handles bridge settings, tokens, and voice data.',
+            url: _privacyUrl,
+          ),
+          Divider(height: 1, color: VbColors.border),
+          _linkRow(
+            icon: Icons.help_outline_rounded,
+            title: 'Support',
+            subtitle: 'Report bugs or ask for help on GitHub.',
+            url: _supportUrl,
+          ),
+          Divider(height: 1, color: VbColors.border),
+          _linkRow(
+            icon: Icons.menu_book_outlined,
+            title: 'Documentation',
+            subtitle: 'Setup, security notes, and bridge configuration.',
+            url: _docsUrl,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _linkRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Uri url,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: VbColors.accent),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: VbColors.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: VbColors.textMuted, height: 1.35),
+      ),
+      trailing: Icon(Icons.open_in_new_rounded, color: VbColors.textMuted),
+      onTap: () => _openUrl(url),
     );
   }
 
