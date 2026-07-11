@@ -63,6 +63,9 @@ Requirements:
 - HTTPS access to that server, ideally through Tailscale;
 - a supported coding agent installed and authenticated on your computer.
 
+VoiceBridge is free and source-available under the PolyForm Noncommercial
+1.0.0 license — no ads, no in-app purchases, no subscription.
+
 ## Google Play Short Description Draft
 
 Talk to your own PC coding agent. Requires the PC bridge running.
@@ -90,6 +93,9 @@ Features:
 VoiceBridge is built for developers who want to step away from the keyboard
 without handing voice traffic to another app service. Your bridge URL and token
 stay on your device. Prompts and replies go to the bridge you configure.
+
+VoiceBridge is free and source-available (PolyForm Noncommercial 1.0.0) — no
+ads, no in-app purchases, no subscription.
 
 ## Screenshot Set
 
