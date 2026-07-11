@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Used to scan the bridge's pairing QR code to connect.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The microphone is used for voice commands.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

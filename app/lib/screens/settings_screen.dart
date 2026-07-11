@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
+import '../qr_pairing.dart';
 import '../settings.dart';
 import '../theme.dart';
+import 'qr_scan_screen.dart';
 import 'sessions_screen.dart';
 
 /// Where the bridge is. The app talks to your machine's voicebridge over the
@@ -75,6 +77,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _scanQr() async {
+    final pairing = await Navigator.push<ScannedPairing>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (pairing == null || !mounted) return;
+    _url.text = pairing.baseUrl;
+    _token.text = pairing.token;
+    await _saveAndTest();
+  }
+
   @override
   Widget build(BuildContext context) {
     final firstRun = _isFirstRun;
@@ -103,7 +116,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 hintText: 'https://your-pc.tailnet.ts.net',
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            Center(
+              child: TextButton.icon(
+                onPressed: _busy ? null : _scanQr,
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                label: const Text('Scan QR code instead'),
+              ),
+            ),
+            const SizedBox(height: 10),
             _label('Access token'),
             const SizedBox(height: 8),
             TextField(
