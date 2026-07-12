@@ -5,6 +5,31 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-12
+
+### Added
+- **QR-code pairing**: scan the bridge's startup QR code to connect instantly,
+  instead of typing the bridge URL and access token by hand.
+- **First-run onboarding**: a short, skippable explainer shown once before the
+  connect screen, covering what VoiceBridge needs on your computer (an agent
+  CLI already installed and signed in, Tailscale) — closes a real
+  comprehension gap for a stranger downloading the app cold from an app store.
+
+### Changed
+- Network/connection failures (unreachable bridge, TLS errors) now show
+  actionable in-app messages ("check that your computer is on, Tailscale is
+  running...") instead of a raw Dart/OS exception string.
+- App Store subtitle and Google Play short description now state the
+  PC/Tailscale requirement explicitly, so the store listing itself filters
+  out the wrong audience before install.
+- Decided and documented the app's pricing model for the upcoming store
+  release: free, matching the PolyForm Noncommercial source license — no
+  ads, no in-app purchases.
+
+### Fixed
+- The App Store Promotional Text draft was 171 characters — one over Apple's
+  170-character limit; trimmed to fit.
+
 ## [0.6.0] - 2026-07-11
 
 ### Added

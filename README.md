@@ -11,9 +11,9 @@
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
 
-**v0.6.0:** Codex and Antigravity sessions now resume cleanly across bridge
-restarts, and `STT_MODE=whisper-stream` adds low-latency local Whisper
-transcription for hands-free talking mode.
+**v0.7.0:** Scan the bridge's startup QR code to connect instantly, and a new
+first-run explainer walks first-time users through what VoiceBridge needs on
+their computer before they connect.
 
 You speak **or type** on your phone, a coding agent (running on your Mac/Linux
 box) does the work, and the reply streams back as chat **and** spoken audio —
