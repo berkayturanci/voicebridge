@@ -37,7 +37,7 @@
   "name": "VoiceBridge",
   "url": "https://berkayturanci.github.io/voicebridge/",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Web, iOS, Android",
+  "operatingSystem": "macOS, Web, iOS, Android",
   "description": "Hands-free voice control for coding agents. Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs.",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Berkay Turancı" }
@@ -362,6 +362,23 @@
   }
   .copy-btn:hover { background: rgba(255,255,255,0.2); }
 
+  .download-strip {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 24px;
+    align-items: stretch;
+  }
+  .download-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+  }
+  .download-panel h3 { font-size: 24px; margin-bottom: 12px; }
+  .download-panel p { color: var(--text-secondary); margin-bottom: 18px; }
+  .steps { display: grid; gap: 12px; color: var(--text-secondary); font-size: 15px; }
+  .steps strong { color: var(--text-primary); }
+
   /* FAQ Accordion */
   .faq-item {
     background: var(--bg-surface);
@@ -404,6 +421,7 @@
     h1 { font-size: 48px; }
     .hero-lead { margin-inline: auto; }
     .hero-cta { justify-content: center; }
+    .download-strip { grid-template-columns: 1fr; }
     .visualizer-container { transform: scale(0.8); }
     nav .nav-links a.link { display: none; } /* Hide links on mobile, keep button */
   }
@@ -441,7 +459,7 @@
   <div class="wrap hero-content">
     <div>
       <div class="pill">
-        <span class="dot"></span> v0.6 · Local Whisper · Agent continuity
+        <span class="dot"></span> v0.8 · Mac host app · QR pairing
       </div>
       <h1>Hands-free voice<br/>for your <span class="grad">coding agent.</span></h1>
       <p class="hero-lead">
@@ -449,7 +467,11 @@
         It keeps the session going across bridge restarts, does the work, and replies in chat <b>and aloud</b> — like a real phone call with your developer companion.
       </p>
       <div class="hero-cta">
-        <a href="#quickstart" class="btn btn-primary">
+        <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download Mac DMG
+        </a>
+        <a href="#quickstart" class="btn btn-secondary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
           Quickstart
         </a>
@@ -507,6 +529,11 @@
         <h3>Local-First Option</h3>
         <p>Use built-in browser STT/TTS, batch Whisper, or streaming Whisper over a local WebSocket for hands-free talking mode without a voice vendor.</p>
       </div>
+      <div class="card">
+        <div class="card-icon">🖥️</div>
+        <h3>Mac Host App</h3>
+        <p>Download the DMG, choose one workspace, pick Claude/Codex/Antigravity/Ollama, and pair your phone by scanning the desktop QR.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -532,8 +559,29 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
   <div class="wrap">
     <div class="section-header">
       <span class="eyebrow">Get Started</span>
-      <h2>Up and running in 4 lines.</h2>
-      <p class="section-lead">You need Node ≥ 18, an authenticated agent CLI, and Tailscale installed.</p>
+      <h2>Use the Mac app, or run from source.</h2>
+      <p class="section-lead">The Mac app is the easiest host setup. The terminal flow stays available for developers who want full control.</p>
+    </div>
+
+    <div class="download-strip" style="max-width: 900px; margin: 0 auto 28px;">
+      <div class="download-panel">
+        <span class="eyebrow">Recommended</span>
+        <h3>Mac host app</h3>
+        <p>Install the unsigned DMG, select your project folder and agent, paste your Tailscale HTTPS URL, then scan the pairing QR from the mobile app.</p>
+        <div class="hero-cta" style="animation:none;">
+          <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg" class="btn btn-primary">Download voicebridge-0.2.0-arm64.dmg</a>
+          <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md" class="btn btn-secondary">Mac setup guide</a>
+        </div>
+      </div>
+      <div class="download-panel">
+        <h3>Setup steps</h3>
+        <div class="steps">
+          <div><strong>1.</strong> Install an agent CLI and sign in on the Mac.</div>
+          <div><strong>2.</strong> Open VoiceBridge, choose the project folder, and start the bridge.</div>
+          <div><strong>3.</strong> Run Tailscale Serve and verify the public URL.</div>
+          <div><strong>4.</strong> Scan the QR from the iOS/Android app.</div>
+        </div>
+      </div>
     </div>
     
     <div class="code-window" style="max-width: 800px; margin: 0 auto;">
@@ -559,7 +607,7 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     </div>
     
     <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 14px;">
-      💡 Tip: Scan the QR code with your phone. Ensure Tailscale is active on both devices!
+      Tip: Scan the QR code with your phone. Ensure Tailscale is active on both devices.
     </p>
   </div>
 </section>
@@ -609,6 +657,8 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     </div>
     <div class="footer-links">
       <a href="https://github.com/berkayturanci/voicebridge">GitHub Repository</a>
+      <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg">Download Mac DMG</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md">Mac Host Guide</a>
       <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mobile-voice-setup.md">Mobile Setup Guide</a>
       <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/security.md">Security Context</a>
       <a href="privacy.html">Privacy Policy</a>

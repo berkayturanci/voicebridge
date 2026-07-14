@@ -21,6 +21,16 @@ project folder, selected agent CLI, and port availability, then waits for
 `/api/health` so failures show as actionable diagnostics instead of a silent
 stopped state.
 
+## Download the Mac build
+
+The current unsigned Apple Silicon DMG is attached to the `v0.8.0` release:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
+
+macOS may warn because this build is not signed or notarized yet. Open it from
+Finder with **Right click → Open** the first time. For the step-by-step setup,
+see [docs/mac-desktop-host.md](../docs/mac-desktop-host.md).
+
 ## Run in development
 
 ```bash
