@@ -5,6 +5,33 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-14
+
+### Added
+- **Mac-first desktop host MVP**: first-run setup now chooses one project folder,
+  agent, host/port, optional mobile URL, and generated access token before the
+  bridge starts.
+- **Desktop QR pairing**: the host app shows a scannable mobile URL and a
+  versioned pairing payload; the native mobile app can scan the QR or paste the
+  payload to configure itself.
+- **Mobile last-seen state**: the bridge exposes authenticated mobile heartbeat
+  endpoints, the native app reports activity from settings/session/chat screens,
+  and the desktop host shows whether the phone is currently connected.
+- **Guided Tailscale setup** in the desktop host: status detection, a copyable
+  `tailscale serve --bg <port>` command, and public URL health verification.
+- **Unsigned Mac DMG build path** with `npm run dist:mac:unsigned`.
+
+### Changed
+- Desktop access tokens are generated automatically and stored with Electron
+  `safeStorage` (`macOS Keychain` on Mac) when OS secure storage is available.
+- The native app setup script now regenerates iOS/Android launcher icons after
+  Flutter platform scaffold generation, so app icons do not fall back to the
+  default Flutter mark.
+
+### Fixed
+- Desktop startup now preflights the selected project folder, selected agent CLI,
+  port binding, and bridge health so failures are shown as actionable diagnostics.
+
 ## [0.7.0] - 2026-07-12
 
 ### Added

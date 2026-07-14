@@ -2,76 +2,219 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline';" />
-<title>voicebridge</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'unsafe-inline';" />
+<title>VoiceBridge</title>
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --green:#3fb950; --red:#f85149; --yellow:#d29922; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
-  header { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
-  header h1 { font-size:16px; margin:0; }
-  .pill { margin-left:auto; padding:4px 10px; border-radius:999px; font-size:12px; background:#30363d; }
-  .pill.on { background:rgba(63,185,80,.2); color:var(--green); }
-  .pill.warn { background:rgba(210,153,34,.18); color:var(--yellow); }
-  .pill.err { background:rgba(248,81,73,.18); color:var(--red); }
+  :root {
+    --bg:#101418; --panel:#171d22; --panel-2:#1d252b; --border:#33404a;
+    --text:#eef3f7; --muted:#9aa8b3; --green:#4fd06f; --blue:#68a7ff;
+    --red:#ff7d7d; --yellow:#f2c45b;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); background:#0d1114; }
+  header h1 { font-size:16px; margin:0; font-weight:650; letter-spacing:0; }
   main { padding:16px; display:flex; flex-direction:column; gap:14px; }
+  section { display:flex; flex-direction:column; gap:12px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; }
+  .panel h2 { margin:0; font-size:14px; font-weight:650; }
+  .panel-title { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pill { margin-left:auto; padding:4px 10px; border-radius:999px; font-size:12px; background:#2b343c; color:var(--muted); white-space:nowrap; }
+  .pill.on { background:rgba(79,208,111,.18); color:var(--green); }
+  .pill.warn { background:rgba(242,196,91,.16); color:var(--yellow); }
+  .pill.err { background:rgba(255,125,125,.16); color:var(--red); }
   .row { display:flex; gap:10px; }
-  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); flex:1; }
-  input { background:#0d1117; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font-size:14px; }
+  label { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--muted); flex:1; }
+  input, select {
+    width:100%; background:#0d1114; color:var(--text); border:1px solid var(--border);
+    border-radius:6px; padding:8px; font-size:13px; min-height:36px;
+  }
+  input[readonly] { color:#cbd5de; }
+  .field-line { display:flex; gap:8px; align-items:center; }
+  .field-line input { flex:1; }
   .btns { display:flex; gap:8px; flex-wrap:wrap; }
-  button { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 12px; cursor:pointer; font-size:13px; }
-  button.primary { background:var(--green); color:#06210f; border-color:var(--green); font-weight:600; }
+  button {
+    background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+    border-radius:6px; padding:8px 12px; cursor:pointer; font-size:13px; min-height:34px;
+  }
+  button.primary { background:var(--green); color:#082111; border-color:var(--green); font-weight:650; }
   button:disabled { opacity:.5; cursor:default; }
-  .url { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--green); word-break:break-all; }
+  .hint { font-size:12px; color:var(--muted); line-height:1.45; }
+  .error { font-size:12px; color:var(--red); min-height:17px; }
+  .diagnostic {
+    border:1px solid var(--border); border-radius:8px; padding:10px;
+    background:#0d1114; color:var(--muted); font-size:12px; line-height:1.45;
+  }
+  .diagnostic.bad { color:var(--red); border-color:rgba(255,125,125,.45); background:rgba(255,125,125,.08); }
+  .diagnostic.good { color:var(--green); border-color:rgba(79,208,111,.35); background:rgba(79,208,111,.08); }
+  .url, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; word-break:break-all; }
+  .url { color:var(--green); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .metric { background:#0d1114; border:1px solid var(--border); border-radius:8px; padding:10px; min-width:0; }
+  .metric b { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; }
+  .metric span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pills { display:flex; gap:6px; flex-wrap:wrap; }
-  .tag { font-size:11px; padding:3px 8px; border-radius:999px; background:#30363d; color:var(--muted); }
-  .tag.on { background:rgba(63,185,80,.18); color:var(--green); }
+  .tag { font-size:11px; padding:3px 8px; border-radius:999px; background:#2b343c; color:var(--muted); }
+  .tag.on { background:rgba(79,208,111,.18); color:var(--green); }
+  .tag.warn { background:rgba(242,196,91,.16); color:var(--yellow); }
   .sess { font-size:12px; color:#cdd6e0; padding:2px 0; }
-  .log { background:#010409; border:1px solid var(--border); border-radius:8px; padding:10px; height:220px; overflow:auto; font-family:ui-monospace,Menlo,monospace; font-size:11px; white-space:pre-wrap; color:#9da7b3; }
-  .hint { font-size:11px; color:var(--muted); }
-  .error { display:none; border:1px solid rgba(248,81,73,.35); background:rgba(248,81,73,.08); color:#ffb3ad; border-radius:8px; padding:8px 10px; font-size:12px; }
-  .error.on { display:block; }
+  .log { background:#06090c; border:1px solid var(--border); border-radius:8px; padding:10px; height:190px; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; white-space:pre-wrap; color:#a7b2bd; }
+  .pairing { display:flex; gap:12px; align-items:flex-start; }
+  .qr {
+    width:132px; height:132px; border-radius:8px; border:1px solid var(--border);
+    background:#fff; padding:8px; object-fit:contain; flex:0 0 auto;
+  }
+  .qr.empty { display:none; }
+  .pairing-copy { min-width:0; display:flex; flex-direction:column; gap:8px; flex:1; }
+  .hidden { display:none; }
 </style>
 </head>
 <body>
   <header>
-    <h1>🎙️ voicebridge</h1>
-    <span class="pill" id="pill">—</span>
+    <h1>VoiceBridge</h1>
+    <span class="pill" id="pill">-</span>
   </header>
+
   <main>
-    <div class="row">
-      <label>Port <input id="port" type="number" /></label>
-      <label>Host
-        <input id="host" list="hosts" />
-        <datalist id="hosts"><option value="127.0.0.1"><option value="0.0.0.0"></datalist>
+    <section class="panel hidden" id="wizard">
+      <div class="panel-title">
+        <h2>Set Up This Mac</h2>
+        <span class="pill warn">First run</span>
+      </div>
+      <div class="hint">Choose the project folder and agent this Mac should run. VoiceBridge will keep the bridge local by default and generate a pairing token for your phone.</div>
+
+      <label>Project folder
+        <span class="field-line">
+          <input id="setupProject" readonly placeholder="No folder selected" />
+          <button id="setupChooseProject" type="button">Choose</button>
+        </span>
       </label>
-    </div>
-    <label>Access token (optional)
-      <span style="display:flex;gap:8px;">
-        <input id="token" style="flex:1" placeholder="empty = unprotected" />
-        <button id="gen" type="button">Generate</button>
-      </span>
-    </label>
-    <div class="btns">
-      <button id="apply" type="button">Save & restart</button>
-      <button id="toggle" class="primary" type="button">Start</button>
-      <button id="open" type="button">Open in browser</button>
-    </div>
-    <div class="error" id="bridgeError"></div>
-    <div>
-      <div class="hint">Phone address:</div>
-      <div class="url" id="url">—</div>
-      <div class="hint">A QR code to connect from your phone appears in the log below (printed when the bridge starts). For HTTPS: <code>tailscale serve --bg PORT</code></div>
-    </div>
-    <div>
-      <div class="hint">Agents:</div>
-      <div class="pills" id="agents"><span class="tag">—</span></div>
-    </div>
-    <div>
-      <div class="hint">Active sessions:</div>
-      <div id="sessions"><div class="sess">—</div></div>
-    </div>
-    <div class="log" id="log"></div>
+
+      <label>Agent mode
+        <select id="setupAgent"></select>
+      </label>
+
+      <div class="row">
+        <label>Port <input id="setupPort" type="number" min="1" max="65535" /></label>
+        <label>Host
+          <input id="setupHost" list="hosts" />
+        </label>
+      </div>
+
+      <label>Mobile/public URL
+        <input id="setupPublicUrl" placeholder="Optional HTTPS URL from Tailscale Serve" />
+      </label>
+
+      <div>
+        <div class="hint">Access token</div>
+        <div class="mono" id="setupTokenStatus">Generated and stored securely.</div>
+      </div>
+      <div class="error" id="setupError"></div>
+      <div class="btns">
+        <button id="finishSetup" class="primary" type="button">Save & start bridge</button>
+        <button id="regenSetupToken" type="button">Regenerate token</button>
+      </div>
+    </section>
+
+    <section id="control">
+      <div class="grid">
+        <div class="metric"><b>Project</b><span id="projectSummary">-</span></div>
+        <div class="metric"><b>Agent</b><span id="agentSummary">-</span></div>
+        <div class="metric"><b>Local URL</b><span class="url" id="url">-</span></div>
+        <div class="metric"><b>Mobile URL</b><span class="url" id="mobileUrl">-</span></div>
+        <div class="metric"><b>Mobile</b><span id="mobileSummary">-</span></div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Bridge</h2>
+          <span class="pill" id="bridgePill">Stopped</span>
+        </div>
+        <div class="diagnostic" id="bridgeDiagnostic">Bridge is stopped.</div>
+        <div class="row">
+          <label>Port <input id="port" type="number" min="1" max="65535" /></label>
+          <label>Host
+            <input id="host" list="hosts" />
+            <datalist id="hosts"><option value="127.0.0.1"><option value="0.0.0.0"></datalist>
+          </label>
+        </div>
+        <label>Mobile/public URL
+          <input id="publicUrl" placeholder="Optional HTTPS URL from Tailscale Serve" />
+        </label>
+        <div class="btns">
+          <button id="apply" type="button">Save & restart</button>
+          <button id="toggle" class="primary" type="button">Start</button>
+          <button id="open" type="button">Open web UI</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Project & Agent</h2>
+        </div>
+        <label>Project folder
+          <span class="field-line">
+            <input id="projectDir" readonly placeholder="No folder selected" />
+            <button id="chooseProject" type="button">Choose</button>
+          </span>
+        </label>
+        <label>Agent mode
+          <select id="agent"></select>
+        </label>
+        <div class="pills" id="agentAvailability"><span class="tag">-</span></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Network</h2>
+          <span class="pill" id="networkPill">Checking</span>
+        </div>
+        <div class="grid">
+          <div class="metric"><b>Tailscale</b><span id="tailscaleStatus">-</span></div>
+          <div class="metric"><b>Public health</b><span id="publicHealth">-</span></div>
+        </div>
+        <div class="hint">Expose the local bridge to your phone with Tailscale Serve. VoiceBridge only prepares the command and verifies your URL.</div>
+        <div class="mono" id="serveCommand">-</div>
+        <div class="btns">
+          <button id="copyServeCommand" type="button">Copy Tailscale command</button>
+          <button id="verifyPublicUrl" type="button">Verify public URL</button>
+          <button id="refreshNetwork" type="button">Refresh</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Pairing</h2>
+        </div>
+        <div class="pairing">
+          <img class="qr empty" id="pairingQr" alt="Pairing QR code" />
+          <div class="pairing-copy">
+            <div class="hint">Scan this from the phone, or copy the pairing payload. The token is hidden here; regenerating it requires pairing again.</div>
+            <div class="btns">
+              <button id="copyPairing" type="button">Copy pairing payload</button>
+              <button id="copyMobileUrl" type="button">Copy mobile URL</button>
+              <button id="regenToken" type="button">Regenerate token</button>
+            </div>
+          </div>
+        </div>
+        <div class="mono" id="pairingPreview"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Runtime</h2>
+        </div>
+        <div>
+          <div class="hint">Agents:</div>
+          <div class="pills" id="agents"><span class="tag">-</span></div>
+        </div>
+        <div>
+          <div class="hint">Active sessions:</div>
+          <div id="sessions"><div class="sess">-</div></div>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+    </section>
   </main>
   <script src="control.js"></script>
 </body>

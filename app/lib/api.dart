@@ -81,6 +81,17 @@ class Api {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// POST /api/mobile-seen — lightweight heartbeat for the desktop host panel.
+  Future<void> mobileSeen({String source = 'mobile'}) async {
+    final r = await http.post(
+      _u('/api/mobile-seen'),
+      headers: _headers({'Content-Type': 'application/json'}),
+      body: jsonEncode({'source': source}),
+    );
+    if (r.statusCode == 401) throw Exception('Invalid token');
+    if (r.statusCode != 200) throw Exception("Couldn't update mobile status (${r.statusCode})");
+  }
+
   /// POST /api/tts — bridge-side (Piper) neural TTS. Returns WAV audio bytes.
   Future<Uint8List> ttsAudio(String text) async {
     final r = await _post(

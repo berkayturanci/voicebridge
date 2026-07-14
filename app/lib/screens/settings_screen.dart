@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../qr_pairing.dart';
@@ -20,27 +19,68 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static final Uri _privacyUrl = Uri.parse(
-    'https://berkayturanci.github.io/voicebridge/privacy.html',
-  );
-  static final Uri _supportUrl = Uri.parse(
-    'https://github.com/berkayturanci/voicebridge/issues',
-  );
-  static final Uri _docsUrl = Uri.parse(
-    'https://github.com/berkayturanci/voicebridge#readme',
-  );
-
-  late final TextEditingController _url = TextEditingController(
-    text: widget.settings.baseUrl,
-  );
-  late final TextEditingController _token = TextEditingController(
-    text: widget.settings.token,
-  );
+  late final TextEditingController _url =
+      TextEditingController(text: widget.settings.baseUrl);
+  late final TextEditingController _token =
+      TextEditingController(text: widget.settings.token);
   bool _busy = false;
   bool _obscure = true;
   String? _error;
 
   bool get _isFirstRun => !Navigator.canPop(context);
+
+  void _applyPairing(PairingDetails details) {
+    setState(() {
+      _url.text = details.baseUrl;
+      _token.text = details.token;
+      _error = null;
+    });
+  }
+
+  Future<void> _scanPairingQr() async {
+    final details = await Navigator.push<PairingDetails>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (details != null && mounted) _applyPairing(details);
+  }
+
+  Future<void> _pastePairingCode() async {
+    final controller = TextEditingController();
+    final raw = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Paste pairing code'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: 'https://mac.tail-xxxx.ts.net/?token=... or JSON payload',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Use code'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (raw == null || raw.trim().isEmpty || !mounted) return;
+    try {
+      _applyPairing(parsePairingCode(raw));
+    } catch (e) {
+      setState(
+          () => _error = e.toString().replaceFirst('FormatException: ', ''));
+    }
+  }
 
   Future<void> _saveAndTest() async {
     setState(() {
@@ -56,6 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (cfg['authRequired'] == true) {
         await api.sessions(); // authed call → 401 if the token is wrong
       }
+      await api.mobileSeen(source: 'settings');
       await widget.settings.save();
       if (!mounted) return;
       // When opened from the list we pop back; when this is the first-run
@@ -66,8 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => SessionsScreen(settings: widget.settings),
-          ),
+              builder: (_) => SessionsScreen(settings: widget.settings)),
         );
       }
     } catch (e) {
@@ -75,17 +115,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _scanQr() async {
-    final pairing = await Navigator.push<ScannedPairing>(
-      context,
-      MaterialPageRoute(builder: (_) => const QrScanScreen()),
-    );
-    if (pairing == null || !mounted) return;
-    _url.text = pairing.baseUrl;
-    _token.text = pairing.token;
-    await _saveAndTest();
   }
 
   @override
@@ -101,10 +130,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 28),
               Center(child: _logo()),
               const SizedBox(height: 22),
-              _firstRunIntro(),
-              const SizedBox(height: 28),
+              Text(
+                'Connect to your PC',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: VbColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Type and talk to Claude Code from your phone.\n'
+                'Enter the PC bridge address to get started.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: VbColors.textMuted, height: 1.5),
+              ),
+              const SizedBox(height: 34),
             ] else
               const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _scanPairingQr,
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: const Text('Scan QR'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _pastePairingCode,
+                    icon: const Icon(Icons.content_paste_rounded),
+                    label: const Text('Paste code'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
             _label(firstRun ? 'PC bridge URL' : 'Bridge URL'),
             const SizedBox(height: 8),
             TextField(
@@ -113,18 +179,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               autocorrect: false,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.link_rounded),
-                hintText: 'https://your-pc.tailnet.ts.net',
+                hintText: 'https://mac.tail-xxxx.ts.net',
               ),
             ),
-            const SizedBox(height: 10),
-            Center(
-              child: TextButton.icon(
-                onPressed: _busy ? null : _scanQr,
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                label: const Text('Scan QR code instead'),
-              ),
-            ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
             _label('Access token'),
             const SizedBox(height: 8),
             TextField(
@@ -136,11 +194,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 hintText: 'optional',
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _obscure = !_obscure),
-                  icon: Icon(
-                    _obscure
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                  ),
+                  icon: Icon(_obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined),
                 ),
               ),
             ),
@@ -151,33 +207,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: BoxDecoration(
                   color: VbColors.danger.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(VbRadius.field),
-                  border: Border.all(
-                    color: VbColors.danger.withValues(alpha: 0.4),
-                  ),
+                  border:
+                      Border.all(color: VbColors.danger.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      size: 19,
-                      color: VbColors.danger,
-                    ),
+                    Icon(Icons.error_outline_rounded,
+                        size: 19, color: VbColors.danger),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _error!,
                         style: TextStyle(
-                          color: VbColors.danger,
-                          fontSize: 13.5,
-                          height: 1.4,
-                        ),
+                            color: VbColors.danger,
+                            fontSize: 13.5,
+                            height: 1.4),
                       ),
                     ),
                   ],
                 ),
               ),
             ],
+            const SizedBox(height: 22),
+            _hint(),
             const SizedBox(height: 26),
             FilledButton.icon(
               onPressed: _busy ? null : _saveAndTest,
@@ -186,135 +239,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        color: Color(0xFF06210C),
-                      ),
-                    )
+                          strokeWidth: 2.2, color: Color(0xFF06210C)))
                   : const Icon(Icons.arrow_forward_rounded),
-              label: Text(
-                _busy
-                    ? 'Connecting to PC...'
-                    : firstRun
-                        ? 'Connect to PC'
-                        : 'Test & Save',
-              ),
+              label: Text(_busy
+                  ? 'Connecting…'
+                  : firstRun
+                      ? 'Connect to PC'
+                      : 'Test & Save'),
             ),
             const SizedBox(height: 24),
-            if (!firstRun) ...[
-              _label('Appearance'),
-              const SizedBox(height: 8),
-              _themeToggle(),
-              const SizedBox(height: 22),
-            ],
-            _label('About'),
+            _label('Appearance'),
             const SizedBox(height: 8),
-            _aboutLinks(),
-            const SizedBox(height: 22),
-            _hint(),
+            _themeToggle(),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _openUrl(Uri url) async {
-    final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Couldn't open ${url.toString()}")),
-      );
-    }
-  }
-
-  Widget _aboutLinks() {
-    return Material(
-      color: VbColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(VbRadius.card),
-        side: BorderSide(color: VbColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          _linkRow(
-            icon: Icons.privacy_tip_outlined,
-            title: 'Privacy policy',
-            subtitle:
-                'How VoiceBridge handles bridge settings, tokens, and voice data.',
-            url: _privacyUrl,
-          ),
-          Divider(height: 1, color: VbColors.border),
-          _linkRow(
-            icon: Icons.help_outline_rounded,
-            title: 'Support',
-            subtitle: 'Report bugs or ask for help on GitHub.',
-            url: _supportUrl,
-          ),
-          Divider(height: 1, color: VbColors.border),
-          _linkRow(
-            icon: Icons.menu_book_outlined,
-            title: 'Documentation',
-            subtitle: 'Setup, security notes, and bridge configuration.',
-            url: _docsUrl,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _themeSurface({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: VbColors.surface,
-        borderRadius: BorderRadius.circular(VbRadius.card),
-        border: Border.all(color: VbColors.border),
-      ),
-      child: child,
-    );
-  }
-
-  Widget _linkRow({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Uri url,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: VbColors.accent),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          color: VbColors.textPrimary,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(color: VbColors.textMuted, height: 1.35),
-      ),
-      trailing: Icon(Icons.open_in_new_rounded, color: VbColors.textMuted),
-      onTap: () => _openUrl(url),
-    );
-  }
-
   Widget _themeToggle() {
     return ValueListenableBuilder<String>(
       valueListenable: VbThemeController.mode,
-      builder: (_, mode, __) => _themeSurface(
+      builder: (_, mode, __) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: VbColors.surface,
+          borderRadius: BorderRadius.circular(VbRadius.card),
+          border: Border.all(color: VbColors.border),
+        ),
         child: Row(
           children: [
             Icon(Icons.brightness_6_rounded, size: 20, color: VbColors.accent),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                'Theme',
-                style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
-                  color: VbColors.textPrimary,
-                ),
-              ),
+              child: Text('Theme',
+                  style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: VbColors.textPrimary)),
             ),
             _themeSeg('system', 'System', mode == 'system'),
             _themeSeg('light', 'Light', mode == 'light'),
@@ -338,14 +300,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => VbThemeController.setMode(id),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: selected ? VbColors.accent : VbColors.textMuted,
-              ),
-            ),
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? VbColors.accent : VbColors.textMuted)),
           ),
         ),
       ),
@@ -371,109 +330,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-      child: const Icon(
-        Icons.graphic_eq_rounded,
-        color: Color(0xFF06210C),
-        size: 46,
-      ),
-    );
-  }
-
-  Widget _firstRunIntro() {
-    return Column(
-      children: [
-        Text(
-          'Connect to your PC',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: VbColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Start the bridge on your computer, expose it over Tailscale HTTPS, then paste the PC URL here.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: VbColors.textMuted,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 18),
-        Container(
-          decoration: BoxDecoration(
-            color: VbColors.surface,
-            borderRadius: BorderRadius.circular(VbRadius.card),
-            border: Border.all(color: VbColors.border),
-          ),
-          child: Column(
-            children: [
-              _setupStep(
-                icon: Icons.computer_rounded,
-                title: 'Run bridge',
-                detail: 'npm start',
-              ),
-              Divider(height: 1, color: VbColors.border),
-              _setupStep(
-                icon: Icons.lock_outline_rounded,
-                title: 'Publish HTTPS',
-                detail: 'tailscale serve --bg --https=443 localhost:8787',
-              ),
-              Divider(height: 1, color: VbColors.border),
-              _setupStep(
-                icon: Icons.link_rounded,
-                title: 'Paste URL',
-                detail: 'Use the https://...ts.net address from your PC.',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _setupStep({
-    required IconData icon,
-    required String title,
-    required String detail,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: VbColors.accent),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: VbColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  style: detail.startsWith('Use ')
-                      ? TextStyle(
-                          fontSize: 12.5,
-                          color: VbColors.textMuted,
-                          height: 1.35,
-                        )
-                      : VbTheme.mono(size: 12.2, color: VbColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      child: const Icon(Icons.graphic_eq_rounded,
+          color: Color(0xFF06210C), size: 46),
     );
   }
 
@@ -500,11 +358,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.lightbulb_outline_rounded,
-            size: 18,
-            color: VbColors.warning,
-          ),
+          Icon(Icons.lightbulb_outline_rounded,
+              size: 18, color: VbColors.warning),
           const SizedBox(width: 11),
           Expanded(
             child: Column(
@@ -513,33 +368,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   'Tip',
                   style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: VbColors.textPrimary,
-                  ),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: VbColors.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'On your computer, serve the bridge over HTTPS with Tailscale:',
                   style: TextStyle(
-                    fontSize: 12.5,
-                    color: VbColors.textMuted,
-                    height: 1.45,
-                  ),
+                      fontSize: 12.5, color: VbColors.textMuted, height: 1.45),
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   decoration: BoxDecoration(
                     color: VbColors.bg,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: VbColors.border),
                   ),
                   child: Text(
-                    'tailscale serve --bg --https=443 localhost:8787',
+                  'tailscale serve --bg --https=443 localhost:8787',
                     style: VbTheme.mono(size: 12, color: VbColors.accentBright),
                   ),
                 ),

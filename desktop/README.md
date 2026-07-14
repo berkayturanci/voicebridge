@@ -4,10 +4,22 @@ A small **Mac / Windows / Linux** desktop app that runs the voicebridge Node
 bridge for you — no terminal needed — with a control panel and a tray icon.
 
 It's a thin shell: the bridge (`../server.js`) runs as a child process, and the
-app gives it a UI to **start/stop**, set the **port / host / access token**,
-**open the web UI** in your browser, watch the **live log** (the phone QR code
-the bridge prints shows up there too), and see a small **dashboard** of the
-agents (with availability) and the active sessions, refreshed live.
+app gives it a first-run setup flow to choose the **project folder**, **agent
+mode**, generated **access token**, **port / host**, and optional public/mobile
+URL. After setup, the control panel can **start/stop**, **open the web UI** in
+your browser, show a scannable QR for the mobile URL, copy a versioned pairing
+payload, see the phone's last-seen status, watch the **live log**, and see a
+small **dashboard** of the agents (with availability) and the active sessions,
+refreshed live.
+
+The network panel detects basic Tailscale status, prepares a copyable
+`tailscale serve --bg <port>` command, and verifies the configured public URL's
+`/api/health` endpoint. It does not run Tailscale commands automatically.
+
+Startup is preflighted before the bridge process launches: the app validates the
+project folder, selected agent CLI, and port availability, then waits for
+`/api/health` so failures show as actionable diagnostics instead of a silent
+stopped state.
 
 ## Run in development
 
@@ -43,7 +55,10 @@ is self-contained — it does **not** need Node installed on the target machine
 
 - The app keeps running in the tray when you close the window; quit from the
   tray menu (which also stops the bridge).
-- Settings are stored in the OS user-data dir (`settings.json`).
+- Non-secret settings are stored in the OS user-data dir (`settings.json`). The
+  desktop app generates an access token automatically and stores it with
+  Electron `safeStorage` (`macOS Keychain` on Mac). If OS secure storage is not
+  available, it falls back to `settings.json` so development builds still work.
 - The agent CLIs (Claude Code, Codex, …) still need to be installed and
   authenticated on the machine — the desktop app runs the bridge, not the agents.
 - For phone access over HTTPS, run `tailscale serve --bg <port>` and point the

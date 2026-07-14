@@ -2,51 +2,83 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:voicebridge_app/qr_pairing.dart';
 
 void main() {
-  test('parses a URL with a token query param', () {
-    final result = parsePairingQr(
-      'https://mac.tail-abc123.ts.net?token=sekrit',
-    );
-    expect(result, isNotNull);
-    expect(result!.baseUrl, 'https://mac.tail-abc123.ts.net');
-    expect(result.token, 'sekrit');
+  group('parsePairingQr', () {
+    test('parses bridge URL with token', () {
+      final result = parsePairingQr('https://mac.tailnet.ts.net/?token=abc123');
+
+      expect(result, isNotNull);
+      expect(result!.baseUrl, 'https://mac.tailnet.ts.net');
+      expect(result.token, 'abc123');
+    });
+
+    test('parses bridge URL without token', () {
+      final result = parsePairingQr('https://mac.tailnet.ts.net/');
+
+      expect(result, isNotNull);
+      expect(result!.baseUrl, 'https://mac.tailnet.ts.net');
+      expect(result.token, '');
+    });
+
+    test('keeps path and port in the base URL', () {
+      final result = parsePairingQr('http://127.0.0.1:8787/app?token=t');
+
+      expect(result, isNotNull);
+      expect(result!.baseUrl, 'http://127.0.0.1:8787/app');
+      expect(result.token, 't');
+    });
+
+    test('returns null for unrelated QR content', () {
+      expect(parsePairingQr('not a url'), isNull);
+    });
+
+    test('returns null for non-http URLs', () {
+      expect(parsePairingQr('mailto:test@example.com'), isNull);
+    });
   });
 
-  test('parses a URL with no token as an empty token', () {
-    final result = parsePairingQr('https://mac.tail-abc123.ts.net');
-    expect(result, isNotNull);
-    expect(result!.baseUrl, 'https://mac.tail-abc123.ts.net');
-    expect(result.token, '');
-  });
+  group('parsePairingCode', () {
+    test('parses JSON pairing payload', () {
+      final result = parsePairingCode('''
+        {
+          "schema": "voicebridge.pairing",
+          "version": 1,
+          "bridgeUrl": "https://mac.tailnet.ts.net/?token=url-token",
+          "token": "payload-token"
+        }
+      ''');
 
-  test('parses a plain http fallback URL (host:port, no Tailscale)', () {
-    final result = parsePairingQr('http://127.0.0.1:8787?token=abc');
-    expect(result, isNotNull);
-    expect(result!.baseUrl, 'http://127.0.0.1:8787');
-    expect(result.token, 'abc');
-  });
+      expect(result.baseUrl, 'https://mac.tailnet.ts.net');
+      expect(result.token, 'url-token');
+    });
 
-  test('trims surrounding whitespace from the scanned value', () {
-    final result = parsePairingQr('  https://mac.tail-abc123.ts.net  ');
-    expect(result, isNotNull);
-    expect(result!.baseUrl, 'https://mac.tail-abc123.ts.net');
-  });
+    test('uses payload token when URL has no token', () {
+      final result = parsePairingCode('''
+        {
+          "schema": "voicebridge.pairing",
+          "version": 1,
+          "bridgeUrl": "https://mac.tailnet.ts.net",
+          "token": "payload-token"
+        }
+      ''');
 
-  test('rejects a non-http(s) scheme', () {
-    expect(parsePairingQr('mailto:someone@example.com'), isNull);
-  });
+      expect(result.baseUrl, 'https://mac.tailnet.ts.net');
+      expect(result.token, 'payload-token');
+    });
 
-  test('rejects an unrelated QR payload (not a URL at all)', () {
-    expect(parsePairingQr('just some random scanned text'), isNull);
-  });
+    test('rejects unsupported payload schema', () {
+      expect(
+        () => parsePairingCode('{"schema":"other","bridgeUrl":"https://x"}'),
+        throwsFormatException,
+      );
+    });
 
-  test('rejects an empty string', () {
-    expect(parsePairingQr(''), isNull);
-  });
-
-  test('URL-decodes a percent-encoded token', () {
-    final result = parsePairingQr(
-      'https://mac.tail-abc123.ts.net?token=a%2Bb%3Dc',
-    );
-    expect(result!.token, 'a+b=c');
+    test('rejects unsupported payload version', () {
+      expect(
+        () => parsePairingCode(
+          '{"schema":"voicebridge.pairing","version":2,"bridgeUrl":"https://x"}',
+        ),
+        throwsFormatException,
+      );
+    });
   });
 }

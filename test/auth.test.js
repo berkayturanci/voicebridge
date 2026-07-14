@@ -49,3 +49,11 @@ test("correct Bearer token is accepted", async () => {
   const { status } = await request(server, "GET", "/api/sessions", null, { Authorization: "Bearer secret-token" });
   assert.strictEqual(status, 200);
 });
+
+test("mobile seen endpoints are protected", async () => {
+  assert.strictEqual((await request(server, "GET", "/api/mobile-state")).status, 401);
+  assert.strictEqual((await request(server, "POST", "/api/mobile-seen", { source: "test" })).status, 401);
+  const ok = await request(server, "POST", "/api/mobile-seen", { source: "test" }, { Authorization: "Bearer secret-token" });
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual(JSON.parse(ok.data).mobile.connected, true);
+});

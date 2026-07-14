@@ -52,6 +52,9 @@ class _SessionsScreenState extends State<SessionsScreen>
     try {
       final cfg = await _api.config();
       final s = await _api.sessions();
+      try {
+        await _api.mobileSeen(source: 'sessions');
+      } catch (_) {}
       setState(() {
         _agents = (cfg['agents'] as List?) ?? [];
         _sessions = s;
