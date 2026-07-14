@@ -1,7 +1,7 @@
 name: voicebridge_app
 description: Native iOS/Android client for the voicebridge agent — talk to Claude Code from your phone.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   # Color.withValues (used by the theme) needs Flutter 3.27+ / Dart 3.6+.

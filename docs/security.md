@@ -27,6 +27,13 @@ export ACCESS_TOKEN="$(openssl rand -hex 16)"
 
 - The check is constant-time (`crypto.timingSafeEqual`).
 - The web client stores the token in `localStorage` and prompts for it once.
+- The Electron desktop host generates the token automatically and stores it with
+  Electron `safeStorage` (`macOS Keychain` on Mac) when OS secure storage is
+  available. If secure storage is unavailable, development builds fall back to
+  `settings.json`.
+- The native mobile app stores the bridge URL/token in platform preferences and
+  can receive them by scanning the desktop host QR or pasting the pairing
+  payload. Treat pairing payloads like passwords.
 - When `PUBLIC_URL`/`ACCESS_TOKEN` are set, the startup QR encodes `?token=…`;
   scanning it authorizes the phone, and the client immediately scrubs the token
   from the address bar. Anyone who can see that QR (or the URL) gets in — treat

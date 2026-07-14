@@ -1,6 +1,6 @@
 {
   "name": "voicebridge",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Hands-free, two-way voice for coding agents (Claude Code, Codex, Antigravity, Ollama) from your phone. Free, source-available, no ElevenLabs. Browser voice plus optional local Whisper STT through a tiny Node bridge.",
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "commonjs",

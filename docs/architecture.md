@@ -108,6 +108,8 @@ session is recreated on boot).
 | `GET /api/browse` | List subdirectories of a path (folder picker). `runner=cloud` proxies to the cloud runner's `GET /browse` for remote dirs. |
 | `GET /api/commands` | A session project's commands (`.claude/commands` + npm scripts) for the palette. |
 | `GET /api/sessions` | List sessions. |
+| `GET /api/mobile-state` | Authenticated. Returns the native mobile client's last-seen time and connected state for the desktop host. |
+| `POST /api/mobile-seen` | Authenticated. Records a lightweight native mobile heartbeat. |
 | `POST /api/sessions` | Create a session `{ name, agent, projectDir, mode }`. |
 | `DELETE /api/sessions/:id` | Remove a session (not the default). |
 | `POST /api/ask` | Stream a turn `{ text, sessionId, mode?, reset? }` → NDJSON. |

@@ -8,12 +8,22 @@ const path = require("node:path");
 const { classifyBridgeFatal, fetchFailureMessage, healthOk } = require("../lib/bridge-health");
 const { loadSettings, saveSettings, webUrl } = require("../lib/settings");
 
+const DEFAULT_SETTINGS = {
+  port: 8787,
+  host: "127.0.0.1",
+  token: "",
+  projectDir: "",
+  agent: "claude",
+  publicUrl: "",
+  setupComplete: false,
+};
+
 test("desktop settings load defaults when the file is missing or malformed", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-desktop-"));
   const file = path.join(dir, "settings.json");
-  assert.deepStrictEqual(loadSettings(file), { port: 8787, host: "127.0.0.1", token: "" });
+  assert.deepStrictEqual(loadSettings(file), DEFAULT_SETTINGS);
   fs.writeFileSync(file, "{ nope");
-  assert.deepStrictEqual(loadSettings(file), { port: 8787, host: "127.0.0.1", token: "" });
+  assert.deepStrictEqual(loadSettings(file), DEFAULT_SETTINGS);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -21,7 +31,12 @@ test("desktop settings save and webUrl normalize local host/token", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-desktop-"));
   const file = path.join(dir, "settings.json");
   saveSettings(file, { port: 9999, host: "0.0.0.0", token: "a b" });
-  assert.deepStrictEqual(loadSettings(file), { port: 9999, host: "0.0.0.0", token: "a b" });
+  assert.deepStrictEqual(loadSettings(file), {
+    ...DEFAULT_SETTINGS,
+    port: 9999,
+    host: "0.0.0.0",
+    token: "a b",
+  });
   assert.strictEqual(webUrl(loadSettings(file)), "http://127.0.0.1:9999/?token=a%20b");
   fs.rmSync(dir, { recursive: true, force: true });
 });

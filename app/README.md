@@ -16,6 +16,8 @@ First-stage features:
   (`flutter_tts`), then listens again.
 - **Bridge settings** — point it at your machine's URL (a Tailscale HTTPS URL is
   ideal) and an optional access token, stored on the device.
+- **QR pairing** — scan the QR shown in the desktop host app, or paste the
+  pairing URL / payload manually.
 
 > The PWA still works too — install the web app from Safari for a zero-extra-step
 > option. This native app is the path when you want reliable voice as an
@@ -24,58 +26,32 @@ First-stage features:
 ## Prerequisites
 
 - A running voicebridge bridge reachable from the phone — ideally over HTTPS via
-  Tailscale: on the computer,
-  `tailscale serve --bg --https=443 localhost:8787`.
+  Tailscale: on the computer, `tailscale serve --bg 8787`.
 - [Flutter](https://docs.flutter.dev/get-started/install) (stable). For iOS you
   also need **macOS + Xcode** and (for a real device / the App Store) an Apple
   Developer account.
 
 ## Build & run
 
-This folder ships the Dart sources (`lib/`), `pubspec.yaml`, and the committed
-iOS/Android platform projects used for store builds. Refresh native permissions
-and fetch packages, then run:
+This folder ships the Dart sources (`lib/`) and `pubspec.yaml`. Generate the
+platform projects, fetch packages, then run:
 
 ```bash
 cd app
-bash tool/setup.sh                # refreshes ios/android permissions + pub get
+bash tool/setup.sh                # generates ios/ android/ + injects mic/speech permissions + pub get
 dart run flutter_launcher_icons   # apply the voicebridge app icon (from assets/icon/)
 flutter run                       # on a connected device/simulator
 flutter run -d macos        # …or a desktop target: macos | windows | linux
 ```
 
-`tool/setup.sh` runs `flutter create .` only if `ios/` or `android/` is missing,
-then adds the native permission keys for you, idempotently. Prefer doing it by
-hand? The manual equivalents are below.
+`tool/setup.sh` runs `flutter create .` (which scaffolds `ios/ android/ …` —
+these are generated, version-specific, and not committed) and then adds the
+native permission keys for you, idempotently. Prefer doing it by hand? The
+manual equivalents are below.
 
 The same codebase is a **desktop client** too (macOS / Windows / Linux) — a
 "connect-from" app for your laptop. Chat + streaming work everywhere; voice
 support depends on the platform plugins (see Desktop notes below).
-
-## Install On A Phone
-
-For development:
-
-```bash
-cd app
-flutter run -d <device-id>
-```
-
-For Android beta/store installation:
-
-1. Run the manual `Android Release` workflow.
-2. Upload the signed `app-release.aab` to Google Play Internal testing.
-3. Add testers in Play Console and install from the Play testing link.
-
-For iOS beta/store installation:
-
-1. Verify the `iOS Release` workflow is green.
-2. Archive from Xcode and upload to App Store Connect.
-3. Add internal testers in TestFlight and install from the TestFlight app.
-
-The first screen in the installed app is the PC connection screen. Start the
-bridge on the computer, expose it with Tailscale HTTPS, paste the `https://...ts.net`
-URL, add the access token if one is configured, then tap **Connect to PC**.
 
 ### iOS permissions (required for voice)
 
@@ -87,6 +63,8 @@ allows the mic and speech recognition:
 <string>The microphone is used to give voice commands.</string>
 <key>NSSpeechRecognitionUsageDescription</key>
 <string>Used to transcribe what you say.</string>
+<key>NSCameraUsageDescription</key>
+<string>The camera is used to scan VoiceBridge pairing QR codes.</string>
 ```
 
 Minimum iOS deployment target **12.0+** (set in `ios/Podfile` /
@@ -99,6 +77,8 @@ Minimum iOS deployment target **12.0+** (set in `ios/Podfile` /
 
 ```xml
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" android:required="false" />
 ```
 
 ### Desktop (macOS / Windows / Linux)
@@ -124,8 +104,9 @@ The app runs on the desktop from the same code. Caveats:
 
 ## First launch
 
-1. Enter the **PC bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token.
-2. **Connect to PC** verifies it can reach `/api/config`.
+1. Scan the desktop host app's QR, paste its pairing code, or enter the
+   **bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token manually.
+2. "Test & Save" verifies it can reach `/api/config`.
 3. You land on the session list — open one and talk.
 
 ## Notes
@@ -136,15 +117,5 @@ The app runs on the desktop from the same code. Caveats:
   `.claude/commands` + npm scripts and prefills the composer.
 - **Folder browser** — the new-session sheet has a "Project folder" picker backed
   by `/api/browse`.
-- CI runs `flutter analyze` and `flutter test` against the Dart client. Store
-  builds still need final store metadata; Android signed AAB release steps are
-  documented in
-  [../docs/android-release.md](../docs/android-release.md). See also
-  [../docs/ios-release.md](../docs/ios-release.md),
-  [../docs/flutter-plugin-compatibility.md](../docs/flutter-plugin-compatibility.md),
-  [../docs/store-release.md](../docs/store-release.md),
-  [../docs/store-publishing-runbook.md](../docs/store-publishing-runbook.md) and
-  [../docs/store-listing.md](../docs/store-listing.md).
-- On first launch, the mobile app opens a PC connection screen. Paste the
-  Tailscale HTTPS bridge URL and optional access token, then the app tests the
-  connection before opening sessions.
+- Code is written against the bridge API but **hasn't been compiled in this
+  repo's CI** (no Flutter toolchain here) — run `flutter analyze` locally.

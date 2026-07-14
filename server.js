@@ -278,10 +278,28 @@ function resolveRunner(runner) {
 const sessions = new Map();
 let sessionSeq = 0;
 let defaultSessionId = null;
+const mobileClient = { lastSeen: 0, userAgent: "", source: "" };
 
 // Concurrent in-flight agent turns, capped to bound host resources.
 let inflight = 0;
 function maxInflight() { return parseInt(process.env.MAX_INFLIGHT || "8", 10); }
+
+function publicMobileState(now = Date.now()) {
+  const lastSeen = mobileClient.lastSeen || 0;
+  return {
+    connected: !!lastSeen && now - lastSeen < 45_000,
+    lastSeen: lastSeen ? new Date(lastSeen).toISOString() : null,
+    lastSeenAgoMs: lastSeen ? now - lastSeen : null,
+    userAgent: mobileClient.userAgent,
+    source: mobileClient.source,
+  };
+}
+
+function markMobileSeen(req, data) {
+  mobileClient.lastSeen = Date.now();
+  mobileClient.userAgent = String(req.headers["user-agent"] || "").slice(0, 160);
+  mobileClient.source = String((data && data.source) || "mobile").slice(0, 40);
+}
 
 function isDir(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
@@ -1600,6 +1618,21 @@ function handleRequest(req, res) {
       return sendJson(res, 200, {
         sessions: Array.from(sessions.values()).map(publicSession),
         defaultSessionId,
+      });
+    }
+
+    if (req.method === "GET" && urlPath === "/api/mobile-state") {
+      return sendJson(res, 200, publicMobileState());
+    }
+
+    if (req.method === "POST" && urlPath === "/api/mobile-seen") {
+      return readBody(req, 8 * 1024, (e, body) => {
+        if (e) return sendJson(res, 400, { error: "Bad request" });
+        let data = {};
+        try { data = JSON.parse(body.toString("utf8") || "{}"); }
+        catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
+        markMobileSeen(req, data);
+        return sendJson(res, 200, { ok: true, mobile: publicMobileState() });
       });
     }
 
