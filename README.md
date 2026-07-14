@@ -11,9 +11,9 @@
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
 
-**v0.7.0:** Scan the bridge's startup QR code to connect instantly, and a new
-first-run explainer walks first-time users through what VoiceBridge needs on
-their computer before they connect.
+**v0.8.0:** Download the Mac host app DMG, choose one workspace, start the
+bridge, verify Tailscale, and pair the native mobile app by scanning the desktop
+QR code.
 
 You speak **or type** on your phone, a coding agent (running on your Mac/Linux
 box) does the work, and the reply streams back as chat **and** spoken audio —
@@ -60,6 +60,18 @@ like a phone call with your agent, with a keyboard when you want one.
 ---
 
 ## Quickstart
+
+### Easiest: Mac host app
+
+Download the unsigned Apple Silicon DMG:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
+
+Open it, choose your project folder and agent, set your Tailscale HTTPS URL,
+then scan the pairing QR from the iOS/Android app. Full walkthrough:
+[docs/mac-desktop-host.md](docs/mac-desktop-host.md).
+
+### From source
 
 ```bash
 git clone https://github.com/berkayturanci/voicebridge.git voicebridge && cd voicebridge && npm install
@@ -241,7 +253,8 @@ drive the same silence timer as browser STT.
   **desktop client** (macOS/Windows/Linux). The PWA stays the zero-install option.
 - **Desktop app (Electron)**: [`desktop/`](desktop/) packages the bridge itself
   into a **Mac `.dmg` / Windows / Linux** app with a control panel + tray —
-  run the server with no terminal.
+  run the server with no terminal. See the
+  [Mac desktop host setup guide](docs/mac-desktop-host.md).
 
 ### Modes (autonomy)
 

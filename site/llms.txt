@@ -12,10 +12,13 @@
 ## Source
 
 - [GitHub repository](https://github.com/berkayturanci/voicebridge): source, issues, and releases
+- [Mac DMG download](https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg): unsigned Apple Silicon desktop host app
+- [Mac host guide](https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md): install, Tailscale, and QR pairing setup
 
 ## Key concepts
 
 - Hands-free control: dictate to and listen to coding agents by voice
 - Multi-agent: works with Claude Code, Codex, Antigravity, and Ollama
 - Phone-first: drive an agent from your phone while away from the desk
+- Mac host app: starts the bridge, stores the token, verifies Tailscale, and shows the pairing QR
 - Free & source-available: no ElevenLabs or paid TTS/STT dependency
