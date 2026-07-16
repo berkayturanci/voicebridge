@@ -51,3 +51,24 @@ jobs:
       # Package an unpacked Linux build: validates electron / electron-builder bumps
       # actually install and package (no AppImage/system libs needed for `dir`).
       - run: npx --no-install electron-builder --linux dir
+
+  desktop-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run dist:win:dir
+      - run: npm run verify:win:dir
+      - run: npm run dist:win:preview
+      - uses: actions/upload-artifact@v6
+        with:
+          name: voicebridge-windows-preview
+          path: desktop/dist/voicebridge-*-setup.exe
+          if-no-files-found: error

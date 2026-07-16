@@ -13,11 +13,12 @@
 
 **v0.8.0:** Download the Mac host app DMG, choose one workspace, start the
 bridge, verify Tailscale, and pair the native mobile app by scanning the desktop
-QR code.
+QR code. Windows preview packaging is wired through CI.
 
-You speak **or type** on your phone, a coding agent (running on your Mac/Linux
-box) does the work, and the reply streams back as chat **and** spoken audio —
-like a phone call with your agent, with a keyboard when you want one.
+You speak **or type** on your phone, a coding agent (running on your Mac,
+Windows PC, or Linux box) does the work, and the reply streams back as chat
+**and** spoken audio — like a phone call with your agent, with a keyboard when
+you want one.
 
 <p align="center"><img src="docs/demo.svg" alt="voicebridge phone UI — a chat with an agent, with a text box and a mic" width="300" /></p>
 <p align="center"><em>Type or speak; the agent replies in chat and aloud.</em></p>
@@ -61,15 +62,18 @@ like a phone call with your agent, with a keyboard when you want one.
 
 ## Quickstart
 
-### Easiest: Mac host app
+### Easiest: desktop host app
 
-Download the unsigned Apple Silicon DMG:
+Download the Apple Silicon DMG:
 
 https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
 
 Open it, choose your project folder and agent, set your Tailscale HTTPS URL,
 then scan the pairing QR from the iOS/Android app. Full walkthrough:
 [docs/mac-desktop-host.md](docs/mac-desktop-host.md).
+
+Windows preview installers are built by CI and documented in
+[docs/windows-desktop-host.md](docs/windows-desktop-host.md).
 
 ### From source
 
@@ -87,11 +91,10 @@ iOS) and tap 🎤 or just type. New to it? See [Requirements](#requirements),
 
 ## Requirements
 
-- A computer (macOS/Linux) with **Claude Code** installed and logged in
+- A computer (macOS/Windows/Linux) with **Claude Code** installed and logged in
   (`npm i -g @anthropic-ai/claude-code`, then `claude` → `/login`).
-- **Node.js ≥ 18** (`brew install node`).
-- **Tailscale** on both the computer and the phone (`brew install --cask tailscale`,
-  and the Tailscale app from the App Store). Free.
+- **Node.js ≥ 18**.
+- **Tailscale** on both the computer and the phone. Free.
 - iPhone/iPad: open in **Safari** (do **not** "Add to Home Screen" — installed PWAs
   can't use the microphone on iOS).
 
@@ -254,7 +257,8 @@ drive the same silence timer as browser STT.
 - **Desktop app (Electron)**: [`desktop/`](desktop/) packages the bridge itself
   into a **Mac `.dmg` / Windows / Linux** app with a control panel + tray —
   run the server with no terminal. See the
-  [Mac desktop host setup guide](docs/mac-desktop-host.md).
+  [Mac desktop host setup guide](docs/mac-desktop-host.md) and
+  [Windows desktop host setup guide](docs/windows-desktop-host.md).
 
 ### Modes (autonomy)
 
