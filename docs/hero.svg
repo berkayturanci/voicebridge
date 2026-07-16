@@ -76,7 +76,7 @@
   <rect x="72" y="430" width="486" height="96" rx="12" fill="#161b22" stroke="#21262d"/>
   <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">
     <text x="90" y="462"><tspan fill="#3fb950">$</tspan> <tspan fill="#e6edf3">npm start</tspan> <tspan fill="#6e7681"># prints a QR for your phone</tspan></text>
-    <text x="90" y="490"><tspan fill="#3fb950">$</tspan> <tspan fill="#e6edf3">tailscale serve --bg --https=443 localhost:8787</tspan></text>
+    <text x="90" y="490"><tspan fill="#3fb950">$</tspan> <tspan fill="#e6edf3">tailscale serve --bg http://127.0.0.1:8787</tspan></text>
     <text x="90" y="513" font-size="14" fill="#6e7681">scan the QR  ·  open in Safari  ·  tap 🎤 and speak</text>
   </g>
 
