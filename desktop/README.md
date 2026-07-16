@@ -27,17 +27,17 @@ stopped state.
 
 ## Download desktop builds
 
-The current Apple Silicon DMG is attached to the `v0.8.0` release:
+The current Apple Silicon DMG is attached to the `v0.8.1` release:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg
 
 The current Windows x64 preview installer is attached to the same release:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-x64-setup.exe
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe
 
 SHA256 checksums are published here:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/checksums.txt
 
 macOS may warn if a release is unsigned or development-signed. Open it from
 Finder with **Right click → Open** the first time. Public release DMGs should be

@@ -1,6 +1,6 @@
 {
   "name": "voicebridge-desktop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Desktop control app for the voicebridge agent — runs the Node bridge with a small panel and tray. Mac/Windows/Linux.",
   "author": "VoiceBridge",
   "license": "PolyForm-Noncommercial-1.0.0",

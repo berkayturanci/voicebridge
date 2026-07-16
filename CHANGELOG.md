@@ -5,6 +5,28 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-16
+
+### Added
+- Mac preview DMG verification now runs in CI and uploads a workflow artifact.
+- Windows desktop preview packaging now runs in CI and publishes a Windows
+  installer artifact.
+- The README, desktop docs, and landing site now include a current desktop host
+  screenshot.
+
+### Changed
+- Desktop Tailscale diagnostics now distinguish missing CLI, logged-out
+  Tailscale, DNS/network failures, HTTP status, timeout, and token mismatch.
+- Desktop Tailscale Serve command guidance now points directly at the configured
+  local bridge URL, for example `tailscale serve --bg http://127.0.0.1:8787`.
+- Mac and Windows setup docs, the landing site, and `llms.txt` now point to the
+  current release assets.
+
+### Fixed
+- Windows troubleshooting docs now cover SmartScreen, agent CLI `PATH`,
+  Tailscale connection state, public URL verification, Defender/firewall prompts,
+  port conflicts, and tray quit behavior.
+
 ## [0.8.0] - 2026-07-14
 
 ### Added

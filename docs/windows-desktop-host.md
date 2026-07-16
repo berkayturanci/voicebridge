@@ -8,19 +8,19 @@ QR code for the mobile app.
 
 Download the current Windows x64 preview installer:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-x64-setup.exe
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe
 
 Verify it against the published SHA256 checksums:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/checksums.txt
 
 In PowerShell, run:
 
 ```powershell
-Get-FileHash .\voicebridge-0.2.0-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\voicebridge-0.2.1-x64-setup.exe -Algorithm SHA256
 ```
 
-Compare the `Hash` value with the `voicebridge-0.2.0-x64-setup.exe` line in
+Compare the `Hash` value with the `voicebridge-0.2.1-x64-setup.exe` line in
 `checksums.txt`.
 
 Preview installers are unsigned, so Windows SmartScreen may warn on first
