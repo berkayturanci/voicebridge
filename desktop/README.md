@@ -23,13 +23,14 @@ stopped state.
 
 ## Download the Mac build
 
-The current unsigned Apple Silicon DMG is attached to the `v0.8.0` release:
+The current Apple Silicon DMG is attached to the `v0.8.0` release:
 
 https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
 
-macOS may warn because this build is not signed or notarized yet. Open it from
-Finder with **Right click → Open** the first time. For the step-by-step setup,
-see [docs/mac-desktop-host.md](../docs/mac-desktop-host.md).
+macOS may warn if a release is unsigned or development-signed. Open it from
+Finder with **Right click → Open** the first time. Public release DMGs should be
+Developer ID signed and notarized. For the step-by-step setup, see
+[docs/mac-desktop-host.md](../docs/mac-desktop-host.md).
 
 ## Run in development
 
@@ -49,6 +50,8 @@ npm install
 npm run icons        # (re)generate app icons from the brand glyph
 npm run dist         # current OS
 npm run dist:mac     # .dmg   (build on macOS)
+npm run dist:mac:signed    # Developer ID signed + notarized .dmg
+npm run verify:mac:release # Gatekeeper + stapler verification
 npm run dist:win     # .exe   (NSIS installer; build on Windows)
 npm run dist:linux   # AppImage
 ```
@@ -60,6 +63,22 @@ is self-contained — it does **not** need Node installed on the target machine
 
 > Cross-compiling has limits: build the `.dmg` on macOS and the Windows
 > installer on Windows for signed, working results.
+
+## Mac release signing
+
+`npm run dist:mac:signed` requires a **Developer ID Application** certificate in
+Keychain and notarization credentials. It accepts any one of these credential
+sets:
+
+- App Store Connect API key: `APPLE_API_KEY`, `APPLE_API_KEY_ID`,
+  `APPLE_API_ISSUER`
+- Apple ID app-specific password: `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+  `APPLE_TEAM_ID`
+- Stored notarytool profile: `APPLE_KEYCHAIN`, `APPLE_KEYCHAIN_PROFILE`
+
+The verification command mounts the generated DMG, checks the bundle resources,
+verifies code signing, runs Gatekeeper assessment, and validates the stapled
+notarization ticket for both the app and DMG.
 
 ## Notes
 
