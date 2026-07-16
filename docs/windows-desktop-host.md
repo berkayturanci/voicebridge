@@ -6,7 +6,14 @@ QR code for the mobile app.
 
 ## Download
 
-Download the Windows installer from the latest release assets when available.
+Download the current Windows x64 preview installer:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-x64-setup.exe
+
+Verify it against the published SHA256 checksums:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
+
 Preview installers are unsigned, so Windows SmartScreen may warn on first
 launch. Choose **More info** and **Run anyway** only if you trust the release
 source.
