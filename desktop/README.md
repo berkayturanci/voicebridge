@@ -21,16 +21,26 @@ project folder, selected agent CLI, and port availability, then waits for
 `/api/health` so failures show as actionable diagnostics instead of a silent
 stopped state.
 
-## Download the Mac build
+## Download desktop builds
 
 The current Apple Silicon DMG is attached to the `v0.8.0` release:
 
 https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
 
+The current Windows x64 preview installer is attached to the same release:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-x64-setup.exe
+
+SHA256 checksums are published here:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
+
 macOS may warn if a release is unsigned or development-signed. Open it from
 Finder with **Right click → Open** the first time. Public release DMGs should be
 Developer ID signed and notarized. For the step-by-step setup, see
-[docs/mac-desktop-host.md](../docs/mac-desktop-host.md).
+[docs/mac-desktop-host.md](../docs/mac-desktop-host.md). Windows preview
+installers are unsigned and may show Windows SmartScreen; see
+[docs/windows-desktop-host.md](../docs/windows-desktop-host.md).
 
 ## Run in development
 

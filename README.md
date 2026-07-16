@@ -68,11 +68,17 @@ Download the Apple Silicon DMG:
 
 https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
 
+Or download the Windows x64 preview installer:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-x64-setup.exe
+
+Release checksums are published at:
+
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
+
 Open it, choose your project folder and agent, set your Tailscale HTTPS URL,
 then scan the pairing QR from the iOS/Android app. Full walkthrough:
-[docs/mac-desktop-host.md](docs/mac-desktop-host.md).
-
-Windows preview installers are built by CI and documented in
+[docs/mac-desktop-host.md](docs/mac-desktop-host.md) and
 [docs/windows-desktop-host.md](docs/windows-desktop-host.md).
 
 ### From source
@@ -349,6 +355,8 @@ Details in [docs/security.md](docs/security.md).
 - [docs/architecture.md](docs/architecture.md) — components, request flow, and the agent-adapter design.
 - [docs/configuration.md](docs/configuration.md) — full env-var reference, agents, and modes.
 - [docs/security.md](docs/security.md) — threat model, the access token, Tailscale, and full-auto risks.
+- [docs/mac-desktop-host.md](docs/mac-desktop-host.md) — Mac DMG install, Tailscale, and QR pairing setup.
+- [docs/windows-desktop-host.md](docs/windows-desktop-host.md) — Windows installer, Tailscale, and QR pairing setup.
 - [docs/store-publishing-runbook.md](docs/store-publishing-runbook.md) — App Store / Google Play beta and production release checklist.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, and how to add an agent.
 - [CHANGELOG.md](CHANGELOG.md) — release notes.
