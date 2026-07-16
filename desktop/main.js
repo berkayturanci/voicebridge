@@ -16,6 +16,12 @@ const os = require("os");
 const path = require("path");
 const { classifyBridgeFatal, fetchFailureMessage, healthOk } = require("./lib/bridge-health");
 const { AGENT_OPTIONS, loadSettings, normalizeSettings, saveSettings, webUrl: buildWebUrl } = require("./lib/settings");
+const {
+  describePublicProbe,
+  describeTailscaleStatus,
+  publicProbeUrl,
+  serveCommand: buildServeCommand,
+} = require("./lib/tailscale-diagnostics");
 
 let QRCode = null;
 try { QRCode = require("qrcode"); } catch (_) {}
@@ -407,7 +413,7 @@ function mobileUrl() {
 }
 
 function serveCommand() {
-  return `tailscale serve --bg ${settings.port || 8787}`;
+  return buildServeCommand(settings, process.platform);
 }
 
 function pairingPayload() {
@@ -438,8 +444,14 @@ async function pairingQrDataUrl() {
 
 function execFileJson(file, args, timeout = 2500) {
   return new Promise((resolve) => {
-    execFile(file, args, { timeout, maxBuffer: 512 * 1024 }, (err, stdout) => {
-      if (err) return resolve({ ok: false, error: err.code === "ENOENT" ? "not_installed" : err.message });
+    execFile(file, args, { timeout, maxBuffer: 512 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        return resolve({
+          ok: false,
+          error: err.code === "ENOENT" ? "not_installed" : err.code || err.message,
+          stderr: String(stderr || "").trim(),
+        });
+      }
       try { resolve({ ok: true, data: JSON.parse(stdout) }); } catch (_) { resolve({ ok: false, error: "invalid_json" }); }
     });
   });
@@ -447,39 +459,44 @@ function execFileJson(file, args, timeout = 2500) {
 
 async function tailscaleStatus() {
   const result = await execFileJson("tailscale", ["status", "--json"]);
-  if (!result.ok) return { installed: result.error !== "not_installed", running: false, error: result.error };
-  const self = result.data && result.data.Self;
-  return {
-    installed: true,
-    running: !!(self && self.Online),
-    dnsName: (self && self.DNSName) || "",
-    tailscaleIps: (self && self.TailscaleIPs) || [],
-  };
+  return describeTailscaleStatus(result);
 }
 
-function publicHealthCheck() {
+function requestPublicUrl(url, opts = {}) {
   return new Promise((resolve) => {
-    if (!settings.publicUrl) return resolve({ configured: false, ok: false, status: 0, error: "missing_public_url" });
-    let url;
-    try {
-      url = new URL(settings.publicUrl);
-      url.pathname = "/api/health";
-      url.search = "";
-      url.hash = "";
-    } catch (_) {
-      return resolve({ configured: true, ok: false, status: 0, error: "invalid_public_url" });
-    }
     const lib = url.protocol === "https:" ? https : http;
-    const req = lib.get(url, { timeout: 4000 }, (res) => {
+    const req = lib.get(url, { timeout: 4000, headers: opts.headers || {} }, (res) => {
       res.resume();
       res.on("end", () => resolve({ configured: true, ok: res.statusCode === 200, status: res.statusCode || 0, url: url.toString() }));
     });
-    req.on("error", (err) => resolve({ configured: true, ok: false, status: 0, error: err.message, url: url.toString() }));
+    req.on("error", (err) => resolve({ configured: true, ok: false, status: 0, error: err.code || err.message, url: url.toString() }));
     req.setTimeout(4000, () => {
       req.destroy();
       resolve({ configured: true, ok: false, status: 0, error: "timeout", url: url.toString() });
     });
   });
+}
+
+async function publicHealthCheck() {
+  const healthUrl = publicProbeUrl(settings.publicUrl, "/api/health");
+  if (!healthUrl.ok) {
+    return describePublicProbe({
+      configured: !!settings.publicUrl,
+      ok: false,
+      status: 0,
+      error: healthUrl.error,
+    });
+  }
+
+  const health = describePublicProbe(await requestPublicUrl(healthUrl.url), { probe: "health" });
+  if (!health.ok || !settings.token) return health;
+
+  const authUrl = publicProbeUrl(settings.publicUrl, "/api/mobile-state");
+  if (!authUrl.ok) return health;
+  const auth = describePublicProbe(await requestPublicUrl(authUrl.url, {
+    headers: { Authorization: `Bearer ${settings.token}` },
+  }), { probe: "auth" });
+  return { ...auth, healthUrl: health.url };
 }
 
 async function networkStatus() {
