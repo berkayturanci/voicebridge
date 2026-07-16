@@ -78,7 +78,7 @@ if (process.platform !== "darwin") {
 
 fs.rmSync(dmgPath, { force: true });
 
-run("npx", ["--no-install", "electron-builder", "--mac", "dir"]);
+run("npx", ["--no-install", "electron-builder", "--mac", "dir", "--arm64"]);
 
 if (!fs.existsSync(appPath)) {
   throw new Error(`Missing app bundle: ${appPath}`);
@@ -86,6 +86,6 @@ if (!fs.existsSync(appPath)) {
 
 run("codesign", ["--force", "--deep", "--sign", "-", appPath]);
 run("codesign", ["--verify", "--deep", "--strict", appPath]);
-run("npx", ["--no-install", "electron-builder", "--mac", "dmg", "--prepackaged", appPath]);
+run("npx", ["--no-install", "electron-builder", "--mac", "dmg", "--arm64", "--prepackaged", appPath]);
 
 verifyDmg();

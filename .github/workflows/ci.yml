@@ -72,3 +72,25 @@ jobs:
           name: voicebridge-windows-preview
           path: desktop/dist/voicebridge-*-setup.exe
           if-no-files-found: error
+
+  desktop-macos-preview:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      # Builds a non-notarized, ad-hoc signed preview DMG and verifies that it
+      # mounts, contains voicebridge.app, bundles the bridge resources, and
+      # passes codesign verification.
+      - run: npm run dist:mac:preview
+      - uses: actions/upload-artifact@v6
+        with:
+          name: voicebridge-mac-preview
+          path: desktop/dist/voicebridge-*-arm64.dmg
+          if-no-files-found: error
