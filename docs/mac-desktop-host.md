@@ -6,13 +6,13 @@ health, and shows a QR code for the mobile app.
 
 ## Download
 
-Download the current unsigned Apple Silicon DMG:
+Download the current Apple Silicon DMG:
 
 https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
 
-Because this build is unsigned, macOS may block the first launch. Open it from
-Finder with **Right click → Open**, then confirm. Signing and notarization are
-tracked separately.
+If the release notes mark the build as unsigned or development-signed, macOS may
+block the first launch. Open it from Finder with **Right click → Open**, then
+confirm. Public releases should use a Developer ID signed and notarized DMG.
 
 ## Requirements
 
@@ -71,3 +71,24 @@ and **Paste code** in the mobile app.
   and verifies the configured URL.
 - The tray menu can start, stop, restart, and quit the bridge.
 - Regenerating the token invalidates existing mobile pairing details.
+
+## Release Signing
+
+Release DMGs should be signed with a **Developer ID Application** certificate
+and notarized by Apple. The repository has a guarded release path:
+
+```bash
+cd desktop
+npm run dist:mac:signed
+npm run verify:mac:release
+```
+
+`dist:mac:signed` fails early unless the Mac has a Developer ID Application
+identity and one notarization credential profile:
+
+- `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, or
+- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, or
+- `APPLE_KEYCHAIN`, `APPLE_KEYCHAIN_PROFILE`.
+
+`verify:mac:release` mounts the DMG and checks the bundle resources, code
+signature, Gatekeeper assessment, and stapled notarization ticket.

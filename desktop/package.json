@@ -11,7 +11,9 @@
     "icons": "node assets/gen-icons.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
+    "dist:mac:signed": "node scripts/check-mac-signing-env.js && electron-builder --mac dmg",
     "dist:mac:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "verify:mac:release": "node scripts/verify-mac-release.js",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux"
   },
@@ -34,7 +36,9 @@
     "mac": {
       "target": "dmg",
       "icon": "assets/icon@512.png",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
     "dmg": {
       "writeUpdateInfo": false
