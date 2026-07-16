@@ -459,7 +459,7 @@
   <div class="wrap hero-content">
     <div>
       <div class="pill">
-        <span class="dot"></span> v0.8 · Mac host app · QR pairing
+        <span class="dot"></span> v0.8 · Desktop host app · QR pairing
       </div>
       <h1>Hands-free voice<br/>for your <span class="grad">coding agent.</span></h1>
       <p class="hero-lead">
@@ -531,8 +531,8 @@
       </div>
       <div class="card">
         <div class="card-icon">🖥️</div>
-        <h3>Mac Host App</h3>
-        <p>Download the DMG, choose one workspace, pick Claude/Codex/Antigravity/Ollama, and pair your phone by scanning the desktop QR.</p>
+        <h3>Desktop Host App</h3>
+        <p>Install the Mac DMG or Windows preview build, choose one workspace, pick Claude/Codex/Antigravity/Ollama, and pair your phone by scanning the desktop QR.</p>
       </div>
     </div>
   </div>
@@ -547,7 +547,7 @@
     </div>
     
     <div class="flow-diagram">
-[ <span class="blue">iPhone Safari</span> ]                          [ <span class="highlight">Your Mac</span> ]
+[ <span class="blue">iPhone Safari</span> ]                       [ <span class="highlight">Your Mac or PC</span> ]
       
 mic <span style="color:#71717a">─Web Speech or Whisper STT─▶</span> text <span style="color:#71717a">──https/Tailscale──▶</span> <span class="highlight">voicebridge</span> <span style="color:#71717a">──spawn──▶</span> claude / codex / agy
 speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span style="color:#71717a">◀──────────────</span> reply <span style="color:#71717a">◀───────────</span> (agent CLI)
@@ -559,24 +559,25 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
   <div class="wrap">
     <div class="section-header">
       <span class="eyebrow">Get Started</span>
-      <h2>Use the Mac app, or run from source.</h2>
-      <p class="section-lead">The Mac app is the easiest host setup. The terminal flow stays available for developers who want full control.</p>
+      <h2>Use the desktop app, or run from source.</h2>
+      <p class="section-lead">The desktop app is the easiest host setup. The terminal flow stays available for developers who want full control.</p>
     </div>
 
     <div class="download-strip" style="max-width: 900px; margin: 0 auto 28px;">
       <div class="download-panel">
         <span class="eyebrow">Recommended</span>
-        <h3>Mac host app</h3>
-        <p>Install the unsigned DMG, select your project folder and agent, paste your Tailscale HTTPS URL, then scan the pairing QR from the mobile app.</p>
+        <h3>Desktop host app</h3>
+        <p>Install the Mac DMG or Windows preview installer, select your project folder and agent, paste your Tailscale HTTPS URL, then scan the pairing QR from the mobile app.</p>
         <div class="hero-cta" style="animation:none;">
           <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg" class="btn btn-primary">Download voicebridge-0.2.0-arm64.dmg</a>
           <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md" class="btn btn-secondary">Mac setup guide</a>
+          <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/windows-desktop-host.md" class="btn btn-secondary">Windows setup guide</a>
         </div>
       </div>
       <div class="download-panel">
         <h3>Setup steps</h3>
         <div class="steps">
-          <div><strong>1.</strong> Install an agent CLI and sign in on the Mac.</div>
+          <div><strong>1.</strong> Install an agent CLI and sign in on the host computer.</div>
           <div><strong>2.</strong> Open VoiceBridge, choose the project folder, and start the bridge.</div>
           <div><strong>3.</strong> Run Tailscale Serve and verify the public URL.</div>
           <div><strong>4.</strong> Scan the QR from the iOS/Android app.</div>
@@ -659,6 +660,7 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
       <a href="https://github.com/berkayturanci/voicebridge">GitHub Repository</a>
       <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg">Download Mac DMG</a>
       <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md">Mac Host Guide</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/windows-desktop-host.md">Windows Host Guide</a>
       <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mobile-voice-setup.md">Mobile Setup Guide</a>
       <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/security.md">Security Context</a>
       <a href="privacy.html">Privacy Policy</a>

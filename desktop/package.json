@@ -4,10 +4,15 @@
   "description": "Desktop control app for the voicebridge agent — runs the Node bridge with a small panel and tray. Mac/Windows/Linux.",
   "author": "VoiceBridge",
   "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/berkayturanci/voicebridge.git",
+    "directory": "desktop"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/*.test.js",
+    "test": "node scripts/run-tests.js",
     "icons": "node assets/gen-icons.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
@@ -15,7 +20,10 @@
     "dist:mac:signed": "node scripts/check-mac-signing-env.js && electron-builder --mac dmg",
     "dist:mac:unsigned": "npm run dist:mac:preview",
     "verify:mac:release": "node scripts/verify-mac-release.js",
-    "dist:win": "electron-builder --win",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:win:dir": "electron-builder --win dir --publish never",
+    "dist:win:preview": "electron-builder --win nsis --publish never",
+    "verify:win:dir": "node scripts/verify-win-unpacked.js",
     "dist:linux": "electron-builder --linux"
   },
   "dependencies": {
@@ -44,7 +52,14 @@
     "dmg": {
       "writeUpdateInfo": false
     },
-    "win": { "target": "nsis", "icon": "assets/icon@512.png" },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon@512.png",
+      "artifactName": "voicebridge-${version}-${arch}-setup.${ext}"
+    },
+    "nsis": {
+      "differentialPackage": false
+    },
     "linux": { "target": "AppImage", "icon": "assets/icon@512.png" }
   }
 }

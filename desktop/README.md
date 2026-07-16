@@ -55,6 +55,9 @@ npm run dist:mac:unsigned  # alias for dist:mac:preview
 npm run dist:mac:signed    # Developer ID signed + notarized .dmg
 npm run verify:mac:release # Gatekeeper + stapler verification
 npm run dist:win     # .exe   (NSIS installer; build on Windows)
+npm run dist:win:dir        # unpacked Windows app
+npm run verify:win:dir      # verify bundled Windows app resources
+npm run dist:win:preview    # unsigned NSIS preview installer
 npm run dist:linux   # AppImage
 ```
 
@@ -65,6 +68,18 @@ is self-contained — it does **not** need Node installed on the target machine
 
 > Cross-compiling has limits: build the `.dmg` on macOS and the Windows
 > installer on Windows for signed, working results.
+
+## Windows preview builds
+
+Use `npm run dist:win:dir` followed by `npm run verify:win:dir` to check the
+unpacked Windows app before building the installer. The verifier confirms that
+`voicebridge.exe` exists and that `server.js` plus the `public/` assets are
+bundled under `resources/bridge/`.
+
+Use `npm run dist:win:preview` to create the unsigned NSIS installer. The output
+is named `voicebridge-<version>-<arch>-setup.exe`. Unsigned preview installers
+may trigger Windows SmartScreen; signed Windows distribution can be added later
+with a code-signing certificate.
 
 ## Mac preview builds
 
