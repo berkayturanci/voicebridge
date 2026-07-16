@@ -11,9 +11,10 @@
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
 
-**v0.8.0:** Download the Mac host app DMG, choose one workspace, start the
-bridge, verify Tailscale, and pair the native mobile app by scanning the desktop
-QR code. Windows preview packaging is wired through CI.
+**v0.8.0:** Download the Mac host app DMG or Windows preview installer, choose
+one workspace, start the bridge, verify Tailscale, and pair the native mobile
+app by scanning the desktop QR code. Mac and Windows desktop preview builds are
+validated in CI.
 
 You speak **or type** on your phone, a coding agent (running on your Mac,
 Windows PC, or Linux box) does the work, and the reply streams back as chat
@@ -77,9 +78,16 @@ Release checksums are published at:
 https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
 
 Open it, choose your project folder and agent, set your Tailscale HTTPS URL,
-then scan the pairing QR from the iOS/Android app. Full walkthrough:
+then scan the pairing QR from the iOS/Android app. The Network panel prepares
+the Tailscale Serve command and explains missing CLI, logged-out Tailscale,
+DNS/network failures, HTTP status, timeouts, and token mismatch. Full
+walkthrough:
 [docs/mac-desktop-host.md](docs/mac-desktop-host.md) and
 [docs/windows-desktop-host.md](docs/windows-desktop-host.md).
+
+<p align="center">
+  <img src="docs/desktop-host-control.png" alt="VoiceBridge desktop host control panel with bridge health, Tailscale diagnostics, and pairing controls" width="760" />
+</p>
 
 ### From source
 
@@ -87,7 +95,7 @@ then scan the pairing QR from the iOS/Android app. Full walkthrough:
 git clone https://github.com/berkayturanci/voicebridge.git voicebridge && cd voicebridge && npm install
 cp .env.example .env                                  # set PROJECT_DIR + ACCESS_TOKEN
 CLAUDE_BIN=$(which claude) npm start                  # prints a QR for your phone
-tailscale serve --bg --https=443 localhost:8787       # expose over HTTPS (separate terminal)
+tailscale serve --bg http://127.0.0.1:8787            # expose over HTTPS (separate terminal)
 ```
 
 Then open the printed `https://…ts.net` URL in your phone's browser (Safari on
@@ -132,7 +140,7 @@ phone's browser disables the mic. Tailscale gives your machine a real HTTPS cert
 automatically:
 
 ```bash
-tailscale serve --bg --https=443 localhost:8787
+tailscale serve --bg http://127.0.0.1:8787
 tailscale serve status     # shows the https://<your-machine>.<tailnet>.ts.net URL
 ```
 
@@ -262,7 +270,9 @@ drive the same silence timer as browser STT.
   **desktop client** (macOS/Windows/Linux). The PWA stays the zero-install option.
 - **Desktop app (Electron)**: [`desktop/`](desktop/) packages the bridge itself
   into a **Mac `.dmg` / Windows / Linux** app with a control panel + tray —
-  run the server with no terminal. See the
+  run the server with no terminal. It stores the pairing token, shows mobile
+  last-seen, prepares the Tailscale Serve command, and verifies both public URL
+  reachability and token-authenticated access. See the
   [Mac desktop host setup guide](docs/mac-desktop-host.md) and
   [Windows desktop host setup guide](docs/windows-desktop-host.md).
 

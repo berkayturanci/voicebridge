@@ -12,14 +12,18 @@ payload, see the phone's last-seen status, watch the **live log**, and see a
 small **dashboard** of the agents (with availability) and the active sessions,
 refreshed live.
 
-The network panel detects basic Tailscale status, prepares a copyable
-`tailscale serve --bg <port>` command, and verifies the configured public URL's
-`/api/health` endpoint. It does not run Tailscale commands automatically.
+The network panel detects Tailscale CLI/login/online status, prepares a
+copyable `tailscale serve --bg http://127.0.0.1:<port>` command, suggests the
+likely tailnet hostname when available, and verifies both public `/api/health`
+reachability and token-authenticated access. It does not run Tailscale commands
+automatically.
 
 Startup is preflighted before the bridge process launches: the app validates the
 project folder, selected agent CLI, and port availability, then waits for
 `/api/health` so failures show as actionable diagnostics instead of a silent
 stopped state.
+
+![VoiceBridge desktop host control panel](../docs/desktop-host-control.png)
 
 ## Download desktop builds
 
@@ -128,5 +132,6 @@ notarization ticket for both the app and DMG.
   available, it falls back to `settings.json` so development builds still work.
 - The agent CLIs (Claude Code, Codex, …) still need to be installed and
   authenticated on the machine — the desktop app runs the bridge, not the agents.
-- For phone access over HTTPS, run `tailscale serve --bg <port>` and point the
-  phone (PWA or the Flutter app) at the Tailscale URL.
+- For phone access over HTTPS, run the command from the Network panel, usually
+  `tailscale serve --bg http://127.0.0.1:<port>`, and point the phone (PWA or
+  the Flutter app) at the Tailscale URL.

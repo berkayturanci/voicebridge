@@ -41,7 +41,7 @@ In the desktop app, open the **Network** panel and copy the suggested Tailscale
 Serve command. It looks like this:
 
 ```bash
-tailscale serve --bg 8787
+tailscale serve --bg http://127.0.0.1:8787
 ```
 
 Then set the **Mobile/public URL** to your Tailscale HTTPS URL, for example:
@@ -50,8 +50,11 @@ Then set the **Mobile/public URL** to your Tailscale HTTPS URL, for example:
 https://your-mac.your-tailnet.ts.net
 ```
 
-Use **Verify public URL** to confirm that `/api/health` is reachable from that
-URL.
+Use **Verify public URL** to confirm that the public `/api/health` endpoint is
+reachable and that the token-protected mobile endpoint accepts the generated
+access token. The Network panel reports missing Tailscale CLI, logged-out
+Tailscale, missing public URL, DNS/network failures, HTTP status, timeouts, and
+token mismatch separately.
 
 ## Pair the Mobile App
 
