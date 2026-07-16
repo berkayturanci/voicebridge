@@ -7,6 +7,12 @@ const os = require("node:os");
 const path = require("node:path");
 const { classifyBridgeFatal, fetchFailureMessage, healthOk } = require("../lib/bridge-health");
 const { loadSettings, saveSettings, webUrl } = require("../lib/settings");
+const {
+  describePublicProbe,
+  describeTailscaleStatus,
+  publicProbeUrl,
+  serveCommand,
+} = require("../lib/tailscale-diagnostics");
 
 const DEFAULT_SETTINGS = {
   port: 8787,
@@ -49,4 +55,50 @@ test("desktop bridge health helpers classify common startup and liveness failure
   assert.strictEqual(healthOk({ ok: false }), false);
   assert.strictEqual(fetchFailureMessage({ error: "timeout" }), "Bridge health check timed out.");
   assert.strictEqual(fetchFailureMessage({ statusCode: 503 }), "Bridge health check failed (503).");
+});
+
+test("tailscale diagnostics classify CLI, login, and online states", () => {
+  assert.deepStrictEqual(describeTailscaleStatus({ ok: false, error: "not_installed" }), {
+    installed: false,
+    running: false,
+    authenticated: false,
+    state: "cli_missing",
+    error: "not_installed",
+    message: "Tailscale CLI not found. Install Tailscale, then refresh.",
+    suggestedPublicUrls: [],
+  });
+
+  const loggedOut = describeTailscaleStatus({ ok: true, data: { BackendState: "NeedsLogin" } });
+  assert.strictEqual(loggedOut.installed, true);
+  assert.strictEqual(loggedOut.authenticated, false);
+  assert.strictEqual(loggedOut.state, "logged_out");
+  assert.match(loggedOut.message, /not logged in/);
+
+  const online = describeTailscaleStatus({
+    ok: true,
+    data: {
+      BackendState: "Running",
+      Self: { ID: "node-id", Online: true, DNSName: "mac.tailnet.ts.net.", TailscaleIPs: ["100.64.0.1"] },
+    },
+  });
+  assert.strictEqual(online.running, true);
+  assert.strictEqual(online.dnsName, "mac.tailnet.ts.net");
+  assert.deepStrictEqual(online.suggestedPublicUrls, ["https://mac.tailnet.ts.net"]);
+});
+
+test("tailscale serve command is platform-aware and points at the bridge port", () => {
+  assert.strictEqual(serveCommand({ port: 9999 }, "darwin"), "tailscale serve --bg http://127.0.0.1:9999");
+  assert.strictEqual(serveCommand({ port: 9999 }, "win32"), "tailscale.exe serve --bg http://127.0.0.1:9999");
+});
+
+test("public URL diagnostics classify missing, invalid, network, auth, and HTTP failures", () => {
+  assert.strictEqual(publicProbeUrl("https://mac.tailnet.ts.net/foo?x=1", "/api/health").url.toString(), "https://mac.tailnet.ts.net/api/health");
+  assert.strictEqual(publicProbeUrl("not a url", "/api/health").error, "invalid_public_url");
+
+  assert.strictEqual(describePublicProbe({ configured: false }).category, "missing_url");
+  assert.strictEqual(describePublicProbe({ configured: true, error: "ENOTFOUND" }).category, "dns");
+  assert.strictEqual(describePublicProbe({ configured: true, error: "timeout" }).category, "timeout");
+  assert.strictEqual(describePublicProbe({ configured: true, status: 401 }).category, "auth");
+  assert.strictEqual(describePublicProbe({ configured: true, status: 503 }).category, "server");
+  assert.strictEqual(describePublicProbe({ configured: true, status: 200 }, { probe: "auth" }).ok, true);
 });

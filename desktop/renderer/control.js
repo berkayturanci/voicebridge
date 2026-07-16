@@ -173,21 +173,29 @@ function renderNetwork(n) {
   const tailscale = n.tailscale || {};
   const health = n.health || {};
   const networkPill = $("networkPill");
-  const tailscaleText = !tailscale.installed
-    ? "Not installed"
+  const tailscaleText = tailscale.message || (!tailscale.installed
+    ? "Tailscale CLI not found"
     : tailscale.running
-      ? "Running" + (tailscale.dnsName ? " / " + tailscale.dnsName : "")
-      : "Installed, not online";
-  const healthText = !health.configured
+      ? "Online" + (tailscale.dnsName ? " / " + tailscale.dnsName : "")
+      : "Installed, not online");
+  const healthText = health.message || (!health.configured
     ? "Public URL missing"
     : health.ok
       ? "OK"
-      : "Failed" + (health.status ? " (" + health.status + ")" : "");
+      : "Failed" + (health.status ? " (" + health.status + ")" : ""));
 
   setText("tailscaleStatus", tailscaleText);
   setText("publicHealth", healthText);
   setText("serveCommand", n.serveCommand);
-  networkPill.textContent = health.ok ? "Ready" : tailscale.running ? "Needs URL" : "Manual setup";
+  networkPill.textContent = health.ok
+    ? "Ready"
+    : health.category === "auth"
+      ? "Token"
+      : health.category === "missing_url" && tailscale.running
+        ? "Needs URL"
+        : tailscale.running
+          ? "Verify"
+          : "Manual setup";
   networkPill.classList.toggle("on", !!health.ok);
   networkPill.classList.toggle("warn", !health.ok);
 }
