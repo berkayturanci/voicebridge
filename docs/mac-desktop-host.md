@@ -8,7 +8,7 @@ health, and shows a QR code for the mobile app.
 
 Download the current Apple Silicon DMG:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg
 
 If the release notes mark the build as unsigned or development-signed, macOS may
 block the first launch. Open it from Finder with **Right click → Open**, then

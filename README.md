@@ -11,7 +11,7 @@
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
 
-**v0.8.0:** Download the Mac host app DMG or Windows preview installer, choose
+**v0.8.1:** Download the Mac host app DMG or Windows preview installer, choose
 one workspace, start the bridge, verify Tailscale, and pair the native mobile
 app by scanning the desktop QR code. Mac and Windows desktop preview builds are
 validated in CI.
@@ -67,15 +67,15 @@ you want one.
 
 Download the Apple Silicon DMG:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-arm64.dmg
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg
 
 Or download the Windows x64 preview installer:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/voicebridge-0.2.0-x64-setup.exe
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe
 
 Release checksums are published at:
 
-https://github.com/berkayturanci/voicebridge/releases/download/v0.8.0/checksums.txt
+https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/checksums.txt
 
 Open it, choose your project folder and agent, set your Tailscale HTTPS URL,
 then scan the pairing QR from the iOS/Android app. The Network panel prepares

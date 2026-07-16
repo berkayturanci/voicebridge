@@ -5,8 +5,9 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
+const pkg = require("../package.json");
 const appPath = path.resolve("dist", "mac-arm64", "voicebridge.app");
-const dmgPath = path.resolve("dist", "voicebridge-0.2.0-arm64.dmg");
+const dmgPath = path.resolve("dist", `voicebridge-${pkg.version}-arm64.dmg`);
 
 function run(command, args, options = {}) {
   console.log(`> ${command} ${args.join(" ")}`);
