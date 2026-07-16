@@ -11,8 +11,9 @@
     "icons": "node assets/gen-icons.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
+    "dist:mac:preview": "node scripts/build-mac-preview-dmg.js",
     "dist:mac:signed": "node scripts/check-mac-signing-env.js && electron-builder --mac dmg",
-    "dist:mac:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "dist:mac:unsigned": "npm run dist:mac:preview",
     "verify:mac:release": "node scripts/verify-mac-release.js",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux"

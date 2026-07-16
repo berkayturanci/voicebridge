@@ -74,6 +74,18 @@ and **Paste code** in the mobile app.
 
 ## Release Signing
 
+For internal testing before Developer ID signing is available, build an ad-hoc
+signed preview DMG:
+
+```bash
+cd desktop
+npm run dist:mac:preview
+```
+
+The preview build mounts and checks the generated DMG, verifies the app's
+ad-hoc code signature, and confirms that the bundled bridge files are present.
+It is not notarized, so macOS may still require **Right click → Open**.
+
 Release DMGs should be signed with a **Developer ID Application** certificate
 and notarized by Apple. The repository has a guarded release path:
 

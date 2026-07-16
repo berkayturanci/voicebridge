@@ -50,6 +50,8 @@ npm install
 npm run icons        # (re)generate app icons from the brand glyph
 npm run dist         # current OS
 npm run dist:mac     # .dmg   (build on macOS)
+npm run dist:mac:preview   # ad-hoc signed preview .dmg for manual testing
+npm run dist:mac:unsigned  # alias for dist:mac:preview
 npm run dist:mac:signed    # Developer ID signed + notarized .dmg
 npm run verify:mac:release # Gatekeeper + stapler verification
 npm run dist:win     # .exe   (NSIS installer; build on Windows)
@@ -63,6 +65,17 @@ is self-contained — it does **not** need Node installed on the target machine
 
 > Cross-compiling has limits: build the `.dmg` on macOS and the Windows
 > installer on Windows for signed, working results.
+
+## Mac preview builds
+
+Use `npm run dist:mac:preview` when a Developer ID certificate is not available
+yet. It builds the unpacked Apple Silicon app, applies an ad-hoc signature,
+regenerates the DMG from that signed app, then mounts the DMG and verifies the
+bundle layout, embedded bridge resources, DMG checksum, and code signature.
+
+Preview DMGs are still not notarized, so macOS may require **Right click →
+Open** on first launch. They are useful for internal testing, not final public
+distribution.
 
 ## Mac release signing
 
