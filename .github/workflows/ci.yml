@@ -67,7 +67,7 @@ jobs:
       - run: npm run dist:win:dir
       - run: npm run verify:win:dir
       - run: npm run dist:win:preview
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: voicebridge-windows-preview
           path: desktop/dist/voicebridge-*-setup.exe
@@ -89,7 +89,7 @@ jobs:
       # mounts, contains voicebridge.app, bundles the bridge resources, and
       # passes codesign verification.
       - run: npm run dist:mac:preview
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: voicebridge-mac-preview
           path: desktop/dist/voicebridge-*-arm64.dmg
