@@ -17,7 +17,7 @@ dependencies:
   audioplayers: ^6.1.0    # play bridge-side (Piper) neural TTS audio, opt-in
   wakelock_plus: ^1.2.5   # keep the screen awake during talking mode (so the connection doesn't drop)
   url_launcher: ^6.3.0    # open privacy, support, and docs links from settings
-  mobile_scanner: ^7.2.0  # scan the bridge's startup QR (README-promised pairing flow, #212)
+  mobile_scanner: ^7.4.0  # scan the bridge's startup QR (README-promised pairing flow, #212)
 
 dev_dependencies:
   flutter_test:
