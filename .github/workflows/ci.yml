@@ -72,6 +72,11 @@ jobs:
           name: voicebridge-windows-preview
           path: desktop/dist/voicebridge-*-setup.exe
           if-no-files-found: error
+          # Previews are for looking at the build that just ran, so one day is
+          # enough. The 90-day default filled the account's shared storage
+          # (~118 MB per run, 5 GB accumulated) and broke artifact uploads in
+          # every other repo on the account.
+          retention-days: 1
 
   desktop-macos-preview:
     runs-on: macos-latest
@@ -94,3 +99,5 @@ jobs:
           name: voicebridge-mac-preview
           path: desktop/dist/voicebridge-*-arm64.dmg
           if-no-files-found: error
+          # See the Windows preview above — one day, not the 90-day default.
+          retention-days: 1
