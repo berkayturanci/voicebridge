@@ -255,6 +255,10 @@
         <button id="delSession">🗑 Delete</button>
         <button id="reset" class="primary">New chat</button>
       </div>
+      <div class="row" style="margin-top:6px;">
+        <button id="exportMd" type="button" title="Export conversation as Markdown">📄 Export .md</button>
+        <button id="exportJson" type="button" title="Export conversation as JSON">{ } Export .json</button>
+      </div>
     </div>
   </div>
 
@@ -874,10 +878,82 @@
     else { if (recognizing) stopBrowserSTT(); else startBrowserSTT(); }
   });
 
+  // ---------- MediaSession API (Lock screen & Bluetooth/AirPods headset controls) ----------
+  let silentAudio = null;
+  function ensureSilentAudio() {
+    if (!silentAudio && typeof Audio !== "undefined") {
+      try {
+        silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+        silentAudio.loop = true;
+      } catch (_) {}
+    }
+    if (silentAudio && silentAudio.paused) {
+      try { silentAudio.play().catch(() => {}); } catch (_) {}
+    }
+  }
+  function pauseSilentAudio() {
+    if (silentAudio && !silentAudio.paused) {
+      try { silentAudio.pause(); } catch (_) {}
+    }
+  }
+  function updateMediaSession(stateLabel) {
+    if (!("mediaSession" in navigator)) return;
+    const st = active();
+    const name = st ? st.meta.name : "voicebridge";
+    const agent = st ? (st.meta.agentLabel || st.meta.agent) : "AI Agent";
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: name,
+        artist: "voicebridge · " + agent,
+        album: stateLabel || (talking ? (talkMuted ? "Muted" : "Talking Mode") : "Ready"),
+        artwork: [
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+        ],
+      });
+      navigator.mediaSession.playbackState = talking ? (talkMuted ? "paused" : "playing") : (speaking ? "playing" : "none");
+    } catch (_) {}
+  }
+  function setupMediaSession() {
+    if (!("mediaSession" in navigator)) return;
+    const register = (action, handler) => {
+      try { navigator.mediaSession.setActionHandler(action, handler); } catch (_) {}
+    };
+    register("play", () => {
+      if (talking && talkMuted) setTalkMuted(false);
+      else if (!talking) enterTalking();
+    });
+    register("pause", () => {
+      if (talking && !talkMuted) setTalkMuted(true);
+      else if (speaking) {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        speakQueue.length = 0; speakBuf = ""; speaking = false;
+        updateMediaSession("Interrupted");
+      }
+    });
+    register("stop", () => {
+      if (speaking) {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        speakQueue.length = 0; speakBuf = ""; speaking = false;
+      }
+      if (talking) exitTalking();
+    });
+    register("nexttrack", () => {
+      if (speaking) {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        speakQueue.length = 0; speakBuf = ""; speaking = false;
+        updateMediaSession("Interrupted");
+      }
+    });
+    register("previoustrack", () => {
+      if (talking) setTalkMuted(!talkMuted);
+    });
+  }
+
   // ---------- Talking mode: continuous, hands-free voice conversation ----------
   const talkEl = $("talk"), talkOrb = $("talkOrb"), talkStateEl = $("talkState"), talkHeard = $("talkHeard"), muteBtn = $("talkMute");
   let talking = false, trec = null, talkFinal = "", talkSilence = null, talkMuted = false;
-  function setTalkState(s, label) { talkOrb.className = "orb " + s; talkStateEl.textContent = label; }
+  function setTalkState(s, label) { talkOrb.className = "orb " + s; talkStateEl.textContent = label; updateMediaSession(label); }
   // Voice-reactive orb: grows + glows as your speech is picked up; gentle idle breathing otherwise.
   let orbLevel = 0, orbRAF = 0;
   function orbTick(ts) {
@@ -893,18 +969,20 @@
   function orbBump() { orbLevel = Math.min(1, orbLevel + 0.55); }
   function enterTalking() {
     if (CONFIG.sttMode !== "browser" || !SR) { setStatus(noVoiceMsg()); return; }
-    ensureToken(); ensureAudio();
+    ensureToken(); ensureAudio(); ensureSilentAudio(); setupMediaSession();
     talking = true; talkEl.classList.add("open"); talkHeard.textContent = "";
     talkMuted = false; muteBtn.classList.remove("on"); muteBtn.textContent = "🎙️"; muteBtn.setAttribute("aria-label", "Mute mic");
     startTalkListen();
+    updateMediaSession("Listening…");
   }
   function exitTalking() {
     talking = false; talkMuted = false;
-    clearTimeout(talkSilence); orbMeterStop();
+    clearTimeout(talkSilence); orbMeterStop(); pauseSilentAudio();
     if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
     talkEl.classList.remove("open");
+    updateMediaSession("Ready");
   }
   function startTalkListen() {
     if (!talking) return;
@@ -923,7 +1001,11 @@
       talkSilence = setTimeout(onTalkSilence, talkSilenceMs());
     };
     trec.onerror = () => {}; // ignore no-speech etc.; onend will restart
-    trec.onend = () => { if (talking && talkOrb.classList.contains("listening")) { try { trec.start(); } catch (_) {} } };
+    trec.onend = () => {
+      if (talking && !talkMuted && !talkOrb.classList.contains("thinking") && !talkOrb.classList.contains("speaking")) {
+        startTalkListen();
+      }
+    };
     try { trec.start(); } catch (_) {}
   }
   function onTalkSilence() {
@@ -960,9 +1042,10 @@
   talkOrb.addEventListener("click", () => {
     if (!talking) return;
     if (talkMuted) { setTalkMuted(false); return; } // tap the muted orb to resume listening
-    if (!talkOrb.classList.contains("speaking")) return;
+    if (!speaking && !talkOrb.classList.contains("speaking") && !talkOrb.classList.contains("thinking")) return;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
+    updateMediaSession("Interrupted");
   });
   // Mute: pause listening in talking mode without ending the session (resume to continue).
   function setTalkMuted(m) {
@@ -980,6 +1063,7 @@
     }
   }
   muteBtn.addEventListener("click", () => setTalkMuted(!talkMuted));
+
 
   // ---------- Command palette: repo's commands (.claude/commands + npm) ----------
   const paletteEl = $("palette"), paletteListEl = $("paletteList"), paletteSearch = $("paletteSearch");
@@ -1075,6 +1159,62 @@
     prefs.theme = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
     savePrefs(); applyTheme();
   });
+
+  // ---------- Session transcript export (Markdown and JSON) ----------
+  function downloadBlob(blob, filename) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 2000);
+  }
+
+  function exportTranscript(format) {
+    const st = active();
+    if (!st || !st.messages.length) { alert("No messages to export."); return; }
+    const sessionName = st.meta.name || "session";
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `voicebridge-${sessionName.replace(/[^a-zA-Z0-9_-]/g, "_")}-${dateStr}.${format}`;
+    let content = "", mime = "text/plain";
+    if (format === "json") {
+      mime = "application/json";
+      content = JSON.stringify({
+        session: st.meta,
+        exportedAt: new Date().toISOString(),
+        messages: st.messages.map((m) => ({
+          role: m.cls === "me" ? "user" : m.cls === "claude" ? "assistant" : "system",
+          type: m.cls,
+          text: m.text,
+        })),
+      }, null, 2);
+    } else {
+      mime = "text/markdown";
+      content = `# ${st.meta.name}\n\n` +
+        `* Agent: ${st.meta.agentLabel || st.meta.agent} (${st.meta.mode})\n` +
+        `* Project: \`${st.meta.projectDir}\`\n` +
+        `* Exported: ${new Date().toLocaleString()}\n\n---\n\n` +
+        st.messages.map((m) => {
+          const role = m.cls === "me" ? "### 👤 User" : m.cls === "claude" ? `### 🤖 ${st.meta.agentLabel || "Agent"}` : "### ℹ️ System";
+          return `${role}\n\n${m.text}\n`;
+        }).join("\n---\n\n");
+    }
+
+    const blob = new Blob([content], { type: mime + ";charset=utf-8" });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: mime })] })) {
+      navigator.share({
+        title: `${st.meta.name} Transcript`,
+        files: [new File([blob], filename, { type: mime })],
+      }).catch((err) => {
+        if (err && err.name !== "AbortError") downloadBlob(blob, filename);
+      });
+    } else {
+      downloadBlob(blob, filename);
+    }
+  }
+
+  $("exportMd").addEventListener("click", () => exportTranscript("md"));
+  $("exportJson").addEventListener("click", () => exportTranscript("json"));
 
   // ---------- New-session modal ----------
   const nsAgent = $("ns-agent"), nsMode = $("ns-mode"), nsFav = $("ns-fav");
@@ -1201,6 +1341,7 @@
   fontSizeInput.value = prefs.fontSize || 15;
   applyFontSize();
   populateVoices();
+  setupMediaSession();
   (async () => {
     try { CONFIG = await (await fetch("/api/config")).json(); } catch (_) {}
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });

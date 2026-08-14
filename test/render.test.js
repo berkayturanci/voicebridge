@@ -89,3 +89,11 @@ test("diff auto-detect only fires on untagged blocks", () => {
   const tagged = sandbox.buildPre("-a\n+b", "bash");
   assert.strictEqual(tagged.children[0].tagName, "CODE");
 });
+
+test("index.html contains MediaSession API and transcript export handlers", () => {
+  assert.ok(html.includes("navigator.mediaSession"), "includes MediaSession integration");
+  assert.ok(html.includes("exportTranscript"), "includes exportTranscript function");
+  assert.ok(html.includes("exportMd"), "includes exportMd button");
+  assert.ok(html.includes("exportJson"), "includes exportJson button");
+});
+
