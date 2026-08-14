@@ -5,6 +5,7 @@ const { buildPrompt, looksLikeQuestion } = require("../config");
 const { AGENTS, parseClaudeEvents } = require("../adapters");
 const { saveSessions } = require("../services/sessions");
 const { sendPush } = require("../services/push");
+const { createApproval, clearSessionApprovals } = require("../services/approvals");
 
 function isLiveEnabled() {
   return process.env.PERSISTENT_SESSIONS === "1" || process.env.PERSISTENT_SESSIONS === "true";
@@ -27,6 +28,7 @@ function liveIdleMs() {
 const liveProcs = new Map(); // sessionId -> { child, buf, busy, idleTimer }
 
 function killLive(sessionId) {
+  clearSessionApprovals(sessionId);
   const p = liveProcs.get(sessionId);
   if (!p) return;
   liveProcs.delete(sessionId);
@@ -48,6 +50,7 @@ function getOrSpawnLive(session) {
   const child = spawn(AGENTS.claude.bin(), argv, { cwd: session.projectDir, env: process.env });
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
+  try { if (child.stdin) child.stdin.on("error", () => {}); } catch (_) {}
   const p = { child, buf: "", busy: false, idleTimer: null };
   liveProcs.set(session.id, p);
   const drop = () => { if (liveProcs.get(session.id) === p) liveProcs.delete(session.id); };
@@ -85,6 +88,7 @@ function streamLive(session, prompt, res, emit) {
   };
 
   const failAndRespawnNextTurn = (errMsg) => {
+    clearSessionApprovals(session.id, errMsg);
     endHttp(errMsg);
     if (liveProcs.get(session.id) === p) liveProcs.delete(session.id);
     if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
@@ -110,8 +114,44 @@ function streamLive(session, prompt, res, emit) {
   const onLine = (line) => {
     let obj; try { obj = JSON.parse(line); } catch (_) { return; }
     if (obj.session_id && session.claudeSessionId !== obj.session_id) { session.claudeSessionId = obj.session_id; saveSessions(); }
-    if (!finished) {
-      for (const ev of parseClaudeEvents(line)) { if (ev.type === "delta") replyText += ev.text; emit(ev); }
+    for (const ev of parseClaudeEvents(line)) {
+      if (ev.type === "delta") {
+        replyText += ev.text;
+        if (!finished) emit(ev);
+      } else if (ev.type === "approval_request") {
+        const appr = createApproval({
+          sessionId: session.id,
+          tool: ev.tool,
+          command: ev.command,
+          details: ev.details,
+          description: ev.description,
+          resolve: (approved) => {
+            const resp = JSON.stringify({ type: "approval_response", approved: Boolean(approved) }) + "\n";
+            try {
+              if (p.child && !p.child.killed && p.child.stdin && p.child.stdin.writable) {
+                p.child.stdin.write(resp);
+              }
+            } catch (_) {}
+          },
+        });
+        if (!finished) {
+          emit({
+            type: "approval_request",
+            id: appr.id,
+            tool: appr.tool,
+            command: appr.command,
+            details: appr.details,
+            description: appr.description,
+          });
+        }
+        sendPush({
+          title: "voicebridge — Approval Required",
+          body: `${appr.tool}: ${appr.description || appr.command}`,
+          sessionId: session.id,
+        });
+      } else {
+        if (!finished) emit(ev);
+      }
     }
     if (obj.type === "result") {
       endHttp(obj.is_error ? (obj.result || "Live turn failed.") : null);
@@ -139,6 +179,7 @@ function streamLive(session, prompt, res, emit) {
         if (line) onLine(line);
       }
     }
+    clearSessionApprovals(session.id, "Process exited");
     endHttp(stderr.trim() || ("Live session exited (code " + code + ")."));
     release();
   };

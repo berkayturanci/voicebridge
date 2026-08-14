@@ -31,8 +31,8 @@ const sandbox = {
   navigator: {}, setTimeout: () => {},
 };
 new Function("document", "navigator", "setTimeout",
-  grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") +
-  "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;"
+  grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") + grab("escapeHtml") +
+  "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;this.escapeHtml=escapeHtml;"
 ).call(sandbox, sandbox.document, sandbox.navigator, sandbox.setTimeout);
 
 const tags = (el) => { const out = []; (function w(e) { if (e.tagName) out.push(e.tagName); (e.children || []).forEach(w); })(el); return out; };
@@ -93,5 +93,14 @@ test("index.html contains MediaSession API and transcript export handlers", () =
   assert.ok(html.includes("exportTranscript"), "includes exportTranscript function");
   assert.ok(html.includes("exportMd"), "includes exportMd button");
   assert.ok(html.includes("exportJson"), "includes exportJson button");
+});
+
+test("index.html contains interactive tool approval card rendering", () => {
+  assert.ok(html.includes("approval-card"), "includes approval-card class");
+  assert.ok(html.includes("approval-btn-approve"), "includes approval-btn-approve button class");
+  assert.ok(html.includes("approval-btn-reject"), "includes approval-btn-reject button class");
+  assert.ok(html.includes("renderApprovalCard"), "includes renderApprovalCard function");
+  assert.ok(html.includes("/api/approvals/"), "includes /api/approvals endpoint calls");
+  assert.strictEqual(sandbox.escapeHtml('<script>alert("xss")</script> & "test"'), '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt; &amp; &quot;test&quot;');
 });
 

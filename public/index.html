@@ -166,8 +166,22 @@
   #ns-tree button.up { color: var(--accent); }
   #ns-browse { background: var(--panel2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 5px 10px; }
   .card .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-  .card .row button { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); font-size: 14px; }
   .card .row button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+  .approval-card { background: var(--panel2); border: 1px solid var(--border2); border-left: 4px solid #d29922; border-radius: 10px; padding: 12px 14px; margin: 8px 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; max-width: 100%; box-sizing: border-box; }
+  .approval-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; color: #b08800; }
+  :root[data-theme="dark"] .approval-head, :root:not([data-theme="light"]) .approval-head { color: #e3b341; }
+  .approval-tool { background: rgba(210, 153, 34, 0.15); padding: 2px 8px; border-radius: 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .approval-desc { color: var(--text); line-height: 1.4; }
+  .approval-cmd { background: var(--field); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text); overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .approval-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+  .approval-btn { padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid transparent; cursor: pointer; min-height: 38px; transition: opacity 0.2s; }
+  .approval-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .approval-btn-approve { background: var(--green); color: #fff; border-color: var(--green); }
+  .approval-btn-reject { background: transparent; color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
+  .approval-settled { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 6px; display: inline-block; align-self: flex-end; }
+  .approval-settled.approved { color: var(--green); background: rgba(63, 185, 80, 0.12); }
+  .approval-settled.rejected { color: #f85149; background: rgba(248, 81, 73, 0.12); }
+  #talkApprovals { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 8px; }
 </style>
 </head>
 <body>
@@ -220,6 +234,7 @@
     <div class="orb" id="talkOrb"></div>
     <div id="talkState">Ready</div>
     <div id="talkHeard"></div>
+    <div id="talkApprovals"></div>
     <div id="talkHint">Speak; it sends automatically when you pause. It listens again after each reply. Tap 🎙️ at the top-left to mute the mic temporarily.</div>
   </div>
 
@@ -773,6 +788,12 @@
             }
           } else if (ev.type === "activity") {
             addMsg(sessionId, "⚙︎ " + ev.text, "act");
+          } else if (ev.type === "approval_request") {
+            renderApprovalCard(sessionId, ev);
+            if (talking) {
+              const notice = "Approval required for " + (ev.tool || "tool") + ". Please confirm on screen.";
+              feedSpeech(notice);
+            }
           } else if (ev.type === "error") { throw new Error(ev.error || "Server error"); }
         }
       }
@@ -796,6 +817,90 @@
     if (agent === "antigravity") return "(empty reply — agy may need a different invocation; try AGY_PROMPT_ARG=1 on the server)";
     if (agent === "ollama") return "(empty reply — is the model pulled? check `ollama pull <model>` and OLLAMA_MODEL)";
     return "(empty reply)";
+  }
+
+  function escapeHtml(str) {
+    return String(str || "").replace(/[&<>"']/g, (s) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[s]));
+  }
+
+  function renderApprovalCard(sessionId, appr) {
+    const card = document.createElement("div");
+    card.className = "approval-card";
+    card.id = "appr_" + appr.id;
+    card.setAttribute("role", "alert");
+    card.setAttribute("aria-live", "polite");
+    card.innerHTML = `
+      <div class="approval-head">
+        <span>⚡ Confirmation Required</span>
+        <span class="approval-tool">${escapeHtml(appr.tool || "tool")}</span>
+      </div>
+      <div class="approval-desc">${escapeHtml(appr.description || "The agent is requesting permission to perform an action.")}</div>
+      ${appr.command ? `<div class="approval-cmd">${escapeHtml(appr.command)}</div>` : ""}
+      <div class="approval-actions" id="actions_${appr.id}">
+        <button class="approval-btn approval-btn-reject" type="button">Reject</button>
+        <button class="approval-btn approval-btn-approve" type="button">Approve</button>
+      </div>
+    `;
+    const rejectBtn = card.querySelector(".approval-btn-reject");
+    const approveBtn = card.querySelector(".approval-btn-approve");
+    const actionsEl = card.querySelector(".approval-actions");
+
+    const settle = async (approved) => {
+      rejectBtn.disabled = true;
+      approveBtn.disabled = true;
+      try {
+        const res = await fetch("/api/approvals/" + encodeURIComponent(appr.id), {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ approved }),
+        });
+        if (res.status === 401) {
+          ensureToken(true);
+          throw new Error("Authentication required");
+        }
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || ("Approval request failed (" + res.status + ")"));
+        }
+        actionsEl.innerHTML = `<span class="approval-settled ${approved ? "approved" : "rejected"}">${approved ? "✅ Approved" : "❌ Rejected"}</span>`;
+        if (card._talkClone) {
+          card._talkClone.remove();
+        }
+      } catch (err) {
+        rejectBtn.disabled = false;
+        approveBtn.disabled = false;
+        const errEl = document.createElement("span");
+        errEl.className = "err";
+        errEl.style.fontSize = "11px";
+        errEl.textContent = err.message || "Failed to submit";
+        actionsEl.appendChild(errEl);
+        setTimeout(() => errEl.remove(), 4000);
+      }
+    };
+
+    rejectBtn.addEventListener("click", () => settle(false));
+    approveBtn.addEventListener("click", () => settle(true));
+
+    const st = S.get(sessionId);
+    if (st && st.logEl) {
+      st.logEl.appendChild(card);
+      st.logEl.scrollTop = st.logEl.scrollHeight;
+    }
+
+    const talkApprovals = document.getElementById("talkApprovals");
+    if (talkApprovals && talking) {
+      const clone = card.cloneNode(true);
+      const cReject = clone.querySelector(".approval-btn-reject");
+      const cApprove = clone.querySelector(".approval-btn-approve");
+      if (cReject && cApprove) {
+        cReject.addEventListener("click", () => settle(false));
+        cApprove.addEventListener("click", () => settle(true));
+      }
+      card._talkClone = clone;
+      talkApprovals.appendChild(clone);
+    }
   }
 
   // ---------- Text composer ----------
