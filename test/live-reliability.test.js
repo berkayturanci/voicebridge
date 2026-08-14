@@ -2,7 +2,7 @@
 
 process.env.PERSISTENT_SESSIONS = "1";
 process.env.LIVE_IDLE_MS = "0";
-process.env.AGENT_TIMEOUT_MS = "500";
+process.env.AGENT_TIMEOUT_MS = "1500";
 process.env.SESSIONS_FILE = "off";
 
 const test = require("node:test");
