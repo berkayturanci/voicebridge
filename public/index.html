@@ -1168,6 +1168,106 @@
   function orbMeterStart() { if (!orbRAF) orbRAF = requestAnimationFrame(orbTick); }
   function orbMeterStop() { if (orbRAF) cancelAnimationFrame(orbRAF); orbRAF = 0; orbLevel = 0; talkOrb.style.transform = ""; talkOrb.style.boxShadow = ""; }
   function orbBump() { orbLevel = Math.min(1, orbLevel + 0.55); }
+
+  // ---------- Voice Activity Detection (VAD) Engine ----------
+  let vadStream = null, vadSource = null, vadAnalyser = null, vadDataArray = null;
+  let vadActive = false, vadStarting = false, vadNoiseFloor = 0.012, vadSpeechHeard = false, vadSilenceTimer = null;
+
+  function calculateRmsAndZcr(buf) {
+    const len = buf ? buf.length : 0;
+    if (!len) return { rms: 0, zcrRate: 0 };
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += buf[i];
+    const mean = sum / len;
+
+    let sumSq = 0, zcr = 0;
+    for (let i = 0; i < len; i++) {
+      const v = buf[i] - mean;
+      sumSq += v * v;
+      if (i > 0) {
+        const prev = buf[i - 1] - mean;
+        if ((prev >= 0 && v < 0) || (prev < 0 && v >= 0)) zcr++;
+      }
+    }
+    const rms = Math.sqrt(sumSq / len);
+    const zcrRate = zcr / len;
+    return { rms: Number.isFinite(rms) ? rms : 0, zcrRate: Number.isFinite(zcrRate) ? zcrRate : 0 };
+  }
+
+  async function startVad(onSpeechActivity, onSilenceTrigger) {
+    stopVad();
+    vadStarting = true;
+    try {
+      if (!actx) ensureAudio();
+      if (!actx || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { vadStarting = false; return; }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (!vadStarting || !talking || talkMuted) {
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        return;
+      }
+      vadStream = stream;
+      vadSource = actx.createMediaStreamSource(vadStream);
+      vadAnalyser = actx.createAnalyser();
+      vadAnalyser.fftSize = 512;
+      vadAnalyser.smoothingTimeConstant = 0.3;
+      vadSource.connect(vadAnalyser);
+      vadDataArray = new Float32Array(vadAnalyser.fftSize);
+      vadActive = true;
+      vadSpeechHeard = false;
+      vadNoiseFloor = 0.012;
+
+      function vadLoop() {
+        if (!vadActive) return;
+        vadAnalyser.getFloatTimeDomainData(vadDataArray);
+        const { rms, zcrRate } = calculateRmsAndZcr(vadDataArray);
+
+        if (rms < vadNoiseFloor * 1.5) {
+          vadNoiseFloor = Math.max(0.005, vadNoiseFloor * 0.96 + rms * 0.04);
+        } else if (rms < vadNoiseFloor * 3.0 && !vadSpeechHeard) {
+          vadNoiseFloor = Math.min(0.08, vadNoiseFloor * 0.998 + rms * 0.002);
+        }
+
+        const isVoice = rms > (vadNoiseFloor * 2.2 + 0.014) && zcrRate > 0.008 && zcrRate < 0.45;
+        if (isVoice) {
+          vadSpeechHeard = true;
+          orbLevel = Math.min(1, Math.max(orbLevel, rms * 4.5));
+          if (onSpeechActivity) onSpeechActivity(rms);
+          if (vadSilenceTimer) {
+            clearTimeout(vadSilenceTimer);
+            vadSilenceTimer = null;
+          }
+        } else if (vadSpeechHeard && !vadSilenceTimer) {
+          vadSilenceTimer = setTimeout(() => {
+            vadSpeechHeard = false;
+            vadSilenceTimer = null;
+            if (onSilenceTrigger) onSilenceTrigger();
+          }, talkSilenceMs());
+        }
+        requestAnimationFrame(vadLoop);
+      }
+      requestAnimationFrame(vadLoop);
+    } catch (_) {
+    } finally {
+      vadStarting = false;
+    }
+  }
+
+  function stopVad() {
+    vadStarting = false;
+    vadActive = false;
+    if (vadSilenceTimer) { clearTimeout(vadSilenceTimer); vadSilenceTimer = null; }
+    if (vadStream) {
+      try { vadStream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      vadStream = null;
+    }
+    if (vadSource) {
+      try { vadSource.disconnect(); } catch (_) {}
+      vadSource = null;
+    }
+    vadAnalyser = null;
+    vadDataArray = null;
+  }
+
   function enterTalking() {
     if (CONFIG.sttMode === "browser" && !SR) { setStatus(noVoiceMsg()); return; }
     if (CONFIG.sttMode === "whisper-stream" && streamVoiceMsg()) { setStatus(streamVoiceMsg()); return; }
@@ -1180,7 +1280,7 @@
   }
   function exitTalking() {
     talking = false; talkMuted = false;
-    clearTimeout(talkSilence); orbMeterStop(); pauseSilentAudio();
+    clearTimeout(talkSilence); stopVad(); orbMeterStop(); pauseSilentAudio();
     if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
     stopStreamSTT(false);
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -1191,8 +1291,9 @@
   function startTalkListen() {
     if (!talking) return;
     if (talkMuted) { setTalkState("muted", "Muted — tap 🎙️ to unmute (or tap the orb)"); talkHeard.textContent = ""; return; }
-    if (CONFIG.sttMode === "whisper-stream") { streamText = ""; setTalkState("listening", "Listening…"); talkHeard.textContent = ""; startStreamSTT("talk"); return; }
+    if (CONFIG.sttMode === "whisper-stream") { streamText = ""; setTalkState("listening", "Listening…"); talkHeard.textContent = ""; startStreamSTT("talk"); startVad(() => orbBump(), () => onTalkSilence()); return; }
     talkFinal = ""; setTalkState("listening", "Listening…"); talkHeard.textContent = ""; orbMeterStart();
+    startVad(() => orbBump(), () => onTalkSilence());
     trec = new SR();
     trec.lang = langSel.value; trec.continuous = true; trec.interimResults = true;
     trec.onresult = (ev) => {
@@ -1214,10 +1315,15 @@
     try { trec.start(); } catch (_) {}
   }
   function onTalkSilence() {
+    clearTimeout(talkSilence);
+    talkSilence = null;
     const text = (CONFIG.sttMode === "whisper-stream" ? streamText : talkFinal).trim();
     if (!text) return; // nothing heard yet; keep listening
+    talkFinal = "";
+    streamText = "";
     if (CONFIG.sttMode === "whisper-stream") stopStreamSTT(false);
     else if (trec) { try { trec.onend = null; trec.stop(); } catch (_) {} trec = null; } // pause during the turn (no TTS feedback)
+    stopVad();
     orbMeterStop();
     talkTurn(text);
   }
@@ -1261,7 +1367,7 @@
     muteBtn.textContent = m ? "🔇" : "🎙️";
     muteBtn.setAttribute("aria-label", m ? "Unmute mic" : "Mute mic");
     if (m) {
-      clearTimeout(talkSilence); orbMeterStop();
+      clearTimeout(talkSilence); stopVad(); orbMeterStop();
       // abort() (not stop()) so iOS releases the mic immediately — no lingering "in use" state.
       if (trec) { try { trec.onend = null; trec.abort(); } catch (_) {} trec = null; }
       stopStreamSTT(false);

@@ -31,8 +31,8 @@ const sandbox = {
   navigator: {}, setTimeout: () => {},
 };
 new Function("document", "navigator", "setTimeout",
-  grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") + grab("escapeHtml") +
-  "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;this.escapeHtml=escapeHtml;"
+  grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") + grab("escapeHtml") + grab("calculateRmsAndZcr") +
+  "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;this.escapeHtml=escapeHtml;this.calculateRmsAndZcr=calculateRmsAndZcr;"
 ).call(sandbox, sandbox.document, sandbox.navigator, sandbox.setTimeout);
 
 const tags = (el) => { const out = []; (function w(e) { if (e.tagName) out.push(e.tagName); (e.children || []).forEach(w); })(el); return out; };
@@ -102,5 +102,41 @@ test("index.html contains interactive tool approval card rendering", () => {
   assert.ok(html.includes("renderApprovalCard"), "includes renderApprovalCard function");
   assert.ok(html.includes("/api/approvals/"), "includes /api/approvals endpoint calls");
   assert.strictEqual(sandbox.escapeHtml('<script>alert("xss")</script> & "test"'), '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt; &amp; &quot;test&quot;');
+});
+
+test("index.html contains VAD engine and calculateRmsAndZcr", () => {
+  assert.ok(html.includes("calculateRmsAndZcr"), "includes calculateRmsAndZcr function");
+  assert.ok(html.includes("startVad"), "includes startVad function");
+  assert.ok(html.includes("stopVad"), "includes stopVad function");
+  assert.ok(html.includes("talkSilence"), "includes talkSilence setting");
+
+  // Empty buffer
+  const emptyRes = sandbox.calculateRmsAndZcr(new Float32Array(0));
+  assert.strictEqual(emptyRes.rms, 0);
+  assert.strictEqual(emptyRes.zcrRate, 0);
+
+  // Silence buffer
+  const silenceBuf = new Float32Array(512);
+  const silenceRes = sandbox.calculateRmsAndZcr(silenceBuf);
+  assert.strictEqual(silenceRes.rms, 0);
+  assert.strictEqual(silenceRes.zcrRate, 0);
+
+  // Pure sine wave
+  const sineBuf = new Float32Array(512);
+  for (let i = 0; i < 512; i++) {
+    sineBuf[i] = Math.sin((i * 2 * Math.PI) / 32);
+  }
+  const sineRes = sandbox.calculateRmsAndZcr(sineBuf);
+  assert.ok(sineRes.rms > 0.6, "rms of unit sine should be ~0.707");
+  assert.ok(sineRes.zcrRate > 0.05, "zcr of oscillating wave is non-zero");
+
+  // Sine wave with DC bias (+0.5)
+  const dcBuf = new Float32Array(512);
+  for (let i = 0; i < 512; i++) {
+    dcBuf[i] = 0.5 + Math.sin((i * 2 * Math.PI) / 32);
+  }
+  const dcRes = sandbox.calculateRmsAndZcr(dcBuf);
+  assert.ok(dcRes.rms > 0.6, "rms after mean removal matches AC component");
+  assert.ok(dcRes.zcrRate > 0.05, "zcr detects crossings even with DC bias");
 });
 
