@@ -6,16 +6,37 @@ const { AGENTS, parseClaudeEvents } = require("../adapters");
 const { saveSessions } = require("../services/sessions");
 const { sendPush } = require("../services/push");
 
-const LIVE_ENABLED = process.env.PERSISTENT_SESSIONS === "1";
-const LIVE_IDLE_MS = Number(process.env.LIVE_IDLE_MS ?? 30 * 60 * 1000) || 0;
+function isLiveEnabled() {
+  return process.env.PERSISTENT_SESSIONS === "1" || process.env.PERSISTENT_SESSIONS === "true";
+}
+
+function agentTimeoutMs() {
+  const v = parseInt(process.env.AGENT_TIMEOUT_MS || "1200000", 10);
+  return isNaN(v) ? 1200000 : v;
+}
+
+function agentTimeoutMessage(label, ms) {
+  return `${label} didn't finish within ${Math.round(ms / 60000)} min (timed out).`;
+}
+
+function liveIdleMs() {
+  const v = parseInt(process.env.LIVE_IDLE_MS || "300000", 10);
+  return isNaN(v) ? 300000 : v;
+}
+
 const liveProcs = new Map(); // sessionId -> { child, buf, busy, idleTimer }
 
 function killLive(sessionId) {
   const p = liveProcs.get(sessionId);
   if (!p) return;
   liveProcs.delete(sessionId);
+  if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
   try { p.child.stdin.end(); } catch (_) {}
   try { p.child.kill("SIGTERM"); } catch (_) {}
+}
+
+function killAllLive() {
+  for (const id of Array.from(liveProcs.keys())) killLive(id);
 }
 
 function getOrSpawnLive(session) {
@@ -38,30 +59,45 @@ function getOrSpawnLive(session) {
 function streamLive(session, prompt, res, emit) {
   if (session.handoff === "pc") { session.handoff = null; saveSessions(); }
   const p = getOrSpawnLive(session);
-  if (p.busy) { emit({ type: "error", error: "This session is busy right now (the previous turn is still running)." }); return res.end(); }
+  if (p.busy) {
+    emit({ type: "error", error: "This session is busy right now (the previous turn is still running)." });
+    return res.end();
+  }
   p.busy = true;
   if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
 
+  const agent = AGENTS[session.agent] || { label: "Live agent" };
   let replyText = "";
   let finished = false;
   let stderr = "";
+  let timeoutTimer = null;
   let released = false;
 
-  const release = () => {
+  const release = (rearmIdle = true) => {
     if (released) return;
     released = true;
+    if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
     p.child.stdout.removeListener("data", onData);
     p.child.stderr.removeListener("data", onErr);
     p.child.removeListener("exit", onExit);
     p.busy = false;
-    if (LIVE_IDLE_MS > 0) p.idleTimer = setTimeout(() => killLive(session.id), LIVE_IDLE_MS);
+    if (rearmIdle && liveIdleMs() > 0) p.idleTimer = setTimeout(() => killLive(session.id), liveIdleMs());
+  };
+
+  const failAndRespawnNextTurn = (errMsg) => {
+    endHttp(errMsg);
+    if (liveProcs.get(session.id) === p) liveProcs.delete(session.id);
+    if (p.idleTimer) { clearTimeout(p.idleTimer); p.idleTimer = null; }
+    try { p.child.kill("SIGTERM"); } catch (_) {}
+    release(false);
   };
 
   const endHttp = (errMsg) => {
     if (finished) return;
     finished = true;
-    if (errMsg) emit({ type: "error", error: errMsg });
-    else {
+    if (errMsg) {
+      emit({ type: "error", error: errMsg });
+    } else {
       session.started = true;
       emit({ type: "done" });
       if (looksLikeQuestion(replyText)) {
@@ -94,23 +130,41 @@ function streamLive(session, prompt, res, emit) {
   };
 
   const onErr = (d) => { stderr += d; };
-  const onExit = (code) => { endHttp(stderr.trim() || ("Live session exited (code " + code + ").")); release(); };
+  const onExit = (code) => {
+    if (p.buf && p.buf.length) {
+      let i;
+      while ((i = p.buf.indexOf("\n")) >= 0) {
+        const line = p.buf.slice(0, i).trim();
+        p.buf = p.buf.slice(i + 1);
+        if (line) onLine(line);
+      }
+    }
+    endHttp(stderr.trim() || ("Live session exited (code " + code + ")."));
+    release();
+  };
 
   p.child.stdout.on("data", onData);
   p.child.stderr.on("data", onErr);
   p.child.on("exit", onExit);
 
+  const TIMEOUT_MS = agentTimeoutMs();
+  if (TIMEOUT_MS > 0) {
+    timeoutTimer = setTimeout(() => {
+      failAndRespawnNextTurn(agentTimeoutMessage(agent.label, TIMEOUT_MS));
+    }, TIMEOUT_MS);
+  }
+
   res.on("close", () => { finished = true; });
 
   const userLine = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: buildPrompt(session.voice, prompt) }] } }) + "\n";
-  try { p.child.stdin.write(userLine); } catch (e) { endHttp(e.message); release(); }
+  try { p.child.stdin.write(userLine); } catch (e) { failAndRespawnNextTurn(e.message); }
 }
 
 module.exports = {
-  LIVE_ENABLED,
-  LIVE_IDLE_MS,
+  isLiveEnabled,
   liveProcs,
   killLive,
+  killAllLive,
   getOrSpawnLive,
   streamLive,
 };

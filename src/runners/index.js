@@ -1,9 +1,11 @@
 "use strict";
 
+const { AGENTS } = require("../adapters");
 const { streamCloud, proxyCloudBrowse } = require("./cloud");
 const { streamTmux } = require("./tmux");
 const { streamOllama } = require("./ollama");
 const { streamLocal } = require("./local");
+const { isLiveEnabled, streamLive } = require("./live");
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -24,6 +26,9 @@ function streamAsk(session, prompt, res) {
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
   if (session.runner === "tmux") return streamTmux(session, prompt, res, emit);
   if (session.agent === "ollama") return streamOllama(session, prompt, res, emit);
+  if (isLiveEnabled() && AGENTS[session.agent] && AGENTS[session.agent].live) {
+    return streamLive(session, prompt, res, emit);
+  }
   return streamLocal(session, prompt, res, emit);
 }
 

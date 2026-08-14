@@ -15,17 +15,32 @@ const {
   browseDir,
 } = require("./services/sessions");
 const { listSlashCommands, listNpmScripts } = require("./services/commands");
-const { sendJson } = require("./routes/http-helpers");
+const { sendJson, wsAcceptKey, wsEncode } = require("./routes/http-helpers");
 const { handleRequest } = require("./routes/api");
+const { handleSttStreamUpgrade } = require("./services/stt");
+const { killAllLive, killLive, liveProcs } = require("./runners/live");
+const tmuxRunner = require("./runners/tmux");
+const sessionsService = require("./services/sessions");
 
 function buildServer() {
-  return http.createServer((req, res) => {
+  const server = http.createServer((req, res) => {
     try {
       handleRequest(req, res);
     } catch (e) {
       try { sendJson(res, 500, { error: "Internal error" }); } catch (_) {}
     }
   });
+  server.on("upgrade", (req, socket, head) => {
+    try {
+      if (!handleSttStreamUpgrade(req, socket, head)) {
+        socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+        socket.destroy();
+      }
+    } catch (_) {
+      try { socket.destroy(); } catch (_) {}
+    }
+  });
+  return server;
 }
 
 function printPhoneQr(url) {
@@ -35,6 +50,46 @@ function printPhoneQr(url) {
   } catch (_) {
     console.log("(run `npm install` to show a scannable QR code here)\n");
   }
+}
+
+function closeServerForShutdown(server) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    try {
+      server.close(done);
+      if (typeof server.closeIdleConnections === "function") server.closeIdleConnections();
+      if (typeof server.closeAllConnections === "function") server.closeAllConnections();
+    } catch (_) {
+      done();
+    }
+  });
+}
+
+function createShutdownHandler(server, opts = {}) {
+  const exit = opts.exit || process.exit.bind(process);
+  const logger = opts.logger || console;
+  const graceMs = Number(opts.graceMs ?? 5000) || 5000;
+  let shuttingDown = false;
+  return function shutdown(signal = "shutdown") {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    try { logger.log(`voicebridge shutting down (${signal})...`); } catch (_) {}
+    killAllLive();
+    const forceTimer = setTimeout(() => {
+      try { logger.error(`voicebridge shutdown timed out after ${graceMs}ms; exiting.`); } catch (_) {}
+      exit(1);
+    }, graceMs);
+    if (typeof forceTimer.unref === "function") forceTimer.unref();
+    closeServerForShutdown(server).then(() => {
+      clearTimeout(forceTimer);
+      exit(0);
+    });
+  };
 }
 
 function start() {
@@ -50,6 +105,9 @@ function start() {
   }
   const boot = sessions.get(sessionsService.defaultSessionId);
   const server = buildServer();
+  const shutdown = createShutdownHandler(server);
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
   server.listen(config.PORT, config.HOST, () => {
     console.log(`voicebridge listening on http://${config.HOST}:${config.PORT}`);
     console.log(`default session: ${boot.name} · ${AGENTS[boot.agent].label} · ${boot.projectDir}`);
@@ -67,8 +125,6 @@ function start() {
   });
   return server;
 }
-
-const sessionsService = require("./services/sessions");
 
 module.exports = {
   AGENTS,
@@ -95,6 +151,20 @@ module.exports = {
   buildServer,
   handleRequest,
   start,
+  _internals: {
+    createShutdownHandler,
+    extractAgentConversationId: sessionsService.extractAgentConversationId,
+    extractTuiReply: tmuxRunner.extractTuiReply,
+    killAllLive,
+    killLive,
+    liveProcs,
+    stripAnsi: tmuxRunner.stripAnsi,
+    tmuxCaptureErrorMessage: tmuxRunner.tmuxCaptureErrorMessage,
+    tmuxStillGenerating: tmuxRunner.tmuxStillGenerating,
+    TMUX_GENERATING_RE: tmuxRunner.TMUX_GENERATING_RE,
+    wsAcceptKey,
+    wsEncode,
+  },
   get defaultSessionId() { return sessionsService.defaultSessionId; },
   set defaultSessionId(v) { sessionsService.defaultSessionId = v; },
 };

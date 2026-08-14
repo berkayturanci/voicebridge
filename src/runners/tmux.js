@@ -33,6 +33,53 @@ function killTmux(sessionId) {
   tmuxRun(["kill-session", "-t", tmuxName(sessionId)]);
 }
 
+const TMUX_GENERATING_RE = /esc to interrupt|Cogitating|Thinking|Working…|Pondering|Forging/i;
+
+function stripAnsi(text) {
+  return String(text || "")
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1B[PX^_].*?\x1B\\/gs, "")
+    .replace(/\x1B[@-_]/g, "")
+    .replace(/\r/g, "");
+}
+
+function tmuxStillGenerating(pane) {
+  return TMUX_GENERATING_RE.test(stripAnsi(pane));
+}
+
+function tmuxCaptureErrorMessage(reason) {
+  return "couldn't capture tmux reply: " + reason + ". Attach with `tmux attach` on your Mac to inspect the live session.";
+}
+
+function extractTuiReply(pane, promptEcho) {
+  const lines = stripAnsi(pane).split("\n");
+  const key = (promptEcho || "").trim().slice(0, 24);
+  let start = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i].trim();
+    if (t.startsWith("❯") && key && t.includes(key)) { start = i; break; }
+  }
+  if (start < 0) for (let i = lines.length - 1; i >= 0; i--) { if (lines[i].trim().startsWith("⏺")) { start = i - 1; break; } }
+  const out = [];
+  let sawAssistant = false;
+  for (let i = start + 1; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = lines[i].trim();
+    if (!t) { out.push(""); continue; }
+    if (/^[╭╰│]/.test(t)) continue;
+    if (/^─{5,}$/.test(t)) break;
+    if (t.startsWith("❯")) break;
+    if (/^✻/.test(t)) continue;
+    if (/^⎿/.test(t)) continue;
+    if (!sawAssistant && tmuxStillGenerating(t)) continue;
+    if (/^\s*⏺/.test(raw)) sawAssistant = true;
+    out.push(raw.replace(/^\s*⏺\s?/, "").replace(/^\s{0,3}/, ""));
+  }
+  if (!sawAssistant) return "";
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 async function ensureTmuxAgent(session) {
   const name = tmuxName(session.id);
   if (await tmuxHas(name)) return name;
@@ -93,6 +140,11 @@ async function streamTmux(session, prompt, res, emit) {
 
 module.exports = {
   TMUX_IDLE_MS,
+  TMUX_GENERATING_RE,
+  stripAnsi,
+  tmuxStillGenerating,
+  tmuxCaptureErrorMessage,
+  extractTuiReply,
   tmuxIdleTimers,
   tmuxName,
   tmuxRun,

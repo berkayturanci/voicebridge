@@ -146,7 +146,21 @@ function findJsonlByContent(projectDir, needle) {
   return null;
 }
 
-function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId } = {}) {
+function extractAgentConversationId(text) {
+  const s = String(text || "");
+  const patterns = [
+    /"session[_-]?id"\s*:\s*"([^"]+)"/i,
+    /"conversation[_-]?id"\s*:\s*"([^"]+)"/i,
+    /\b(?:session|conversation|thread)\s*(?:id)?\s*[:=]\s*([A-Za-z0-9._:-]{6,})/i,
+  ];
+  for (const re of patterns) {
+    const m = s.match(re);
+    if (m && m[1]) return m[1];
+  }
+  return "";
+}
+
+function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId, agentSessionId } = {}) {
   if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
@@ -165,6 +179,7 @@ function createSession({ name, agent, projectDir, mode, voice, runner, model, cl
     runner: run,
     model: (model && String(model).trim()) || undefined,
     claudeSessionId: sanitizeSessionId(claudeSessionId),
+    agentSessionId: (agentSessionId && String(agentSessionId).trim()) || undefined,
     started: false,
   };
   sessions.set(id, s);
@@ -176,6 +191,7 @@ function publicSession(s) {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
     projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
     claudeSessionId: s.claudeSessionId || null,
+    agentSessionId: s.agentSessionId || null,
     handoff: s.handoff || null,
   };
 }
@@ -195,7 +211,7 @@ function saveSessions(file) {
       seq: sessionSeq,
       defaultId: defaultSessionId,
       sessions: Array.from(sessions.values()).map((s) => ({
-        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model, claudeSessionId: s.claudeSessionId,
+        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model, claudeSessionId: s.claudeSessionId, agentSessionId: s.agentSessionId, started: s.started,
       })),
     };
     const tmp = `${file}.tmp.${process.pid}`;
@@ -219,7 +235,8 @@ function loadSessions(file) {
       voice: !!s.voice, runner: (s.runner === "cloud" || s.runner === "tmux") ? s.runner : "local",
       model: (s.model && String(s.model).trim()) || undefined,
       claudeSessionId: sanitizeSessionId(s.claudeSessionId),
-      started: false,
+      agentSessionId: (s.agentSessionId && String(s.agentSessionId).trim()) || undefined,
+      started: !!s.started,
     });
   }
   if (typeof data.seq === "number") sessionSeq = Math.max(sessionSeq, data.seq);
@@ -233,6 +250,7 @@ module.exports = {
   get sessionSeq() { return sessionSeq; },
   set sessionSeq(v) { sessionSeq = v; },
   sanitizeSessionId,
+  extractAgentConversationId,
   isDir,
   browseDir,
   firstUserText,

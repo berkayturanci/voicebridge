@@ -5,6 +5,15 @@
  */
 "use strict";
 
+const path = require("path");
+const srcDir = path.join(__dirname, "src");
+
+for (const key of Object.keys(require.cache)) {
+  if (key.startsWith(srcDir)) {
+    delete require.cache[key];
+  }
+}
+
 const src = require("./src");
 
 if (require.main === module) {

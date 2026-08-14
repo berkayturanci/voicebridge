@@ -40,6 +40,29 @@ const { send, sendJson, authorized, readBody } = require("./http-helpers");
 const { serveStatic } = require("./static");
 
 let inflight = 0;
+const mobileClient = { lastSeen: 0, userAgent: "", source: "" };
+
+function publicMobileState(now = Date.now()) {
+  const lastSeen = mobileClient.lastSeen || 0;
+  return {
+    connected: !!lastSeen && now - lastSeen < 45_000,
+    lastSeen: lastSeen ? new Date(lastSeen).toISOString() : null,
+    lastSeenAgoMs: lastSeen ? now - lastSeen : null,
+    userAgent: mobileClient.userAgent,
+    source: mobileClient.source,
+  };
+}
+
+function markMobileSeen(req, data) {
+  mobileClient.lastSeen = Date.now();
+  mobileClient.userAgent = String(req.headers["user-agent"] || "").slice(0, 160);
+  mobileClient.source = String((data && data.source) || "mobile").slice(0, 40);
+}
+
+function onBodyError(res, e) {
+  const tooLarge = e && (e.code === "PAYLOAD_TOO_LARGE" || e.message === "Payload too large");
+  return sendJson(res, tooLarge ? 413 : 400, { error: tooLarge ? "Payload too large" : "Bad request" });
+}
 
 function handleRequest(req, res) {
   const urlPath = req.url.split("?")[0];
@@ -58,23 +81,46 @@ function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && urlPath === "/api/config") {
-    return sendJson(res, 200, {
-      sttMode: STT_MODE,
-      authRequired: !!ACCESS_TOKEN,
+    const isAuth = authorized(req);
+    const tokenPresent = !!(process.env.ACCESS_TOKEN || ACCESS_TOKEN);
+    const mode = (process.env.STT_MODE || STT_MODE || "browser").toLowerCase();
+    const streamUrl = process.env.STT_STREAM_URL || "";
+    const data = {
+      sttMode: mode,
+      sttStream: { enabled: mode === "whisper-stream" && !!streamUrl },
+      authRequired: tokenPresent,
       agents: Object.keys(AGENTS).map((id) => ({
         id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
         defaultMode: AGENTS[id].defaultMode, available: agentAvailable(id),
         modes: Object.keys(AGENTS[id].modes).map((m) => ({ id: m, label: AGENTS[id].modes[m].label })),
       })),
-      defaultProjectDir: DEFAULT_PROJECT_DIR,
-      defaultSessionId: sessionsService.defaultSessionId,
-      favorites: FAVORITES,
       runners: ["local"].concat((process.env.CLOUD_RUNNER_URL || "") ? ["cloud"] : []),
-    });
+    };
+    if (isAuth) {
+      data.defaultProjectDir = DEFAULT_PROJECT_DIR;
+      data.defaultSessionId = sessionsService.defaultSessionId;
+      data.favorites = FAVORITES;
+    }
+    return sendJson(res, 200, data);
   }
 
   if (urlPath.startsWith("/api/")) {
     if (!authorized(req)) return sendJson(res, 401, { error: "Unauthorized" });
+
+    if (req.method === "GET" && urlPath === "/api/mobile-state") {
+      return sendJson(res, 200, publicMobileState());
+    }
+
+    if (req.method === "POST" && urlPath === "/api/mobile-seen") {
+      return readBody(req, 8 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
+        let data = {};
+        try { data = JSON.parse(body.toString("utf8") || "{}"); }
+        catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
+        markMobileSeen(req, data);
+        return sendJson(res, 200, { ok: true, mobile: publicMobileState() });
+      });
+    }
 
     if (req.method === "GET" && urlPath === "/api/commands") {
       const q = new URL(req.url, "http://x").searchParams;
@@ -111,7 +157,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/sessions") {
       return readBody(req, 64 * 1024, (e, body) => {
-        if (e) return sendJson(res, 400, { error: "Bad request" });
+        if (e) return onBodyError(res, e);
         let data; try { data = JSON.parse(body.toString("utf8") || "{}"); }
         catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
         let s;
@@ -135,6 +181,7 @@ function handleRequest(req, res) {
       const s = sessions.get(id);
       if (!s) return sendJson(res, 404, { error: "Not found" });
       return readBody(req, 64 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         if (typeof data.name === "string" && data.name.trim()) s.name = data.name.trim();
         if (data.mode && AGENTS[s.agent].modes[data.mode]) s.mode = data.mode;
@@ -150,7 +197,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/ask") {
       return readBody(req, 64 * 1024, (e, body) => {
-        if (e) return sendJson(res, 400, { error: "Bad request" });
+        if (e) return onBodyError(res, e);
         let data; try { data = JSON.parse(body.toString("utf8") || "{}"); }
         catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
         const text = typeof data.text === "string" ? data.text.trim() : "";
@@ -170,7 +217,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/tts") {
       return readBody(req, 64 * 1024, (e, body) => {
-        if (e) return sendJson(res, 400, { error: "Bad request" });
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const text = (typeof data.text === "string" ? data.text : "").trim();
         if (!text) return sendJson(res, 400, { error: "Empty text" });
@@ -209,7 +256,8 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/stt") {
       return readBody(req, 12 * 1024 * 1024, (e, body) => {
-        if (e || !body || !body.length) return sendJson(res, 400, { error: "No audio" });
+        if (e) return onBodyError(res, e);
+        if (!body || !body.length) return sendJson(res, 400, { error: "No audio" });
         transcribe(body, req.headers["content-type"] || "", (terr, text) => {
           if (terr) return sendJson(res, 500, { error: terr.message });
           sendJson(res, 200, { text });
@@ -219,6 +267,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/push/subscribe") {
       return readBody(req, 64 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const ep = data.subscription && data.subscription.endpoint;
         if (typeof ep !== "string" || !/^https:\/\//i.test(ep)) return sendJson(res, 400, { error: "Bad subscription" });
@@ -232,6 +281,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/reset") {
       return readBody(req, 64 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
         if (session) { session.started = false; session.history = []; }
@@ -241,6 +291,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/handoff") {
       return readBody(req, 16 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
@@ -284,6 +335,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/tmux-rc") {
       return readBody(req, 4 * 1024, async (e, body) => {
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });
@@ -312,7 +364,7 @@ function handleRequest(req, res) {
 
     if (req.method === "POST" && urlPath === "/api/tmux-send") {
       return readBody(req, 64 * 1024, (e, body) => {
-        if (e) return sendJson(res, 400, { error: "Bad request" });
+        if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
         if (!session) return sendJson(res, 404, { error: "Unknown session" });

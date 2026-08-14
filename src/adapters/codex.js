@@ -5,17 +5,20 @@ const { splitArgs } = require("../config");
 const codexAdapter = {
   label: "Codex",
   bin: () => process.env.CODEX_BIN || "codex",
-  get supportsContinue() { return splitArgs(process.env.CODEX_CONTINUE_ARGS).length > 0; },
+  supportsContinue: true,
   stream: "text",
   defaultMode: "auto",
   modes: {
     safe: { label: "Read-only", args: ["-s", "read-only"] },
-    auto: { label: "Automatic (write)", args: ["--full-auto"] },
+    auto: { label: "Automatic (write)", args: ["-s", "workspace-write", "-c", "approval_policy=\"never\""] },
     full: { label: "Fully autonomous", args: ["--dangerously-bypass-approvals-and-sandbox"] },
   },
-  command(prompt, { cont, modeArgs } = {}) {
-    const resume = cont ? splitArgs(process.env.CODEX_CONTINUE_ARGS) : [];
-    return { argv: ["exec", ...resume, ...(modeArgs || [])], stdin: prompt };
+  command(prompt, { cont, resume, modeArgs } = {}) {
+    const legacy = cont && splitArgs(process.env.CODEX_CONTINUE_ARGS);
+    if (legacy && legacy.length) return { argv: ["exec", ...legacy, ...(modeArgs || [])], stdin: prompt };
+    if (resume) return { argv: ["exec", "resume", ...(modeArgs || []), resume, "-"], stdin: prompt };
+    if (cont) return { argv: ["exec", "resume", ...(modeArgs || []), "--last", "-"], stdin: prompt };
+    return { argv: ["exec", ...(modeArgs || [])], stdin: prompt };
   },
   tmux: {
     generatingRe: /Thinking|Working|Generating/i,

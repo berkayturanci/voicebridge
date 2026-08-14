@@ -5,17 +5,18 @@ const { splitArgs } = require("../config");
 const antigravityAdapter = {
   label: "Antigravity",
   bin: () => process.env.AGY_BIN || "agy",
-  get supportsContinue() { return splitArgs(process.env.AGY_CONTINUE_ARGS).length > 0; },
+  supportsContinue: true,
   stream: "text",
   defaultMode: "safe",
   modes: {
     safe: { label: "Sandbox", args: ["--sandbox"] },
-    full: { label: "Fully autonomous", args: ["--yolo"] },
+    full: { label: "Fully autonomous", args: ["--dangerously-skip-permissions"] },
   },
-  command(prompt, { cont, modeArgs } = {}) {
+  command(prompt, { cont, resume, modeArgs } = {}) {
     const base = process.env.AGY_ARGS ? splitArgs(process.env.AGY_ARGS) : ["--print"];
-    const resume = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
-    const argv = [...base, ...resume, ...(modeArgs || [])];
+    const legacy = cont ? splitArgs(process.env.AGY_CONTINUE_ARGS) : [];
+    const continuity = legacy.length ? legacy : resume ? ["--conversation", resume] : cont ? ["--continue"] : [];
+    const argv = [...base, ...continuity, ...(modeArgs || [])];
     if (process.env.AGY_PROMPT_ARG) { argv.push(prompt); return { argv, stdin: null }; }
     return { argv, stdin: prompt };
   },
