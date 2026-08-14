@@ -35,10 +35,29 @@ function parseClaudeEvents(line) {
   let obj;
   try { obj = JSON.parse(line); } catch (_) { return []; }
   const out = [];
+  if (obj.type === "approval_request" || obj.type === "permission_request") {
+    out.push({
+      type: "approval_request",
+      tool: obj.name || obj.tool || "tool",
+      command: obj.command || (obj.input && obj.input.command) || "",
+      details: obj.details || (obj.input && JSON.stringify(obj.input)) || "",
+      description: obj.description || (obj.input && (obj.input.description || obj.input.command)) || "Confirmation required",
+    });
+    return out;
+  }
   if (obj.type === "assistant" && obj.message && Array.isArray(obj.message.content)) {
     for (const b of obj.message.content) {
       if (b && b.type === "text" && b.text) out.push({ type: "delta", text: b.text });
       else if (b && b.type === "tool_use") out.push({ type: "activity", text: toolLabel(b) });
+      else if (b && (b.type === "approval_request" || b.type === "permission_request")) {
+        out.push({
+          type: "approval_request",
+          tool: b.name || b.tool || "tool",
+          command: b.command || (b.input && b.input.command) || "",
+          details: b.details || (b.input && JSON.stringify(b.input)) || "",
+          description: b.description || toolLabel(b),
+        });
+      }
     }
   }
   return out;

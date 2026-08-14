@@ -33,6 +33,7 @@ const {
 const { commandGroupsForAgent } = require("../services/commands");
 const { pushEnabled, pushSubs } = require("../services/push");
 const { transcribe } = require("../services/stt");
+const { getPendingApprovals, resolveApproval, clearSessionApprovals } = require("../services/approvals");
 const { streamAsk, proxyCloudBrowse } = require("../runners");
 const { killTmux, ensureTmuxAgent, tmuxName, tmuxHas, tmuxCapture, tmuxRun, sleepMs } = require("../runners/tmux");
 const { killLive } = require("../runners/live");
@@ -119,6 +120,26 @@ function handleRequest(req, res) {
         catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
         markMobileSeen(req, data);
         return sendJson(res, 200, { ok: true, mobile: publicMobileState() });
+      });
+    }
+
+    if (req.method === "GET" && urlPath === "/api/approvals") {
+      const q = new URL(req.url, "http://x").searchParams;
+      const list = getPendingApprovals(q.get("sessionId"));
+      return sendJson(res, 200, { approvals: list });
+    }
+
+    if (req.method === "POST" && urlPath.startsWith("/api/approvals/")) {
+      const id = urlPath.slice("/api/approvals/".length);
+      return readBody(req, 8 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
+        let data = {};
+        try { data = JSON.parse(body.toString("utf8") || "{}"); }
+        catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
+        const approved = data.approved === true || data.approved === "true" || data.approved === 1;
+        const ok = resolveApproval(id, approved);
+        if (!ok) return sendJson(res, 404, { error: "Approval request not found or already settled" });
+        return sendJson(res, 200, { ok: true, id, approved });
       });
     }
 
@@ -284,7 +305,11 @@ function handleRequest(req, res) {
         if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
         const session = resolveSession(data.sessionId);
-        if (session) { session.started = false; session.history = []; }
+        if (session) {
+          session.started = false;
+          session.history = [];
+          clearSessionApprovals(session.id, "Session reset");
+        }
         return sendJson(res, 200, { ok: true });
       });
     }

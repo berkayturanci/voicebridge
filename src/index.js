@@ -126,6 +126,8 @@ function start() {
   return server;
 }
 
+const approvalsService = require("./services/approvals");
+
 module.exports = {
   AGENTS,
   parseDotEnv: config.parseDotEnv,
@@ -148,6 +150,10 @@ module.exports = {
   publicSession,
   saveSessions,
   loadSessions,
+  createApproval: approvalsService.createApproval,
+  resolveApproval: approvalsService.resolveApproval,
+  getPendingApprovals: approvalsService.getPendingApprovals,
+  clearSessionApprovals: approvalsService.clearSessionApprovals,
   buildServer,
   handleRequest,
   start,
@@ -164,6 +170,7 @@ module.exports = {
     TMUX_GENERATING_RE: tmuxRunner.TMUX_GENERATING_RE,
     wsAcceptKey,
     wsEncode,
+    pendingApprovals: approvalsService.pendingApprovals,
   },
   get defaultSessionId() { return sessionsService.defaultSessionId; },
   set defaultSessionId(v) { sessionsService.defaultSessionId = v; },
