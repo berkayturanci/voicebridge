@@ -108,7 +108,7 @@ You only do this once per tailnet.
 ## Step 4 — Publish the bridge over HTTPS
 
 ```bash
-tailscale serve --bg --https=443 localhost:8787
+tailscale serve --bg http://127.0.0.1:8787
 tailscale serve status
 ```
 
@@ -116,7 +116,7 @@ tailscale serve status
 
 ```
 https://your-machine.tailXXXX.ts.net (tailnet only)
-|-- / proxy http://localhost:8787
+|-- / proxy http://127.0.0.1:8787
 ```
 
 The first request may take a few seconds while Tailscale provisions the TLS
@@ -188,7 +188,7 @@ Both pieces stop when the Mac sleeps or reboots. To bring it back:
 
 ```bash
 ACCESS_TOKEN=… PROJECT_DIR=… npm start          # terminal 1 (the bridge)
-tailscale serve --bg --https=443 localhost:8787  # once per boot (config is remembered)
+tailscale serve --bg http://127.0.0.1:8787       # once per boot (config is remembered)
 ```
 
 `tailscale serve` configuration persists across reboots, so usually you only
@@ -213,9 +213,11 @@ tailscale serve --https=443 off
   exposes the bridge to the internet — set `ACCESS_TOKEN` and prefer Tailscale's
   private tailnet.
 - **Fully-local STT (Whisper):** removes the browser-speech dependency for
-  transcription; see [configuration.md](configuration.md). You still want HTTPS
-  for a good mobile experience, but the mic in whisper mode uses `getUserMedia`,
-  which is *also* gated on a secure context — so HTTPS is still required.
+  transcription; see [configuration.md](configuration.md). Batch `whisper` mode
+  records then transcribes, while `whisper-stream` streams mic chunks through the
+  bridge to a local WebSocket transcriber and supports hands-free talking mode.
+  You still want HTTPS for a good mobile experience, because both modes use
+  `getUserMedia`, which is also gated on a secure context.
 
 See also: [security.md](security.md) for the threat model and the access-token
 design.

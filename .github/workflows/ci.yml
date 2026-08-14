@@ -10,12 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - run: npm ci
       - run: node --check server.js
       - run: node --check examples/cloud-runner/server.js
+      - run: npm run lint
       - run: npm test
       - run: npm run smoke
 
@@ -31,9 +32,9 @@ jobs:
           channel: stable
       - run: flutter --version
       - run: flutter pub get
-      # Errors-only gate: fails on real API breakage (removed/changed symbols) from
-      # dependency bumps, not on the app's pre-existing lint debt (infos/warnings).
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build appbundle --release
 
   desktop:
     runs-on: ubuntu-latest
@@ -42,10 +43,61 @@ jobs:
         working-directory: desktop
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - run: npm install --no-audit --no-fund
+      - run: npm test
       # Package an unpacked Linux build: validates electron / electron-builder bumps
       # actually install and package (no AppImage/system libs needed for `dir`).
       - run: npx --no-install electron-builder --linux dir
+
+  desktop-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run dist:win:dir
+      - run: npm run verify:win:dir
+      - run: npm run dist:win:preview
+      - uses: actions/upload-artifact@v7
+        with:
+          name: voicebridge-windows-preview
+          path: desktop/dist/voicebridge-*-setup.exe
+          if-no-files-found: error
+          # Previews are for looking at the build that just ran, so one day is
+          # enough. The 90-day default filled the account's shared storage
+          # (~118 MB per run, 5 GB accumulated) and broke artifact uploads in
+          # every other repo on the account.
+          retention-days: 1
+
+  desktop-macos-preview:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      # Builds a non-notarized, ad-hoc signed preview DMG and verifies that it
+      # mounts, contains voicebridge.app, bundles the bridge resources, and
+      # passes codesign verification.
+      - run: npm run dist:mac:preview
+      - uses: actions/upload-artifact@v7
+        with:
+          name: voicebridge-mac-preview
+          path: desktop/dist/voicebridge-*-arm64.dmg
+          if-no-files-found: error
+          # See the Windows preview above — one day, not the 90-day default.
+          retention-days: 1

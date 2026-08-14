@@ -1,0 +1,27 @@
+# VoiceBridge
+
+> VoiceBridge gives coding agents a hands-free voice interface. Talk to Claude
+> Code, Codex, Antigravity, and Ollama from your phone — dictate prompts and hear
+> responses without touching the keyboard. Free and source-available, with no
+> dependency on ElevenLabs or other paid speech services.
+
+## Site
+
+- [Home](https://berkayturanci.github.io/voicebridge/): overview, features, and setup
+
+## Source
+
+- [GitHub repository](https://github.com/berkayturanci/voicebridge): source, issues, and releases
+- [Mac DMG download](https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg): Apple Silicon desktop host app
+- [Windows installer download](https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe): Windows x64 preview desktop host app
+- [Release checksums](https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/checksums.txt): SHA256 checksums for desktop release assets
+- [Mac host guide](https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md): install, Tailscale, and QR pairing setup
+- [Windows host guide](https://github.com/berkayturanci/voicebridge/blob/main/docs/windows-desktop-host.md): installer, Tailscale, and QR pairing setup
+
+## Key concepts
+
+- Hands-free control: dictate to and listen to coding agents by voice
+- Multi-agent: works with Claude Code, Codex, Antigravity, and Ollama
+- Phone-first: drive an agent from your phone while away from the desk
+- Desktop host app: starts the bridge, stores the token, diagnoses Tailscale/public URL/token status, and shows the pairing QR on macOS and Windows
+- Free & source-available: no ElevenLabs or paid TTS/STT dependency

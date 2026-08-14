@@ -5,6 +5,96 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-16
+
+### Added
+- Mac preview DMG verification now runs in CI and uploads a workflow artifact.
+- Windows desktop preview packaging now runs in CI and publishes a Windows
+  installer artifact.
+- The README, desktop docs, and landing site now include a current desktop host
+  screenshot.
+
+### Changed
+- Desktop Tailscale diagnostics now distinguish missing CLI, logged-out
+  Tailscale, DNS/network failures, HTTP status, timeout, and token mismatch.
+- Desktop Tailscale Serve command guidance now points directly at the configured
+  local bridge URL, for example `tailscale serve --bg http://127.0.0.1:8787`.
+- Mac and Windows setup docs, the landing site, and `llms.txt` now point to the
+  current release assets.
+
+### Fixed
+- Windows troubleshooting docs now cover SmartScreen, agent CLI `PATH`,
+  Tailscale connection state, public URL verification, Defender/firewall prompts,
+  port conflicts, and tray quit behavior.
+
+## [0.8.0] - 2026-07-14
+
+### Added
+- **Mac-first desktop host MVP**: first-run setup now chooses one project folder,
+  agent, host/port, optional mobile URL, and generated access token before the
+  bridge starts.
+- **Desktop QR pairing**: the host app shows a scannable mobile URL and a
+  versioned pairing payload; the native mobile app can scan the QR or paste the
+  payload to configure itself.
+- **Mobile last-seen state**: the bridge exposes authenticated mobile heartbeat
+  endpoints, the native app reports activity from settings/session/chat screens,
+  and the desktop host shows whether the phone is currently connected.
+- **Guided Tailscale setup** in the desktop host: status detection, a copyable
+  `tailscale serve --bg <port>` command, and public URL health verification.
+- **Unsigned Mac DMG build path** with `npm run dist:mac:unsigned`.
+
+### Changed
+- Desktop access tokens are generated automatically and stored with Electron
+  `safeStorage` (`macOS Keychain` on Mac) when OS secure storage is available.
+- The native app setup script now regenerates iOS/Android launcher icons after
+  Flutter platform scaffold generation, so app icons do not fall back to the
+  default Flutter mark.
+
+### Fixed
+- Desktop startup now preflights the selected project folder, selected agent CLI,
+  port binding, and bridge health so failures are shown as actionable diagnostics.
+
+## [0.7.0] - 2026-07-12
+
+### Added
+- **QR-code pairing**: scan the bridge's startup QR code to connect instantly,
+  instead of typing the bridge URL and access token by hand.
+- **First-run onboarding**: a short, skippable explainer shown once before the
+  connect screen, covering what VoiceBridge needs on your computer (an agent
+  CLI already installed and signed in, Tailscale) — closes a real
+  comprehension gap for a stranger downloading the app cold from an app store.
+
+### Changed
+- Network/connection failures (unreachable bridge, TLS errors) now show
+  actionable in-app messages ("check that your computer is on, Tailscale is
+  running...") instead of a raw Dart/OS exception string.
+- App Store subtitle and Google Play short description now state the
+  PC/Tailscale requirement explicitly, so the store listing itself filters
+  out the wrong audience before install.
+- Decided and documented the app's pricing model for the upcoming store
+  release: free, matching the PolyForm Noncommercial source license — no
+  ads, no in-app purchases.
+
+### Fixed
+- The App Store Promotional Text draft was 171 characters — one over Apple's
+  170-character limit; trimmed to fit.
+
+## [0.6.0] - 2026-07-11
+
+### Added
+- Fully-local streaming STT via `/api/stt-stream`, proxying browser microphone
+  chunks to a configured local Whisper WebSocket transcriber.
+
+### Changed
+- Codex and Antigravity sessions now resume by default with the current
+  non-interactive CLI flags and persist continuity state across bridge restarts.
+- Codex auto mode now uses the current workspace-write/no-approval invocation
+  instead of the removed `--full-auto` flag.
+- Antigravity full mode now uses the current `--dangerously-skip-permissions`
+  flag instead of the removed `--yolo` alias.
+- The smoke test now uses an isolated temporary sessions file instead of the
+  developer's persisted bridge sessions.
+
 ## [0.5.0] - 2026-06-22
 
 ### Added

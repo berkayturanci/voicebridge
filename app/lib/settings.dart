@@ -6,7 +6,16 @@ class AppSettings {
   String baseUrl;
   String token;
 
-  AppSettings({this.baseUrl = '', this.token = ''});
+  /// Whether the first-run explainer (see [OnboardingScreen]) has been shown
+  /// or skipped. Distinct from [isConfigured]: a user can dismiss onboarding
+  /// without having connected to a bridge yet, and it should not reappear.
+  bool hasSeenOnboarding;
+
+  AppSettings({
+    this.baseUrl = '',
+    this.token = '',
+    this.hasSeenOnboarding = false,
+  });
 
   bool get isConfigured => baseUrl.trim().isNotEmpty;
 
@@ -24,6 +33,7 @@ class AppSettings {
     return AppSettings(
       baseUrl: p.getString('baseUrl') ?? '',
       token: p.getString('token') ?? '',
+      hasSeenOnboarding: p.getBool('hasSeenOnboarding') ?? false,
     );
   }
 
@@ -31,5 +41,13 @@ class AppSettings {
     final p = await SharedPreferences.getInstance();
     await p.setString('baseUrl', baseUrl.trim());
     await p.setString('token', token.trim());
+  }
+
+  /// Persisted separately from [save] so dismissing onboarding doesn't
+  /// require (or wait on) a successful bridge connection.
+  Future<void> markOnboardingSeen() async {
+    hasSeenOnboarding = true;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('hasSeenOnboarding', true);
   }
 }

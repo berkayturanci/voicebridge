@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -5,7 +6,6 @@ import 'package:flutter/foundation.dart'; // defaultTargetPlatform / TargetPlatf
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // SystemSound + HapticFeedback (earcons)
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -42,6 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _canSend = false;
   bool _hideActivity = false; // hide ⚙︎ tool/bash activity lines from the chat
   SessionWatch? _watch; // self-reconnecting live transcript watch (#141)
+  Timer? _mobileSeenTimer;
   final List<String> _sentEcho = []; // optimistic sends awaiting their watch echo
   bool get _isTmux => widget.session.runner == 'tmux';
   bool _ttsSpeaking = false; // true while TTS is actually producing audio
@@ -115,6 +116,11 @@ class _ChatScreenState extends State<ChatScreen> {
     } else {
       _loadHistory();
     }
+    _markMobileSeen();
+    _mobileSeenTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _markMobileSeen(),
+    );
     _loadModes();
     SharedPreferences.getInstance().then((p) {
       if (mounted) setState(() => _hideActivity = p.getBool('vb_hide_activity') ?? false);
@@ -125,6 +131,12 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _hideActivity = !_hideActivity);
     final p = await SharedPreferences.getInstance();
     await p.setBool('vb_hide_activity', _hideActivity);
+  }
+
+  Future<void> _markMobileSeen() async {
+    try {
+      await _api.mobileSeen(source: 'chat');
+    } catch (_) {}
   }
 
   // Full (tmux) sessions: load the server transcript, then watch for every new
@@ -266,7 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) => Container(
         decoration: BoxDecoration(
           color: VbColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         child: SafeArea(
           top: false,
@@ -372,6 +384,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _watch?.close(); // stop the live transcript watch (#141)
+    _mobileSeenTimer?.cancel();
     WakelockPlus.disable();
     _stt.cancel();
     _tts.stop();
@@ -449,10 +462,10 @@ class _ChatScreenState extends State<ChatScreen> {
     var tightened = false;
 
     await _stt.listen(
-      localeId: _locale,
-      listenFor: const Duration(seconds: 30),
-      pauseFor: longPause,
       listenOptions: SpeechListenOptions(
+        localeId: _locale,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: longPause,
         listenMode: ListenMode.dictation, // long-form; far less eager to finalize than the default
         partialResults: true,
         onDevice: false, // en uses server recognition
@@ -1137,7 +1150,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final isMe = m.role == 'me';
-    final radius = Radius.circular(VbRadius.bubble);
+    final radius = const Radius.circular(VbRadius.bubble);
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -1829,7 +1842,7 @@ class _CommandSheetState extends State<_CommandSheet> {
       child: Container(
         decoration: BoxDecoration(
           color: VbColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         height: MediaQuery.of(context).size.height * 0.72,
         child: Column(
@@ -1947,7 +1960,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
     return Container(
       decoration: BoxDecoration(
         color: VbColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: SafeArea(
         top: false,
@@ -1985,7 +1998,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 ),
                 const SizedBox(height: 18),
                 Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  padding: const EdgeInsets.only(left: 4, bottom: 6),
                   child: Text('NAME',
                       style: TextStyle(
                           fontSize: 11,
@@ -2001,7 +2014,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 ),
                 const SizedBox(height: 18),
                 Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 4),
+                  padding: const EdgeInsets.only(left: 4, bottom: 4),
                   child: Text('AUTONOMY MODE',
                       style: TextStyle(
                           fontSize: 11,
@@ -2011,7 +2024,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                 ),
                 if (widget.modes.isEmpty)
                   Padding(
-                    padding: EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     child: Text('Couldn\'t load mode info for this session.',
                         style: TextStyle(color: VbColors.textMuted)),
                   )
@@ -2032,7 +2045,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     children: [
                       Icon(Icons.info_outline_rounded,
                           size: 16, color: VbColors.textMuted),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Permission prompts can\'t open from the phone; "full-auto" mode is best for uninterrupted runs.',
@@ -2046,9 +2059,9 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   ),
                 ),
                 if (widget.canAttach) ...[
-                  SizedBox(height: 18),
+                  const SizedBox(height: 18),
                   Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    padding: const EdgeInsets.only(left: 4, bottom: 6),
                     child: Text('CLAUDE SESSION',
                         style: TextStyle(
                             fontSize: 11,
@@ -2064,7 +2077,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                       onTap: () => Navigator.pop(
                           context, <String, String>{'action': 'attach'}),
                       child: Container(
-                        padding: EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 13),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
@@ -2074,7 +2087,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                           children: [
                             Icon(Icons.history_rounded,
                                 size: 22, color: VbColors.accent),
-                            SizedBox(width: 13),
+                            const SizedBox(width: 13),
                             Expanded(
                               child: Text(
                                 'Connect to the CLI/desktop session & continue by voice',
@@ -2093,9 +2106,9 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                   ),
                 ],
                 if (widget.isTmux) ...[
-                  SizedBox(height: 18),
+                  const SizedBox(height: 18),
                   Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 6),
+                    padding: const EdgeInsets.only(left: 4, bottom: 6),
                     child: Text('FULL SESSION',
                         style: TextStyle(
                             fontSize: 11,
@@ -2112,7 +2125,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                           context, <String, String>{'action': 'tmux-attach'}),
                       child: Container(
                         padding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: VbColors.border),
@@ -2121,7 +2134,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                           children: [
                             Icon(Icons.terminal_rounded,
                                 size: 22, color: VbColors.accent),
-                            SizedBox(width: 13),
+                            const SizedBox(width: 13),
                             Expanded(
                               child: Text("Open on Mac / access from the Claude app",
                                   style: TextStyle(
@@ -2137,9 +2150,9 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                     ),
                   ),
                 ],
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 6),
+                  padding: const EdgeInsets.only(left: 4, bottom: 6),
                   child: Text('VOICE',
                       style: TextStyle(
                           fontSize: 11,
@@ -2156,7 +2169,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                         context, <String, String>{'action': 'voice'}),
                     child: Container(
                       padding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: VbColors.border),
@@ -2165,7 +2178,7 @@ class _SessionSettingsSheetState extends State<_SessionSettingsSheet> {
                         children: [
                           Icon(Icons.record_voice_over_rounded,
                               size: 22, color: VbColors.accent),
-                          SizedBox(width: 13),
+                          const SizedBox(width: 13),
                           Expanded(
                             child: Text('Choose the talking voice',
                                 style: TextStyle(
@@ -2274,19 +2287,19 @@ class _ClaudeSessionsSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: VbColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       height: MediaQuery.of(context).size.height * 0.7,
       child: Column(
         children: [
           const _Grabber(),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
             child: Row(
               children: [
                 Icon(Icons.history_rounded, color: VbColors.accent),
-                SizedBox(width: 8),
-                Expanded(
+                const SizedBox(width: 8),
+                const Expanded(
                   child: Text('Claude sessions',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),

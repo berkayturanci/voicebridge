@@ -16,6 +16,8 @@ First-stage features:
   (`flutter_tts`), then listens again.
 - **Bridge settings** — point it at your machine's URL (a Tailscale HTTPS URL is
   ideal) and an optional access token, stored on the device.
+- **QR pairing** — scan the QR shown in the desktop host app, or paste the
+  pairing URL / payload manually.
 
 > The PWA still works too — install the web app from Safari for a zero-extra-step
 > option. This native app is the path when you want reliable voice as an
@@ -61,6 +63,8 @@ allows the mic and speech recognition:
 <string>The microphone is used to give voice commands.</string>
 <key>NSSpeechRecognitionUsageDescription</key>
 <string>Used to transcribe what you say.</string>
+<key>NSCameraUsageDescription</key>
+<string>The camera is used to scan VoiceBridge pairing QR codes.</string>
 ```
 
 Minimum iOS deployment target **12.0+** (set in `ios/Podfile` /
@@ -73,6 +77,8 @@ Minimum iOS deployment target **12.0+** (set in `ios/Podfile` /
 
 ```xml
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" android:required="false" />
 ```
 
 ### Desktop (macOS / Windows / Linux)
@@ -98,7 +104,8 @@ The app runs on the desktop from the same code. Caveats:
 
 ## First launch
 
-1. Enter the **bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token.
+1. Scan the desktop host app's QR, paste its pairing code, or enter the
+   **bridge URL** (e.g. `https://mac.tail-xxxx.ts.net`) and token manually.
 2. "Test & Save" verifies it can reach `/api/config`.
 3. You land on the session list — open one and talk.
 

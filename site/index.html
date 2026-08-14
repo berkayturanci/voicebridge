@@ -3,17 +3,46 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="google-site-verification" content="YOfteG6Rawd61nFnQCQY1iLQB8MbUMlJA6zIFUkJC0g" />
 <title>VoiceBridge — Hands-Free Voice for Coding Agents</title>
-<meta name="description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone. Free, source-available, no ElevenLabs." />
+<meta name="description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
+<meta name="keywords" content="VoiceBridge, voice coding, hands-free coding, Claude Code, Codex, Antigravity, Ollama, Whisper, local speech to text, voice agent, speech to code, coding assistant, source-available" />
+<meta name="author" content="Berkay Turancı" />
 <meta name="theme-color" content="#0a0a0e" />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://berkayturanci.github.io/voicebridge/" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
 <meta property="og:title" content="VoiceBridge — Hands-Free Voice for Coding Agents" />
-<meta property="og:description" content="Talk to Claude Code from your phone. Free, source-available." />
+<meta property="og:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
 <meta property="og:type" content="website" />
-<meta property="og:image" content="hero.svg" />
+<meta property="og:url" content="https://berkayturanci.github.io/voicebridge/" />
+<meta property="og:site_name" content="VoiceBridge" />
+<meta property="og:image" content="https://berkayturanci.github.io/voicebridge/hero.svg" />
+<meta property="og:image:alt" content="VoiceBridge — hands-free voice for coding agents" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="VoiceBridge — Hands-Free Voice for Coding Agents" />
+<meta name="twitter:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
+<meta name="twitter:image" content="https://berkayturanci.github.io/voicebridge/hero.svg" />
+<meta name="twitter:image:alt" content="VoiceBridge — hands-free voice for coding agents" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "VoiceBridge",
+  "url": "https://berkayturanci.github.io/voicebridge/",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Windows, Web, iOS, Android",
+  "description": "Hands-free voice control for coding agents. Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Berkay Turancı" }
+}
+</script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
@@ -189,6 +218,19 @@
     perspective: 1000px;
     animation: fadeIn 1.5s ease-in;
   }
+  .product-shot {
+    width: min(100%, 560px);
+    border-radius: 18px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.5);
+    background: #101418;
+  }
+  .product-shot-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 1.2s ease-in;
+  }
   
   .orb {
     width: 180px;
@@ -333,6 +375,23 @@
   }
   .copy-btn:hover { background: rgba(255,255,255,0.2); }
 
+  .download-strip {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 24px;
+    align-items: stretch;
+  }
+  .download-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+  }
+  .download-panel h3 { font-size: 24px; margin-bottom: 12px; }
+  .download-panel p { color: var(--text-secondary); margin-bottom: 18px; }
+  .steps { display: grid; gap: 12px; color: var(--text-secondary); font-size: 15px; }
+  .steps strong { color: var(--text-primary); }
+
   /* FAQ Accordion */
   .faq-item {
     background: var(--bg-surface);
@@ -375,7 +434,9 @@
     h1 { font-size: 48px; }
     .hero-lead { margin-inline: auto; }
     .hero-cta { justify-content: center; }
+    .download-strip { grid-template-columns: 1fr; }
     .visualizer-container { transform: scale(0.8); }
+    .product-shot-wrap { order: -1; }
     nav .nav-links a.link { display: none; } /* Hide links on mobile, keep button */
   }
   @media (max-width: 600px) {
@@ -384,6 +445,7 @@
     .hero { padding-top: 100px; }
   }
 </style>
+  <!-- Cloudflare Web Analytics --><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f9a978b9ccc64ff49460fbcee8f722ef"}'></script>
 </head>
 <body>
 
@@ -399,7 +461,7 @@
       <a href="#features" class="link">Features</a>
       <a href="#how" class="link">How it works</a>
       <a href="#faq" class="link">FAQ</a>
-      <a href="https://github.com/berkayturanci/speak-with-claude-code" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+      <a href="https://github.com/berkayturanci/voicebridge" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
         <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block; vertical-align:text-bottom; margin-right:4px;"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
         GitHub
       </a>
@@ -411,29 +473,33 @@
   <div class="wrap hero-content">
     <div>
       <div class="pill">
-        <span class="dot"></span> Free · Source-Available · No API Keys
+        <span class="dot"></span> v0.8 · Mac + Windows desktop host · QR pairing
       </div>
       <h1>Hands-free voice<br/>for your <span class="grad">coding agent.</span></h1>
       <p class="hero-lead">
         Talk to Claude Code, Codex, Antigravity, or Ollama directly from your phone. 
-        It does the work and replies in chat <b>and aloud</b> — like a real phone call with your developer companion.
+        It keeps the session going across bridge restarts, does the work, and replies in chat <b>and aloud</b>. The desktop host starts the bridge, checks Tailscale, and pairs the mobile app with a QR.
       </p>
       <div class="hero-cta">
-        <a href="#quickstart" class="btn btn-primary">
+        <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download Mac DMG
+        </a>
+        <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe" class="btn btn-secondary">
+          Download Windows
+        </a>
+        <a href="#quickstart" class="btn btn-secondary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
           Quickstart
         </a>
-        <a href="https://github.com/berkayturanci/speak-with-claude-code" class="btn btn-secondary">
+        <a href="https://github.com/berkayturanci/voicebridge" class="btn btn-secondary">
           View Source
         </a>
       </div>
     </div>
     
-    <div class="visualizer-container">
-      <div class="wave-ring wave-1"></div>
-      <div class="wave-ring wave-2"></div>
-      <div class="wave-ring wave-3"></div>
-      <div class="orb"></div>
+    <div class="product-shot-wrap">
+      <img class="product-shot" src="desktop-host-control.png" alt="VoiceBridge desktop host control panel showing bridge health, Tailscale diagnostics, and pairing controls" />
     </div>
   </div>
 </section>
@@ -443,7 +509,7 @@
     <div class="section-header">
       <span class="eyebrow">Powerful Features</span>
       <h2>A seamless bridge between you and your code.</h2>
-      <p class="section-lead">A tiny Node bridge drives the CLI on your machine and streams everything to your phone. Zero latency, total privacy.</p>
+      <p class="section-lead">A tiny Node bridge drives the CLI on your machine and streams everything to your phone, with browser voice by default or local Whisper when you want it.</p>
     </div>
     
     <div class="grid-features">
@@ -460,7 +526,7 @@
       <div class="card">
         <div class="card-icon">🗂️</div>
         <h3>Parallel Sessions</h3>
-        <p>Run "Claude on Repo A" and "Codex on Repo B" simultaneously. Jump between ongoing persistent sessions instantly.</p>
+        <p>Run "Claude on Repo A" and "Codex on Repo B" simultaneously. Claude, Codex, and Antigravity continuity survives bridge restarts.</p>
       </div>
       <div class="card">
         <div class="card-icon">📞</div>
@@ -475,7 +541,12 @@
       <div class="card">
         <div class="card-icon">⚡</div>
         <h3>Local-First Option</h3>
-        <p>Uses built-in Browser Web Speech API for free STT/TTS. Or, configure it to use your own local Whisper instance for max accuracy.</p>
+        <p>Use built-in browser STT/TTS, batch Whisper, or streaming Whisper over a local WebSocket for hands-free talking mode without a voice vendor.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🖥️</div>
+        <h3>Desktop Host App</h3>
+        <p>Install the Mac DMG or Windows preview build, choose one workspace, pick Claude/Codex/Antigravity/Ollama, verify Tailscale, and pair your phone by scanning the desktop QR.</p>
       </div>
     </div>
   </div>
@@ -490,9 +561,9 @@
     </div>
     
     <div class="flow-diagram">
-[ <span class="blue">iPhone Safari</span> ]                          [ <span class="highlight">Your Mac</span> ]
+[ <span class="blue">iPhone Safari</span> ]                       [ <span class="highlight">Your Mac or PC</span> ]
       
-mic <span style="color:#71717a">─Web Speech STT─▶</span> text <span style="color:#71717a">──https/Tailscale──▶</span> <span class="highlight">voicebridge</span> <span style="color:#71717a">──spawn──▶</span> claude / codex
+mic <span style="color:#71717a">─Web Speech or Whisper STT─▶</span> text <span style="color:#71717a">──https/Tailscale──▶</span> <span class="highlight">voicebridge</span> <span style="color:#71717a">──spawn──▶</span> claude / codex / agy
 speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span style="color:#71717a">◀──────────────</span> reply <span style="color:#71717a">◀───────────</span> (agent CLI)
     </div>
   </div>
@@ -502,8 +573,32 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
   <div class="wrap">
     <div class="section-header">
       <span class="eyebrow">Get Started</span>
-      <h2>Up and running in 4 lines.</h2>
-      <p class="section-lead">You need Node ≥ 18, an authenticated agent CLI, and Tailscale installed.</p>
+      <h2>Use the desktop app, or run from source.</h2>
+      <p class="section-lead">The desktop app is the easiest host setup. The terminal flow stays available for developers who want full control.</p>
+    </div>
+
+    <div class="download-strip" style="max-width: 900px; margin: 0 auto 28px;">
+      <div class="download-panel">
+        <span class="eyebrow">Recommended</span>
+        <h3>Desktop host app</h3>
+        <p>Install the Mac DMG or Windows preview installer, select your project folder and agent, copy the Tailscale Serve command, verify the public URL, then scan the pairing QR from the mobile app.</p>
+        <div class="hero-cta" style="animation:none;">
+          <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg" class="btn btn-primary">Download voicebridge-0.2.1-arm64.dmg</a>
+          <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe" class="btn btn-secondary">Download voicebridge-0.2.1-x64-setup.exe</a>
+          <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/checksums.txt" class="btn btn-secondary">Checksums</a>
+          <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md" class="btn btn-secondary">Mac setup guide</a>
+          <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/windows-desktop-host.md" class="btn btn-secondary">Windows setup guide</a>
+        </div>
+      </div>
+      <div class="download-panel">
+        <h3>Setup steps</h3>
+        <div class="steps">
+          <div><strong>1.</strong> Install an agent CLI and sign in on the host computer.</div>
+          <div><strong>2.</strong> Open VoiceBridge, choose the project folder, and start the bridge.</div>
+          <div><strong>3.</strong> Run the copied Tailscale Serve command and verify the public URL/token.</div>
+          <div><strong>4.</strong> Scan the QR from the iOS/Android app.</div>
+        </div>
+      </div>
     </div>
     
     <div class="code-window" style="max-width: 800px; margin: 0 auto;">
@@ -514,7 +609,7 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
       </div>
       <div class="code-content">
         <button class="copy-btn" onclick="copyQuickstart(this)">Copy</button>
-        <pre id="qs-code"><span class="cmd">git clone</span> https://github.com/berkayturanci/speak-with-claude-code voicebridge
+        <pre id="qs-code"><span class="cmd">git clone</span> https://github.com/berkayturanci/voicebridge voicebridge
 <span class="cmd">cd</span> voicebridge && <span class="cmd">npm install</span>
 
 <span class="comment"># Optional: Set up your environment (PROJECT_DIR, ACCESS_TOKEN)</span>
@@ -524,12 +619,12 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
 <span class="cmd">npm start</span>
 
 <span class="comment"># In a new terminal tab: Expose securely to your phone</span>
-<span class="cmd">tailscale serve</span> --bg --https=443 localhost:8787</pre>
+<span class="cmd">tailscale serve</span> --bg http://127.0.0.1:8787</pre>
       </div>
     </div>
     
     <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 14px;">
-      💡 Tip: Scan the QR code with your phone. Ensure Tailscale is active on both devices!
+      Tip: the desktop Network panel now distinguishes missing Tailscale, logged-out state, DNS/network failure, HTTP status, timeout, and token mismatch.
     </p>
   </div>
 </section>
@@ -544,14 +639,14 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     <details class="faq-item" open>
       <summary class="faq-summary">Is the voice feature actually free?</summary>
       <div class="faq-content">
-        Yes. Speech-to-text and text-to-speech run natively in your phone's browser using the Web Speech API. This means zero dependencies on paid services like ElevenLabs. (You only pay for your actual LLM agent usage, like your Anthropic Claude plan).
+        Yes. Browser speech-to-text and text-to-speech need no paid voice provider, and Whisper modes can keep transcription local on your own machine. You only pay for actual cloud agent usage where that agent CLI requires it.
       </div>
     </details>
     
     <details class="faq-item">
       <summary class="faq-summary">Does my code leave my machine?</summary>
       <div class="faq-content">
-        No, VoiceBridge acts only as a local proxy. Your agent (Claude, Codex, Antigravity) runs locally on your machine. Voice recording is transcribed on-device (via Apple/Google's dictation engines) and sent securely over your private Tailscale network.
+        VoiceBridge acts only as a local proxy. Your agent CLI runs on your machine, and traffic goes over your private Tailscale network. Claude, Codex, and Antigravity may still call their vendor clouds; Ollama and local Whisper can stay fully local.
       </div>
     </details>
     
@@ -565,7 +660,7 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     <details class="faq-item">
       <summary class="faq-summary">Can I use Whisper instead?</summary>
       <div class="faq-content">
-        Absolutely. If you want maximum accuracy (especially for coding syntax and punctuation), you can configure VoiceBridge to use your own local Whisper command-line tool via the `STT_MODE` and `STT_CMD` environment variables.
+        Absolutely. Use `STT_MODE=whisper` with `STT_CMD` for batch transcription, or `STT_MODE=whisper-stream` with `STT_STREAM_URL` for a local WebSocket transcriber that works with hands-free talking mode.
       </div>
     </details>
   </div>
@@ -578,9 +673,15 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
       VoiceBridge
     </div>
     <div class="footer-links">
-      <a href="https://github.com/berkayturanci/speak-with-claude-code">GitHub Repository</a>
-      <a href="https://github.com/berkayturanci/speak-with-claude-code/blob/main/docs/mobile-voice-setup.md">Mobile Setup Guide</a>
-      <a href="https://github.com/berkayturanci/speak-with-claude-code/blob/main/docs/security.md">Security Context</a>
+      <a href="https://github.com/berkayturanci/voicebridge">GitHub Repository</a>
+      <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg">Download Mac DMG</a>
+      <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-x64-setup.exe">Download Windows</a>
+      <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/checksums.txt">Checksums</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mac-desktop-host.md">Mac Host Guide</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/windows-desktop-host.md">Windows Host Guide</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/mobile-voice-setup.md">Mobile Setup Guide</a>
+      <a href="https://github.com/berkayturanci/voicebridge/blob/main/docs/security.md">Security Context</a>
+      <a href="privacy.html">Privacy Policy</a>
     </div>
     <div style="color: var(--text-secondary); font-size: 13px; opacity: 0.6;">
       Licensed under PolyForm Noncommercial 1.0.0

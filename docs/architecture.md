@@ -40,6 +40,27 @@ middleman.
 If the client disconnects (the **Stop** button aborts the `fetch`), the bridge
 kills the spawned child via the response `close` handler.
 
+## Shutdown Behavior
+
+The bridge handles `SIGINT` and `SIGTERM` as graceful shutdown signals. Shutdown
+is idempotent: the first signal starts cleanup, later signals are ignored while
+cleanup is in progress. The server closes its HTTP listener, closes active HTTP
+connections when the Node runtime supports it, and sends `SIGTERM` to every
+persistent live child in `liveProcs`. A short grace timer forces process exit if
+the HTTP server or a wedged child prevents normal shutdown.
+
+tmux runner sessions are intentionally not killed by bridge shutdown. A tmux
+session is an attachable Mac-side workspace (`tmux attach -t vb_<session>`) and
+may be useful after a phone disconnect or bridge restart. Session deletion and
+tmux idle timers still clean up tmux sessions through `killTmux`; process
+shutdown only reaps live child processes.
+
+tmux replies are scraped from the pane after the TUI becomes stable. The final
+capture uses a bounded scrollback window (`TMUX_CAPTURE_LINES`) and strips ANSI
+control sequences before extracting the latest assistant reply. If the pane only
+contains a partial or malformed turn, the bridge returns an `{type:"error"}`
+event instead of fabricating a fallback reply.
+
 ## Agent adapters
 
 Each agent is one entry in the `AGENTS` map in `server.js`:
@@ -83,10 +104,12 @@ session is recreated on boot).
 | Method & path | Purpose |
 |---------------|---------|
 | `GET /api/health` | Public. `{ ok, version, uptime, sessions }` for liveness/uptime checks. |
-| `GET /api/config` | Public. STT mode, whether auth is required, the agent list (with modes), the default project dir and session id. |
+| `GET /api/config` | Public bootstrap: STT mode, whether auth is required, the agent list (with modes), and runner types. With a valid token, also includes default project/session/favorites. |
 | `GET /api/browse` | List subdirectories of a path (folder picker). `runner=cloud` proxies to the cloud runner's `GET /browse` for remote dirs. |
 | `GET /api/commands` | A session project's commands (`.claude/commands` + npm scripts) for the palette. |
 | `GET /api/sessions` | List sessions. |
+| `GET /api/mobile-state` | Authenticated. Returns the native mobile client's last-seen time and connected state for the desktop host. |
+| `POST /api/mobile-seen` | Authenticated. Records a lightweight native mobile heartbeat. |
 | `POST /api/sessions` | Create a session `{ name, agent, projectDir, mode }`. |
 | `DELETE /api/sessions/:id` | Remove a session (not the default). |
 | `POST /api/ask` | Stream a turn `{ text, sessionId, mode?, reset? }` → NDJSON. |
@@ -95,5 +118,6 @@ session is recreated on boot).
 | `GET /api/ollama/models` | List models from the configured Ollama server (`OLLAMA_URL`). |
 | `POST /api/push/subscribe` | Register a Web Push subscription (https endpoints only). |
 
-All `/api/*` routes except `/api/config` and `/api/health` require the access
-token when `ACCESS_TOKEN` is set.
+All `/api/*` routes except `/api/health`, `/api/push/key`, and the public
+bootstrap subset of `/api/config` require the access token when `ACCESS_TOKEN`
+is set.

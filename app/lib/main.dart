@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'settings.dart';
 import 'theme.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/sessions_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -21,7 +22,7 @@ class VoiceBridgeApp extends StatelessWidget {
       builder: (_, dark, __) {
         VbColors.setPalette(dark ? VbPalette.dark : VbPalette.light);
         return MaterialApp(
-          title: 'voicebridge',
+          title: 'berkayturanci',
           debugShowCheckedModeBanner: false,
           theme: VbTheme.themed(),
           home: const _Bootstrap(),
@@ -81,7 +82,7 @@ class _BootstrapState extends State<_Bootstrap> {
                     color: Color(0xFF06210C), size: 40),
               ),
               const SizedBox(height: 22),
-              Text('voicebridge',
+              Text('berkayturanci',
                   style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -97,6 +98,12 @@ class _BootstrapState extends State<_Bootstrap> {
           ),
         ),
       );
+    }
+    // Show the explainer once, only for a genuinely fresh install (never
+    // seen it, never configured) — an existing install upgrading into this
+    // feature already has isConfigured=true and skips straight past it.
+    if (!s.hasSeenOnboarding && !s.isConfigured) {
+      return OnboardingScreen(settings: s);
     }
     if (!s.isConfigured) return SettingsScreen(settings: s);
     return SessionsScreen(settings: s);

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VoiceBridge Privacy Policy</title>
+<meta name="description" content="Privacy policy for the VoiceBridge web and native apps." />
+<link rel="canonical" href="https://berkayturanci.github.io/voicebridge/privacy.html" />
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0e;
+    --surface: #141419;
+    --border: rgba(255,255,255,.12);
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --accent: #3fb950;
+  }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+  }
+  main {
+    width: min(760px, calc(100% - 40px));
+    margin: 0 auto;
+    padding: 56px 0 72px;
+  }
+  a { color: var(--accent); }
+  h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.05; margin: 0 0 12px; }
+  h2 { margin-top: 34px; font-size: 22px; }
+  p, li { color: var(--muted); }
+  .lede { font-size: 18px; }
+  .box {
+    margin: 28px 0;
+    padding: 18px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+  }
+  footer {
+    margin-top: 44px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="./">VoiceBridge</a></p>
+  <h1>Privacy Policy</h1>
+  <p class="lede">VoiceBridge is a local-first bridge between your phone and a coding agent running on your own computer.</p>
+
+  <div class="box">
+    <strong>Short version:</strong>
+    <p>VoiceBridge does not run a hosted account system and the app developer does not receive your bridge URL, access token, prompts, transcripts, audio, code, or agent replies through the native app.</p>
+  </div>
+
+  <h2>What The App Stores</h2>
+  <p>The native app stores your configured bridge URL and optional access token on your device so it can connect to your own VoiceBridge server. Chat transcripts may also be stored locally on your device for session continuity.</p>
+
+  <h2>What The App Sends</h2>
+  <p>The app sends your typed prompts, voice transcripts, and session actions only to the bridge URL that you configure. That bridge is expected to run on your own machine or private network, commonly through Tailscale HTTPS.</p>
+
+  <h2>Voice Processing</h2>
+  <p>The native app uses operating-system speech recognition and text-to-speech capabilities. Depending on your platform and settings, the operating system provider may process speech recognition requests. VoiceBridge also supports local Whisper modes on the bridge for users who want local transcription.</p>
+
+  <h2>Developer Collection</h2>
+  <p>The VoiceBridge app developer does not collect personal data from the native app. The public marketing website may use basic web analytics from its hosting or analytics provider; that website activity is separate from your private bridge traffic.</p>
+
+  <h2>Third-Party Agent CLIs</h2>
+  <p>If you use Claude Code, Codex, Antigravity, or another cloud-backed agent CLI, that agent may send prompts and context to its own provider according to that provider's terms. Ollama and local Whisper can run locally.</p>
+
+  <h2>No Accounts</h2>
+  <p>VoiceBridge does not provide a hosted account system. There is no VoiceBridge account to delete. Removing the app and clearing your local bridge/session files removes local app data under your control.</p>
+
+  <h2>Contact</h2>
+  <p>For privacy or support questions, open an issue at <a href="https://github.com/berkayturanci/voicebridge/issues">github.com/berkayturanci/voicebridge/issues</a>.</p>
+
+  <footer>Last updated: 2026-07-11</footer>
+</main>
+</body>
+</html>

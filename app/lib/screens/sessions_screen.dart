@@ -52,6 +52,9 @@ class _SessionsScreenState extends State<SessionsScreen>
     try {
       final cfg = await _api.config();
       final s = await _api.sessions();
+      try {
+        await _api.mobileSeen(source: 'sessions');
+      } catch (_) {}
       setState(() {
         _agents = (cfg['agents'] as List?) ?? [];
         _sessions = s;
@@ -127,7 +130,7 @@ class _SessionsScreenState extends State<SessionsScreen>
                   size: 18, color: Color(0xFF06210C)),
             ),
             const SizedBox(width: 10),
-            const Text('voicebridge'),
+            const Text('berkayturanci'),
           ],
         ),
         actions: [
@@ -270,7 +273,9 @@ class _SessionsScreenState extends State<SessionsScreen>
                         runSpacing: 6,
                         children: [
                           if (s.agentLabel.isNotEmpty)
-                            _MetaChip(label: s.agentLabel, icon: Icons.smart_toy_outlined),
+                            _MetaChip(
+                                label: s.agentLabel,
+                                icon: Icons.smart_toy_outlined),
                           if (s.mode.isNotEmpty) _MetaChip(label: s.mode),
                           _MetaChip(
                             label: s.runner == 'cloud' ? 'cloud' : 'local',
@@ -389,7 +394,8 @@ class _StateView extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: VbColors.textMuted, height: 1.4),
+          style:
+              TextStyle(fontSize: 14, color: VbColors.textMuted, height: 1.4),
         ),
         const SizedBox(height: 24),
         Center(
@@ -419,8 +425,8 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   bool _fullSession = false; // Toggle: run a full interactive claude in tmux
 
   List<dynamic> get _modes {
-    final a = widget.agents.firstWhere((e) => e['id'] == _agent,
-        orElse: () => null);
+    final a =
+        widget.agents.firstWhere((e) => e['id'] == _agent, orElse: () => null);
     return a == null ? [] : (a['modes'] as List? ?? []);
   }
 
@@ -450,7 +456,9 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
         agent: _agent ?? 'claude',
         mode: _mode ?? '',
         projectDir: _projectDir.isEmpty ? null : _projectDir,
-        runner: (_fullSession && (_agent ?? 'claude') == 'claude') ? 'tmux' : 'local',
+        runner: (_fullSession && (_agent ?? 'claude') == 'claude')
+            ? 'tmux'
+            : 'local',
       );
       if (mounted) Navigator.pop(context, s);
     } catch (e) {
@@ -467,7 +475,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
     return Container(
       decoration: BoxDecoration(
         color: VbColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: Padding(
         padding: EdgeInsets.only(
@@ -513,7 +521,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
             _fieldLabel('Agent'),
             const SizedBox(height: 7),
             DropdownButtonFormField<String>(
-              value: _agent,
+              initialValue: _agent,
               isExpanded: true,
               borderRadius: BorderRadius.circular(VbRadius.field),
               items: [
@@ -535,7 +543,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
             _fieldLabel('Mode'),
             const SizedBox(height: 7),
             DropdownButtonFormField<String>(
-              value: _mode,
+              initialValue: _mode,
               isExpanded: true,
               borderRadius: BorderRadius.circular(VbRadius.field),
               items: [
@@ -592,7 +600,8 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                                       fontWeight: FontWeight.w600,
                                       color: VbColors.textPrimary)),
                               const SizedBox(height: 2),
-                              Text("You can also join from the Mac — /remote-control works",
+                              Text(
+                                  "You can also join from the Mac — /remote-control works",
                                   style: TextStyle(
                                       fontSize: 11.5,
                                       color: VbColors.textMuted)),
@@ -601,8 +610,7 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                         ),
                         Switch(
                             value: _fullSession,
-                            onChanged: (v) =>
-                                setState(() => _fullSession = v)),
+                            onChanged: (v) => setState(() => _fullSession = v)),
                       ],
                     ),
                   ),
@@ -701,7 +709,8 @@ class _BrowseScreenState extends State<_BrowseScreen> {
     }
   }
 
-  String _join(String dir) => _path.endsWith('/') ? '$_path$dir' : '$_path/$dir';
+  String _join(String dir) =>
+      _path.endsWith('/') ? '$_path$dir' : '$_path/$dir';
 
   @override
   Widget build(BuildContext context) {
@@ -778,7 +787,7 @@ class _BrowseScreenState extends State<_BrowseScreen> {
                       ),
                     if (_dirs.isEmpty)
                       Padding(
-                        padding: EdgeInsets.all(40),
+                        padding: const EdgeInsets.all(40),
                         child: Center(
                           child: Text('No subfolders',
                               style: TextStyle(color: VbColors.textMuted)),

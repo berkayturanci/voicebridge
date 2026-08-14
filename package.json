@@ -1,7 +1,7 @@
 {
   "name": "voicebridge",
-  "version": "0.5.0",
-  "description": "Hands-free, two-way voice for coding agents (Claude Code, Codex, Antigravity) from your phone. Free, source-available, no ElevenLabs. Browser Web Speech (STT/TTS) + a tiny zero-dependency Node bridge that drives the agent CLI on your machine.",
+  "version": "0.8.1",
+  "description": "Hands-free, two-way voice for coding agents (Claude Code, Codex, Antigravity, Ollama) from your phone. Free, source-available, no ElevenLabs. Browser voice plus optional local Whisper STT through a tiny Node bridge.",
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "commonjs",
   "bin": {
@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/*.test.js",
+    "lint": "eslint server.js test/*.js examples/**/*.js desktop/main.js desktop/preload.js desktop/lib/*.js desktop/renderer/*.js desktop/test/*.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
     "smoke": "bash scripts/smoke.sh"
   },
   "engines": {
@@ -20,5 +21,11 @@
   },
   "optionalDependencies": {
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6"
   }
 }

@@ -1,19 +1,36 @@
 {
   "name": "voicebridge-desktop",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Desktop control app for the voicebridge agent — runs the Node bridge with a small panel and tray. Mac/Windows/Linux.",
+  "author": "VoiceBridge",
   "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/berkayturanci/voicebridge.git",
+    "directory": "desktop"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node scripts/run-tests.js",
     "icons": "node assets/gen-icons.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
+    "dist:mac:preview": "node scripts/build-mac-preview-dmg.js",
+    "dist:mac:signed": "node scripts/check-mac-signing-env.js && electron-builder --mac dmg",
+    "dist:mac:unsigned": "npm run dist:mac:preview",
+    "verify:mac:release": "node scripts/verify-mac-release.js",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:win:dir": "electron-builder --win dir --publish never",
+    "dist:win:preview": "electron-builder --win nsis --publish never",
+    "verify:win:dir": "node scripts/verify-win-unpacked.js",
     "dist:linux": "electron-builder --linux"
   },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
   "devDependencies": {
-    "electron": "^42.4.1",
+    "electron": "^43.0.0",
     "electron-builder": "^26.15.3"
   },
   "build": {
@@ -28,9 +45,21 @@
     "mac": {
       "target": "dmg",
       "icon": "assets/icon@512.png",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
-    "win": { "target": "nsis", "icon": "assets/icon@512.png" },
+    "dmg": {
+      "writeUpdateInfo": false
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon@512.png",
+      "artifactName": "voicebridge-${version}-${arch}-setup.${ext}"
+    },
+    "nsis": {
+      "differentialPackage": false
+    },
     "linux": { "target": "AppImage", "icon": "assets/icon@512.png" }
   }
 }

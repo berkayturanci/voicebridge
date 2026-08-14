@@ -1,0 +1,10 @@
+╭─ Claude Code v1.0
+│ Welcome
+╰
+❯ Produce a long answer
+✻ Thinking…
+⏺ [32mThis is a very long answer that wraps
+  across pane rows without losing content.[0m
+  It also keeps punctuation: [ok].
+────────────────────────────────
+❯

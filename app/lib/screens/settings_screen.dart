@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../qr_pairing.dart';
 import '../settings.dart';
 import '../theme.dart';
+import 'qr_scan_screen.dart';
 import 'sessions_screen.dart';
 
 /// Where the bridge is. The app talks to your machine's voicebridge over the
@@ -27,6 +29,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool get _isFirstRun => !Navigator.canPop(context);
 
+  void _applyPairing(PairingDetails details) {
+    setState(() {
+      _url.text = details.baseUrl;
+      _token.text = details.token;
+      _error = null;
+    });
+  }
+
+  Future<void> _scanPairingQr() async {
+    final details = await Navigator.push<PairingDetails>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (details != null && mounted) _applyPairing(details);
+  }
+
+  Future<void> _pastePairingCode() async {
+    final controller = TextEditingController();
+    final raw = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Paste pairing code'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: 'https://mac.tail-xxxx.ts.net/?token=... or JSON payload',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Use code'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (raw == null || raw.trim().isEmpty || !mounted) return;
+    try {
+      _applyPairing(parsePairingCode(raw));
+    } catch (e) {
+      setState(
+          () => _error = e.toString().replaceFirst('FormatException: ', ''));
+    }
+  }
+
   Future<void> _saveAndTest() async {
     setState(() {
       _busy = true;
@@ -41,6 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (cfg['authRequired'] == true) {
         await api.sessions(); // authed call → 401 if the token is wrong
       }
+      await api.mobileSeen(source: 'settings');
       await widget.settings.save();
       if (!mounted) return;
       // When opened from the list we pop back; when this is the first-run
@@ -65,9 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final firstRun = _isFirstRun;
     return Scaffold(
-      appBar: firstRun
-          ? null
-          : AppBar(title: const Text('Bridge settings')),
+      appBar: firstRun ? null : AppBar(title: const Text('Bridge settings')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
@@ -77,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Center(child: _logo()),
               const SizedBox(height: 22),
               Text(
-                'voicebridge',
+                'Connect to your PC',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 26,
@@ -89,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 8),
               Text(
                 'Type and talk to Claude Code from your phone.\n'
-                'Enter the bridge address to get started.',
+                'Enter the PC bridge address to get started.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 14, color: VbColors.textMuted, height: 1.5),
@@ -97,7 +151,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 34),
             ] else
               const SizedBox(height: 12),
-            _label('Bridge URL'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _scanPairingQr,
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: const Text('Scan QR'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _pastePairingCode,
+                    icon: const Icon(Icons.content_paste_rounded),
+                    label: const Text('Paste code'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            _label(firstRun ? 'PC bridge URL' : 'Bridge URL'),
             const SizedBox(height: 8),
             TextField(
               controller: _url,
@@ -133,8 +207,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: BoxDecoration(
                   color: VbColors.danger.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(VbRadius.field),
-                  border: Border.all(
-                      color: VbColors.danger.withValues(alpha: 0.4)),
+                  border:
+                      Border.all(color: VbColors.danger.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,6 +229,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 22),
+            _hint(),
             const SizedBox(height: 26),
             FilledButton.icon(
               onPressed: _busy ? null : _saveAndTest,
@@ -168,15 +244,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: Text(_busy
                   ? 'Connecting…'
                   : firstRun
-                      ? 'Connect'
+                      ? 'Connect to PC'
                       : 'Test & Save'),
             ),
             const SizedBox(height: 24),
             _label('Appearance'),
             const SizedBox(height: 8),
             _themeToggle(),
-            const SizedBox(height: 22),
-            _hint(),
           ],
         ),
       ),
@@ -302,9 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   'On your computer, serve the bridge over HTTPS with Tailscale:',
                   style: TextStyle(
-                      fontSize: 12.5,
-                      color: VbColors.textMuted,
-                      height: 1.45),
+                      fontSize: 12.5, color: VbColors.textMuted, height: 1.45),
                 ),
                 const SizedBox(height: 6),
                 Container(
@@ -316,7 +388,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     border: Border.all(color: VbColors.border),
                   ),
                   child: Text(
-                    'tailscale serve --bg 8787',
+                  'tailscale serve --bg --https=443 localhost:8787',
                     style: VbTheme.mono(size: 12, color: VbColors.accentBright),
                   ),
                 ),

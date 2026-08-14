@@ -20,7 +20,21 @@ test.after(() => new Promise((r) => server.close(r)));
 test("/api/config stays public and reports authRequired", async () => {
   const { status, data } = await request(server, "GET", "/api/config");
   assert.strictEqual(status, 200);
-  assert.strictEqual(JSON.parse(data).authRequired, true);
+  const cfg = JSON.parse(data);
+  assert.strictEqual(cfg.authRequired, true);
+  assert.ok(!("defaultProjectDir" in cfg));
+  assert.ok(!("defaultSessionId" in cfg));
+  assert.ok(!("favorites" in cfg));
+  assert.ok(Array.isArray(cfg.agents));
+});
+
+test("/api/config returns private convenience fields only when authorized", async () => {
+  const { status, data } = await request(server, "GET", "/api/config", null, { Authorization: "Bearer secret-token" });
+  assert.strictEqual(status, 200);
+  const cfg = JSON.parse(data);
+  assert.strictEqual(cfg.defaultSessionId, boot.id);
+  assert.strictEqual(typeof cfg.defaultProjectDir, "string");
+  assert.ok(Array.isArray(cfg.favorites));
 });
 
 test("protected endpoints reject missing/wrong token", async () => {
@@ -34,4 +48,12 @@ test("protected endpoints reject missing/wrong token", async () => {
 test("correct Bearer token is accepted", async () => {
   const { status } = await request(server, "GET", "/api/sessions", null, { Authorization: "Bearer secret-token" });
   assert.strictEqual(status, 200);
+});
+
+test("mobile seen endpoints are protected", async () => {
+  assert.strictEqual((await request(server, "GET", "/api/mobile-state")).status, 401);
+  assert.strictEqual((await request(server, "POST", "/api/mobile-seen", { source: "test" })).status, 401);
+  const ok = await request(server, "POST", "/api/mobile-seen", { source: "test" }, { Authorization: "Bearer secret-token" });
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual(JSON.parse(ok.data).mobile.connected, true);
 });

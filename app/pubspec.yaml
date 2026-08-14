@@ -1,7 +1,7 @@
 name: voicebridge_app
 description: Native iOS/Android client for the voicebridge agent — talk to Claude Code from your phone.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   # Color.withValues (used by the theme) needs Flutter 3.27+ / Dart 3.6+.
@@ -15,9 +15,13 @@ dependencies:
   speech_to_text: ^7.4.0
   flutter_tts: ^4.2.5
   audioplayers: ^6.1.0    # play bridge-side (Piper) neural TTS audio, opt-in
-  wakelock_plus: ^1.2.5   # keep the screen awake during talking mode (so the connection doesn't drop)
+  wakelock_plus: ^1.7.0   # keep the screen awake during talking mode (so the connection doesn't drop)
+  url_launcher: ^6.3.0    # open privacy, support, and docs links from settings
+  mobile_scanner: ^7.4.0  # scan the bridge's startup QR (README-promised pairing flow, #212)
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
 

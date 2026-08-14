@@ -30,13 +30,11 @@ const sandbox = {
   document: { createElement: (t) => new El(t), createTextNode: (t) => new TextNode(t) },
   navigator: {}, setTimeout: () => {},
 };
-// eslint-disable-next-line no-new-func
 new Function("document", "navigator", "setTimeout",
   grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") +
   "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;"
 ).call(sandbox, sandbox.document, sandbox.navigator, sandbox.setTimeout);
 
-const txt = (el) => el instanceof TextNode ? el.text : (el._text || el.children.map(txt).join(""));
 const tags = (el) => { const out = []; (function w(e) { if (e.tagName) out.push(e.tagName); (e.children || []).forEach(w); })(el); return out; };
 
 test("links: http(s) becomes <a>, other schemes are inert text", () => {

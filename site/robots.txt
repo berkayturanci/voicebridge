@@ -1,0 +1,50 @@
+# VoiceBridge — https://berkayturanci.github.io/voicebridge/
+# Hands-free voice control for coding agents. Free, source-available.
+
+User-agent: *
+Allow: /
+
+# Allow well-behaved search crawlers explicitly
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# AI assistants & answer engines — explicitly allowed so the site can be
+# crawled, retrieved, and cited in AI-generated answers.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://berkayturanci.github.io/voicebridge/sitemap.xml
+# LLM-friendly summary: https://berkayturanci.github.io/voicebridge/llms.txt
