@@ -1012,7 +1012,7 @@
   function stopWhisper() { if (mediaRec && mediaRec.state !== "inactive") mediaRec.stop(); }
 
   // ---------- Local streaming STT (browser -> bridge WebSocket -> local transcriber) ----------
-  let streamRec = null, streamTracks = [], streamSock = null, streamText = "", streamKind = "mic";
+  let streamRec = null, streamTracks = [], streamSock = null, streamText = "", streamKind = "mic", streamStarting = false;
   function sttStreamUrl() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const u = new URL(proto + "//" + location.host + "/api/stt-stream");
@@ -1022,7 +1022,7 @@
   function parseSttStreamMessage(raw) {
     let msg = {};
     try { msg = typeof raw === "string" ? JSON.parse(raw) : JSON.parse(String(raw)); } catch (_) { msg = { text: String(raw || "") }; }
-    const text = (msg.text || msg.transcript || msg.partial || msg.final || "").toString().trim();
+    const text = (msg.text || msg.transcript || msg.partial || msg.final || msg.delta || "").toString().trim();
     const done = msg.type === "final" || msg.type === "done" || msg.isFinal === true || msg.final === true;
     return { type: msg.type || "", text, done, error: msg.error || "" };
   }
@@ -1031,11 +1031,12 @@
     return choices.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
   }
   async function startStreamSTT(kind) {
-    if (recognizing || !streamVoiceReady()) { setStatus(streamVoiceMsg()); return; }
+    if (recognizing || streamStarting || !streamVoiceReady()) { setStatus(streamVoiceMsg()); return; }
     if (!(CONFIG.sttStream && CONFIG.sttStream.enabled)) { setStatus(streamVoiceMsg()); return; }
-    streamKind = kind || "mic"; streamText = "";
+    streamStarting = true; streamKind = kind || "mic"; streamText = "";
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (!streamStarting) { stream.getTracks().forEach((t) => t.stop()); return; }
       streamTracks = Array.from(stream.getTracks());
       const mimeType = streamMimeType();
       streamRec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -1043,8 +1044,9 @@
       streamSock.binaryType = "arraybuffer";
       streamRec.ondataavailable = (e) => { if (e.data && e.data.size && streamSock && streamSock.readyState === WebSocket.OPEN) streamSock.send(e.data); };
       streamSock.onopen = () => {
+        streamStarting = false;
         streamSock.send(JSON.stringify({ type: "start", mimeType: streamRec.mimeType || mimeType || "audio/webm", lang: langSel.value }));
-        streamRec.start(500);
+        streamRec.start(250);
         recognizing = true; refreshMic(); cue("listen");
         if (streamKind === "talk") { setTalkState("listening", "Listening…"); talkHeard.textContent = ""; orbMeterStart(); }
         else setStatus("Listening locally…");
@@ -1068,14 +1070,22 @@
         }
         if (m.done && streamKind !== "talk") stopStreamSTT(true);
       };
-      streamSock.onerror = () => setStatus("⚠️ Local streaming STT connection failed.");
+      streamSock.onerror = () => {
+        setStatus("⚠️ Local streaming STT connection failed.");
+        if (streamKind === "talk" && talking) setTalkState("muted", "STT connection failed — tap 🎙️ to retry");
+      };
       streamSock.onclose = () => {
         const wasRecognizing = recognizing;
         streamTracks.forEach((t) => t.stop()); streamTracks = [];
         streamRec = null; streamSock = null; recognizing = false; refreshMic();
-        if (streamKind !== "talk" && wasRecognizing && streamText.trim()) submitStreamText();
+        if (streamKind === "talk" && talking && !talkMuted && !talkOrb.classList.contains("speaking") && !talkOrb.classList.contains("thinking")) {
+          setTalkState("muted", "STT stream closed — tap 🎙️ to retry");
+        } else if (streamKind !== "talk" && wasRecognizing && streamText.trim()) {
+          submitStreamText();
+        }
       };
     } catch (e) {
+      streamStarting = false;
       streamTracks.forEach((t) => t.stop()); streamTracks = [];
       streamRec = null; streamSock = null; recognizing = false; refreshMic();
       setStatus("Couldn't open local streaming STT: " + e.message);
@@ -1088,6 +1098,7 @@
     else setStatus("Couldn't understand the audio.");
   }
   function stopStreamSTT(submit) {
+    streamStarting = false;
     const text = streamText.trim();
     try { if (streamSock && streamSock.readyState === WebSocket.OPEN) streamSock.send(JSON.stringify({ type: "end" })); } catch (_) {}
     try { if (streamRec && streamRec.state !== "inactive") streamRec.stop(); } catch (_) {}

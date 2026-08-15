@@ -31,6 +31,7 @@ const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "";
 const STT_MODE = (process.env.STT_MODE || "browser").toLowerCase();
 const STT_CMD = process.env.STT_CMD || "";
 const STT_STREAM_URL = process.env.STT_STREAM_URL || "";
+const STT_STREAM_CMD = process.env.STT_STREAM_CMD || "";
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 let PKG_VERSION = "0.0.0";
 try { PKG_VERSION = require("../package.json").version || PKG_VERSION; } catch (_) {}
@@ -98,6 +99,7 @@ module.exports = {
   STT_MODE,
   STT_CMD,
   STT_STREAM_URL,
+  STT_STREAM_CMD,
   PUBLIC_DIR,
   PKG_VERSION,
   FAVORITES,

@@ -8,6 +8,8 @@ const { spawn } = require("child_process");
 const {
   PKG_VERSION,
   STT_MODE,
+  STT_STREAM_URL,
+  STT_STREAM_CMD,
   ACCESS_TOKEN,
   DEFAULT_PROJECT_DIR,
   FAVORITES,
@@ -86,10 +88,11 @@ function handleRequest(req, res) {
     const isAuth = authorized(req);
     const tokenPresent = !!(process.env.ACCESS_TOKEN || ACCESS_TOKEN);
     const mode = (process.env.STT_MODE || STT_MODE || "browser").toLowerCase();
-    const streamUrl = process.env.STT_STREAM_URL || "";
+    const streamUrl = process.env.STT_STREAM_URL || STT_STREAM_URL || "";
+    const streamCmd = process.env.STT_STREAM_CMD || STT_STREAM_CMD || "";
     const data = {
       sttMode: mode,
-      sttStream: { enabled: mode === "whisper-stream" && !!streamUrl },
+      sttStream: { enabled: mode === "whisper-stream" && (!!streamUrl || !!streamCmd) },
       authRequired: tokenPresent,
       agents: Object.keys(AGENTS).map((id) => ({
         id, label: AGENTS[id].label, supportsContinue: AGENTS[id].supportsContinue,
