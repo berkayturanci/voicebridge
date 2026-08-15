@@ -55,7 +55,7 @@ test("GET /api/config advertises agents, their modes, and the default session", 
   const { status, data } = await request(server, "GET", "/api/config");
   assert.strictEqual(status, 200);
   const cfg = JSON.parse(data);
-  assert.deepStrictEqual(cfg.agents.map((a) => a.id).sort(), ["antigravity", "claude", "codex", "ollama"]);
+  assert.deepStrictEqual(cfg.agents.map((a) => a.id).sort(), ["aider", "antigravity", "claude", "codex", "gemini", "ollama"]);
   const claude = cfg.agents.find((a) => a.id === "claude");
   assert.strictEqual(claude.defaultMode, "ask");
   assert.ok(claude.modes.some((m) => m.id === "full"));
@@ -93,6 +93,30 @@ test("POST /api/ask routes to a codex session (plain-text stream)", async () => 
   const evs = ndjson(data);
   const text = evs.filter((e) => e.type === "delta").map((e) => e.text).join("");
   assert.strictEqual(text, "echo:build it");
+  assert.strictEqual(evs[evs.length - 1].type, "done");
+});
+
+test("POST /api/ask routes to an aider session", async () => {
+  const create = await request(server, "POST", "/api/sessions", { name: "ai", agent: "aider", projectDir: process.cwd() });
+  const { session } = JSON.parse(create.data);
+  assert.strictEqual(session.agent, "aider");
+
+  const { data } = await request(server, "POST", "/api/ask", { text: "test aider", sessionId: session.id });
+  const evs = ndjson(data);
+  const text = evs.filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assert.strictEqual(text, "aider:test aider");
+  assert.strictEqual(evs[evs.length - 1].type, "done");
+});
+
+test("POST /api/ask routes to a gemini session", async () => {
+  const create = await request(server, "POST", "/api/sessions", { name: "gm", agent: "gemini", projectDir: process.cwd() });
+  const { session } = JSON.parse(create.data);
+  assert.strictEqual(session.agent, "gemini");
+
+  const { data } = await request(server, "POST", "/api/ask", { text: "test gemini", sessionId: session.id });
+  const evs = ndjson(data);
+  const text = evs.filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assert.strictEqual(text, "echo:test gemini");
   assert.strictEqual(evs[evs.length - 1].type, "done");
 });
 

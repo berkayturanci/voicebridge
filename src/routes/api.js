@@ -231,6 +231,10 @@ function handleRequest(req, res) {
           s.claudeSessionId = sanitizeSessionId(data.claudeSessionId);
           s.started = false;
         }
+        if (typeof data.agentSessionId === "string") {
+          s.agentSessionId = sanitizeSessionId(data.agentSessionId);
+          s.started = false;
+        }
         saveSessions();
         return sendJson(res, 200, { session: publicSession(s) });
       });

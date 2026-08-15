@@ -19,20 +19,31 @@ process.stdout.write(JSON.stringify({type:"assistant",message:{content:[{type:"t
 process.stdout.write(JSON.stringify({type:"result",subtype:"success",result:"ok"})+"\\n");
 `);
 
-  // plain-text stub (codex / agy): echo whatever arrives on stdin.
+  // plain-text stub (codex / agy / gemini): echo whatever arrives on stdin.
   const echo = `#!/usr/bin/env node
 let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{process.stdout.write("echo:"+d.trim());});
 `;
+  const aiderStub = `#!/usr/bin/env node
+const msgIdx = process.argv.indexOf("--message");
+const msg = msgIdx >= 0 ? process.argv[msgIdx + 1] : "";
+process.stdout.write("aider:" + msg);
+`;
   const codex = path.join(dir, "codex");
   const agy = path.join(dir, "agy");
+  const aider = path.join(dir, "aider");
+  const gemini = path.join(dir, "gemini");
   fs.writeFileSync(codex, echo);
   fs.writeFileSync(agy, echo);
+  fs.writeFileSync(aider, aiderStub);
+  fs.writeFileSync(gemini, echo);
 
-  for (const f of [claude, codex, agy]) fs.chmodSync(f, 0o755);
+  for (const f of [claude, codex, agy, aider, gemini]) fs.chmodSync(f, 0o755);
 
   process.env.CLAUDE_BIN = claude;
   process.env.CODEX_BIN = codex;
   process.env.AGY_BIN = agy;
+  process.env.AIDER_BIN = aider;
+  process.env.GEMINI_BIN = gemini;
   return dir;
 }
 
