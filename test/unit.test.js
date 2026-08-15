@@ -107,6 +107,33 @@ test("antigravity adapter: `--print` with prompt on stdin", () => {
   assert.strictEqual(stdin, "go");
 });
 
+test("aider adapter: arguments, modes, and continuity", () => {
+  assert.strictEqual(srv.AGENTS.aider.label, "Aider");
+  assert.strictEqual(srv.AGENTS.aider.defaultMode, "code");
+  assert.strictEqual(srv.AGENTS.aider.supportsContinue, true);
+
+  const fresh = srv.AGENTS.aider.command("write a test");
+  assert.deepStrictEqual(fresh.argv, ["--no-git", "--yes-always", "--no-auto-commits", "--chat-mode", "code", "--message", "write a test"]);
+  assert.strictEqual(fresh.stdin, null);
+
+  const architect = srv.AGENTS.aider.command("plan architecture", { modeArgs: srv.AGENTS.aider.modes.architect.args, cont: true });
+  assert.deepStrictEqual(architect.argv, ["--no-git", "--yes-always", "--no-auto-commits", "--chat-mode", "architect", "--restore-chat-history", "--message", "plan architecture"]);
+});
+
+test("gemini adapter: arguments, modes, and continuity", () => {
+  assert.strictEqual(srv.AGENTS.gemini.label, "Gemini");
+  assert.strictEqual(srv.AGENTS.gemini.defaultMode, "default");
+  assert.strictEqual(srv.AGENTS.gemini.supportsContinue, true);
+
+  const fresh = srv.AGENTS.gemini.command("explain code");
+  assert.deepStrictEqual(fresh.argv, ["--print"]);
+  assert.strictEqual(fresh.stdin, "explain code");
+
+  const yolo = srv.AGENTS.gemini.command("refactor", { modeArgs: srv.AGENTS.gemini.modes.yolo.args, resume: "gem-789" });
+  assert.deepStrictEqual(yolo.argv, ["--print", "--conversation", "gem-789", "--yolo"]);
+  assert.strictEqual(yolo.stdin, "refactor");
+});
+
 test("generic agent conversation id extraction handles common CLI text", () => {
   assert.strictEqual(srv._internals.extractAgentConversationId('{"session_id":"abc-123"}'), "abc-123");
   assert.strictEqual(srv._internals.extractAgentConversationId('{"conversationId":"conv_456"}'), "conv_456");

@@ -6,12 +6,16 @@ const { claudeAdapter, parseClaudeLine, parseClaudeEvents } = require("./claude"
 const { codexAdapter } = require("./codex");
 const { antigravityAdapter } = require("./antigravity");
 const { ollamaAdapter } = require("./ollama");
+const { aiderAdapter } = require("./aider");
+const { geminiAdapter } = require("./gemini");
 
 const AGENTS = {
   claude: claudeAdapter,
   codex: codexAdapter,
   antigravity: antigravityAdapter,
   ollama: ollamaAdapter,
+  aider: aiderAdapter,
+  gemini: geminiAdapter,
 };
 
 function resolveMode(agentId, mode) {

@@ -11,7 +11,7 @@ function streamLocal(session, prompt, res, emit) {
   if (LIVE_ENABLED && AGENTS[session.agent] && AGENTS[session.agent].live) return streamLive(session, prompt, res, emit);
   const agent = AGENTS[session.agent];
   const cont = session.started && agent.supportsContinue;
-  const resume = (!session.started && session.claudeSessionId) ? session.claudeSessionId : null;
+  const resume = (!session.started && (session.agentSessionId || session.claudeSessionId)) ? (session.agentSessionId || session.claudeSessionId) : null;
   const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
   const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, resume, modeArgs });
 
@@ -26,6 +26,8 @@ function streamLocal(session, prompt, res, emit) {
 
   if (stdin != null) {
     try { child.stdin.write(stdin); child.stdin.end(); } catch (_) {}
+  } else {
+    try { if (child.stdin) child.stdin.end(); } catch (_) {}
   }
 
   let timedOut = false;
