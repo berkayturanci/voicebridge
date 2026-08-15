@@ -140,3 +140,13 @@ test("index.html contains VAD engine and calculateRmsAndZcr", () => {
   assert.ok(dcRes.zcrRate > 0.05, "zcr detects crossings even with DC bias");
 });
 
+test("index.html contains Git changes drawer and diff viewer", () => {
+  assert.ok(html.includes("gitBtn"), "includes gitBtn in header");
+  assert.ok(html.includes("gitModal"), "includes gitModal container");
+  assert.ok(html.includes("gitFileList"), "includes gitFileList container");
+  assert.ok(html.includes("gitDiffContainer"), "includes gitDiffContainer");
+  assert.ok(html.includes("openGitDrawer"), "includes openGitDrawer function");
+  assert.ok(html.includes("/api/git/status"), "includes /api/git/status endpoint call");
+  assert.ok(html.includes("/api/git/diff"), "includes /api/git/diff endpoint call");
+});
+

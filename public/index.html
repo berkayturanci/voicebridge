@@ -77,9 +77,10 @@
   .claude h3, .claude h4, .claude h5 { margin: .6em 0 .3em; line-height: 1.3; }
   .claude h3 { font-size: 1.15em; } .claude h4 { font-size: 1.05em; } .claude h5 { font-size: 1em; color: var(--muted); }
   .claude ul, .claude ol { margin: .3em 0; padding-left: 1.4em; } .claude li { margin: .15em 0; }
-  .claude blockquote { margin: .4em 0; padding-left: .8em; border-left: 3px solid var(--border2); color: var(--muted); }
   .claude a { color: #58a6ff; } .claude .mdline { margin: 0; }
-  .claude pre .add { color: #3fb950; } .claude pre .del { color: #f85149; } .claude pre .hunk { color: #58a6ff; }
+  .claude pre .add, .git-diff-box pre .add { color: #3fb950; }
+  .claude pre .del, .git-diff-box pre .del { color: #f85149; }
+  .claude pre .hunk, .git-diff-box pre .hunk { color: #58a6ff; }
   .claude code, .claude pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .claude :not(pre) > code { background: var(--panel2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
   .copybtn { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border2); background: var(--panel2); color: var(--text); opacity: .85; }
@@ -141,9 +142,19 @@
   @keyframes orbpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,.45); transform: scale(1); } 50% { box-shadow: 0 0 0 26px rgba(63,185,80,0); transform: scale(1.04); } }
   #talkState { font-size: 19px; font-weight: 600; }
   #talkHeard { font-size: 16px; color: var(--muted); text-align: center; min-height: 44px; max-width: 92%; overflow-wrap: anywhere; word-break: break-word; }
-  #talkHint { font-size: 12px; color: var(--muted); text-align: center; max-width: 80%; }
-  #modal, #settings, #palette { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
-  #modal.open, #settings.open, #palette.open { display: flex; }
+  #modal, #settings, #palette, #gitModal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  #modal.open, #settings.open, #palette.open, #gitModal.open { display: flex; }
+  .git-file-list { display: flex; flex-direction: column; gap: 4px; max-height: 52vh; overflow-y: auto; }
+  .git-file-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--border2); border-radius: 8px; font-size: 13px; cursor: pointer; text-align: left; color: var(--text); width: 100%; box-sizing: border-box; }
+  .git-file-item:hover, .git-file-item:focus-visible { border-color: var(--border); outline: none; }
+  .git-file-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; margin-right: 8px; }
+  .git-badge { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; flex-shrink: 0; }
+  .git-badge.modified { color: #58a6ff; background: rgba(56, 139, 253, 0.15); }
+  .git-badge.added { color: var(--green); background: rgba(63, 185, 80, 0.15); }
+  .git-badge.deleted { color: #f85149; background: rgba(248, 81, 73, 0.15); }
+  .git-badge.renamed { color: #d29922; background: rgba(210, 153, 34, 0.15); }
+  .git-diff-box { max-height: 50vh; overflow-y: auto; overflow-x: auto; background: var(--field); border: 1px solid var(--border2); border-radius: 8px; padding: 10px; }
+  .git-diff-box pre { margin: 0; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; line-height: 1.45; }
   #login { position: fixed; inset: 0; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 30; }
   #login.open { display: flex; }
   #login .err { color: #f85149; font-size: 13px; min-height: 1em; }
@@ -191,6 +202,7 @@
     <select id="session" aria-label="Session"></select>
     <button id="newSession" title="New session">＋</button>
     <span class="spacer"></span>
+    <button id="gitBtn" title="Changed files" aria-label="Changed files">±</button>
     <button id="talkBtn" title="Conversation mode" aria-label="Conversation mode">📞</button>
     <button id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
   </header>
@@ -236,6 +248,26 @@
     <div id="talkHeard"></div>
     <div id="talkApprovals"></div>
     <div id="talkHint">Speak; it sends automatically when you pause. It listens again after each reply. Tap 🎙️ at the top-left to mute the mic temporarily.</div>
+  </div>
+
+  <div id="gitModal">
+    <div class="card" style="max-width:560px;">
+      <div class="srow">
+        <h3 style="display:flex;align-items:center;gap:8px;">
+          <span>Repository Changes</span>
+          <span id="gitBranch" style="font-size:11px;padding:2px 6px;border-radius:10px;background:var(--panel2);color:var(--muted);font-weight:normal;"></span>
+        </h3>
+        <button id="gitClose" aria-label="Close">✕</button>
+      </div>
+      <div id="gitFileList" class="git-file-list"></div>
+      <div id="gitDiffContainer" class="git-diff-container" style="display:none;">
+        <div class="srow" style="margin-bottom:6px;gap:8px;">
+          <strong id="gitDiffPath" style="font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;"></strong>
+          <button id="gitDiffBack" type="button" style="font-size:12px;background:none;border:none;color:var(--accent);cursor:pointer;flex-shrink:0;padding:6px 10px;min-height:32px;">← Files</button>
+        </div>
+        <div id="gitDiffPre" class="git-diff-box"></div>
+      </div>
+    </div>
   </div>
 
   <div id="palette">
@@ -1412,11 +1444,86 @@
   paletteEl.addEventListener("click", (e) => { if (e.target === paletteEl) paletteEl.classList.remove("open"); });
   paletteSearch.addEventListener("input", () => renderPalette(paletteSearch.value));
 
+  // ---------- Repository Changed Files & Git Diff Drawer ----------
+  const gitModalEl = $("gitModal"), gitFileListEl = $("gitFileList"), gitBranchEl = $("gitBranch");
+  const gitDiffContainer = $("gitDiffContainer"), gitDiffPathEl = $("gitDiffPath"), gitDiffPreEl = $("gitDiffPre");
+
+  async function openGitDrawer() {
+    if (!activeId) return;
+    ensureToken();
+    gitModalEl.classList.add("open");
+    gitFileListEl.style.display = "flex";
+    gitDiffContainer.style.display = "none";
+    gitFileListEl.innerHTML = "<div style='color:var(--muted);font-size:13px;padding:12px 0;'>Loading repository status…</div>";
+    gitBranchEl.textContent = "";
+
+    try {
+      const res = await fetch("/api/git/status?sessionId=" + encodeURIComponent(activeId), { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to load git status");
+      gitBranchEl.textContent = data.branch || "HEAD";
+      renderGitFiles(data.files || []);
+    } catch (err) {
+      gitFileListEl.innerHTML = `<div style="color:#f85149;font-size:13px;padding:12px 0;">⚠️ ${escapeHtml(err.message || "Could not read git status")}</div>`;
+    }
+  }
+
+  function renderGitFiles(files) {
+    gitFileListEl.innerHTML = "";
+    if (!files || !files.length) {
+      gitFileListEl.innerHTML = "<div style='color:var(--muted);font-size:13px;padding:16px 0;text-align:center;'>✨ Working tree is clean (no modified files).</div>";
+      return;
+    }
+
+    files.forEach((f) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "git-file-item";
+      let statusClass = "modified", badgeText = "M";
+      if (f.status === "added") { statusClass = "added"; badgeText = "A"; }
+      else if (f.status === "deleted") { statusClass = "deleted"; badgeText = "D"; }
+      else if (f.status === "renamed") { statusClass = "renamed"; badgeText = "R"; }
+
+      item.innerHTML = `
+        <span class="git-file-path">${escapeHtml(f.path)}</span>
+        <span class="git-badge ${statusClass}">${badgeText}</span>
+      `;
+      item.addEventListener("click", () => showFileDiff(f.path));
+      gitFileListEl.appendChild(item);
+    });
+  }
+
+  async function showFileDiff(filePath) {
+    gitFileListEl.style.display = "none";
+    gitDiffContainer.style.display = "block";
+    gitDiffPathEl.textContent = filePath;
+    gitDiffPreEl.innerHTML = "<div style='color:var(--muted);font-size:12px;'>Loading diff…</div>";
+
+    try {
+      const res = await fetch(`/api/git/diff?sessionId=${encodeURIComponent(activeId)}&file=${encodeURIComponent(filePath)}`, { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to load file diff");
+      gitDiffPreEl.innerHTML = "";
+      const pre = buildPre(data.diff || "No changes detected.", "diff");
+      gitDiffPreEl.appendChild(pre);
+    } catch (err) {
+      gitDiffPreEl.innerHTML = `<div style="color:#f85149;font-size:12px;">⚠️ ${escapeHtml(err.message || "Could not read diff")}</div>`;
+    }
+  }
+
+  $("gitBtn").addEventListener("click", openGitDrawer);
+  $("gitClose").addEventListener("click", () => gitModalEl.classList.remove("open"));
+  gitModalEl.addEventListener("click", (e) => { if (e.target === gitModalEl) gitModalEl.classList.remove("open"); });
+  $("gitDiffBack").addEventListener("click", () => {
+    gitDiffContainer.style.display = "none";
+    gitFileListEl.style.display = "flex";
+  });
+
   // Escape closes any open overlay (or exits talking mode).
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (talking) { exitTalking(); return; }
-    [modal, settingsEl, paletteEl].forEach((m) => m.classList.remove("open"));
+    [modal, settingsEl, paletteEl, gitModalEl].forEach((m) => m.classList.remove("open"));
   });
 
   resetBtn.addEventListener("click", async () => {

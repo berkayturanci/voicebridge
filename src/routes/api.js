@@ -34,6 +34,7 @@ const { commandGroupsForAgent } = require("../services/commands");
 const { pushEnabled, pushSubs } = require("../services/push");
 const { transcribe } = require("../services/stt");
 const { getPendingApprovals, resolveApproval, clearSessionApprovals } = require("../services/approvals");
+const { getRepoStatus, getFileDiff } = require("../services/git");
 const { streamAsk, proxyCloudBrowse } = require("../runners");
 const { killTmux, ensureTmuxAgent, tmuxName, tmuxHas, tmuxCapture, tmuxRun, sleepMs } = require("../runners/tmux");
 const { killLive } = require("../runners/live");
@@ -141,6 +142,22 @@ function handleRequest(req, res) {
         if (!ok) return sendJson(res, 404, { error: "Approval request not found or already settled" });
         return sendJson(res, 200, { ok: true, id, approved });
       });
+    }
+
+    if (req.method === "GET" && urlPath === "/api/git/status") {
+      const q = new URL(req.url, "http://x").searchParams;
+      const session = resolveSession(q.get("sessionId"));
+      const projectDir = (session && session.projectDir) || q.get("projectDir") || DEFAULT_PROJECT_DIR;
+      return getRepoStatus(projectDir).then((data) => sendJson(res, 200, data));
+    }
+
+    if (req.method === "GET" && urlPath === "/api/git/diff") {
+      const q = new URL(req.url, "http://x").searchParams;
+      const session = resolveSession(q.get("sessionId"));
+      const projectDir = (session && session.projectDir) || q.get("projectDir") || DEFAULT_PROJECT_DIR;
+      const filePath = q.get("file");
+      if (!filePath) return sendJson(res, 400, { error: "file parameter required" });
+      return getFileDiff(projectDir, filePath).then((data) => sendJson(res, data.ok ? 200 : 400, data));
     }
 
     if (req.method === "GET" && urlPath === "/api/commands") {

@@ -127,6 +127,7 @@ function start() {
 }
 
 const approvalsService = require("./services/approvals");
+const gitService = require("./services/git");
 
 module.exports = {
   AGENTS,
@@ -154,6 +155,8 @@ module.exports = {
   resolveApproval: approvalsService.resolveApproval,
   getPendingApprovals: approvalsService.getPendingApprovals,
   clearSessionApprovals: approvalsService.clearSessionApprovals,
+  getRepoStatus: gitService.getRepoStatus,
+  getFileDiff: gitService.getFileDiff,
   buildServer,
   handleRequest,
   start,
