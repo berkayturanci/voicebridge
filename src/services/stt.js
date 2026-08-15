@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const net = require("net");
 const tls = require("tls");
 const { spawn } = require("child_process");
-const { STT_MODE, STT_CMD, STT_STREAM_URL, ACCESS_TOKEN } = require("../config");
+const { STT_MODE, STT_CMD, STT_STREAM_URL, STT_STREAM_CMD, ACCESS_TOKEN } = require("../config");
 const { wsAcceptKey, wsEncode } = require("../routes/http-helpers");
 
 function transcribe(audioBuf, contentType, cb) {
@@ -53,6 +53,7 @@ function attachWs(socket, { incomingMasked, onMessage, onClose, onError }) {
         if (high !== 0) return fail(new Error("WebSocket frame too large"));
         len = low;
       }
+      if (len > 32 * 1024 * 1024) return fail(new Error("WebSocket frame exceeds 32MB limit"));
       if (masked !== !!incomingMasked) return fail(new Error("Bad WebSocket mask"));
       let key = null;
       if (masked) {
@@ -91,10 +92,17 @@ function wsConnect(rawUrl, cb) {
     if (settled) return;
     settled = true;
     socket.removeAllListeners("connect");
+    socket.removeAllListeners("secureConnect");
+    socket.removeAllListeners("timeout");
     if (err) { try { socket.destroy(); } catch (_) {} return cb(err); }
     cb(null, client);
   };
-  socket.on("connect", () => {
+
+  socket.setTimeout(10000, () => done(new Error("STT stream upstream connection timeout")));
+  socket.on("close", () => done(new Error("STT stream upstream closed connection prematurely")));
+  socket.on("error", (e) => done(e));
+
+  const onConnected = () => {
     const target = (u.pathname || "/") + (u.search || "");
     socket.write([
       `GET ${target} HTTP/1.1`,
@@ -105,10 +113,18 @@ function wsConnect(rawUrl, cb) {
       "Sec-WebSocket-Version: 13",
       "\r\n",
     ].join("\r\n"));
-  });
+  };
+
+  if (secure) {
+    socket.on("secureConnect", onConnected);
+  } else {
+    socket.on("connect", onConnected);
+  }
+
   socket.on("data", function onHead(d) {
     if (settled) return;
     head = Buffer.concat([head, d]);
+    if (head.length > 64 * 1024) return done(new Error("STT upstream response headers too large"));
     const idx = head.indexOf("\r\n\r\n");
     if (idx < 0) return;
     socket.removeListener("data", onHead);
@@ -130,15 +146,26 @@ function wsConnect(rawUrl, cb) {
     if (rest.length) ws.push(rest);
     done(null, api);
   });
-  socket.on("error", (e) => done(e));
+}
+
+function timingSafeCheck(input, secret) {
+  if (!secret) return true;
+  try {
+    const a = crypto.createHash("sha256").update(String(input || "")).digest();
+    const b = crypto.createHash("sha256").update(String(secret)).digest();
+    return crypto.timingSafeEqual(a, b);
+  } catch (_) {
+    return false;
+  }
 }
 
 function authorizedWs(req, parsed) {
   const token = process.env.ACCESS_TOKEN || ACCESS_TOKEN;
   if (!token) return true;
   const h = req.headers.authorization || "";
-  if (h === "Bearer " + token) return true;
-  return parsed.searchParams.get("token") === token;
+  const gotBearer = h.startsWith("Bearer ") ? h.slice(7) : "";
+  const gotQuery = parsed.searchParams.get("token") || "";
+  return timingSafeCheck(gotBearer, token) || timingSafeCheck(gotQuery, token);
 }
 
 function handleSttStreamUpgrade(req, socket, head) {
@@ -151,7 +178,8 @@ function handleSttStreamUpgrade(req, socket, head) {
   if (!authorizedWs(req, parsed)) { reject(401, "Unauthorized"); return true; }
   const mode = process.env.STT_MODE || STT_MODE;
   const streamUrl = process.env.STT_STREAM_URL || STT_STREAM_URL;
-  if (mode !== "whisper-stream" || !streamUrl) { reject(503, "STT Stream Not Configured"); return true; }
+  const streamCmd = process.env.STT_STREAM_CMD || STT_STREAM_CMD;
+  if (mode !== "whisper-stream" || (!streamUrl && !streamCmd)) { reject(503, "STT Stream Not Configured"); return true; }
   const key = req.headers["sec-websocket-key"];
   if (!key) { reject(400, "Bad Request"); return true; }
   socket.write([
@@ -162,40 +190,103 @@ function handleSttStreamUpgrade(req, socket, head) {
     "\r\n",
   ].join("\r\n"));
 
-  let upstream = null, closed = false, bytes = 0;
+  let upstream = null, childProc = null, closed = false, bytes = 0;
   const pending = [];
   const closeAll = () => {
     if (closed) return;
     closed = true;
+    if (childProc) {
+      try { childProc.stdin && childProc.stdin.end(); } catch (_) {}
+      try { childProc.kill("SIGTERM"); } catch (_) {}
+      childProc = null;
+    }
     try { upstream && upstream.close(); } catch (_) {}
     try { socket.end(wsEncode(Buffer.alloc(0), { opcode: 0x8 })); } catch (_) {}
   };
   const sendClient = (obj) => {
     try { socket.write(wsEncode(JSON.stringify(obj), { opcode: 1 })); } catch (_) {}
   };
+
   const clientWs = attachWs(socket, {
     incomingMasked: true,
     onMessage: (payload, opcode) => {
       bytes += payload.length;
       if (bytes > 32 * 1024 * 1024) { sendClient({ type: "error", error: "STT stream too large" }); return closeAll(); }
-      if (upstream) upstream.send(payload, opcode);
-      else pending.push({ payload, opcode });
+      if (streamCmd && childProc) {
+        if (opcode === 2 && childProc.stdin && !childProc.stdin.destroyed) {
+          try { childProc.stdin.write(payload); } catch (_) {}
+        }
+      } else if (upstream) {
+        upstream.send(payload, opcode);
+      } else {
+        pending.push({ payload, opcode });
+      }
     },
     onClose: closeAll,
     onError: closeAll,
   });
   if (head && head.length) clientWs.push(head);
-  wsConnect(streamUrl, (err, up) => {
-    if (closed) return;
-    if (err) { sendClient({ type: "error", error: err.message }); return closeAll(); }
-    upstream = up;
-    upstream.onMessage = (payload, opcode) => {
-      try { socket.write(wsEncode(payload, { opcode })); } catch (_) { closeAll(); }
-    };
-    upstream.onClose = closeAll;
-    for (const frame of pending.splice(0)) upstream.send(frame.payload, frame.opcode);
-    sendClient({ type: "ready" });
-  });
+
+  if (streamUrl) {
+    wsConnect(streamUrl, (err, up) => {
+      if (closed) return;
+      if (err) { sendClient({ type: "error", error: err.message }); return closeAll(); }
+      upstream = up;
+      upstream.onMessage = (payload, opcode) => {
+        try { socket.write(wsEncode(payload, { opcode })); } catch (_) { closeAll(); }
+      };
+      upstream.onClose = closeAll;
+      for (const frame of pending.splice(0)) upstream.send(frame.payload, frame.opcode);
+      sendClient({ type: "ready" });
+    });
+  } else if (streamCmd) {
+    try {
+      childProc = spawn("/bin/sh", ["-c", streamCmd], { env: process.env });
+      if (childProc.stdin) {
+        childProc.stdin.on("error", () => {});
+      }
+      let lineBuf = "", stderrBuf = "";
+      childProc.stdout.on("data", (d) => {
+        lineBuf += d.toString("utf8");
+        const lines = lineBuf.split("\n");
+        lineBuf = lines.pop() || "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const json = JSON.parse(trimmed);
+            sendClient(json);
+          } catch (_) {
+            sendClient({ type: "delta", text: trimmed });
+          }
+        }
+      });
+      childProc.stderr.on("data", (d) => {
+        stderrBuf += d.toString("utf8");
+      });
+      childProc.on("close", (code) => {
+        if (lineBuf.trim()) {
+          try {
+            const json = JSON.parse(lineBuf.trim());
+            sendClient(json);
+          } catch (_) {
+            sendClient({ type: "delta", text: lineBuf.trim() });
+          }
+          lineBuf = "";
+        }
+        if (code !== 0 && !closed) {
+          sendClient({ type: "error", error: stderrBuf.trim() || `Process exited with code ${code}` });
+        }
+        closeAll();
+      });
+      childProc.on("error", (e) => { sendClient({ type: "error", error: e.message }); closeAll(); });
+      sendClient({ type: "ready" });
+    } catch (e) {
+      sendClient({ type: "error", error: e.message });
+      closeAll();
+    }
+  }
+
   return true;
 }
 

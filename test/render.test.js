@@ -31,8 +31,8 @@ const sandbox = {
   navigator: {}, setTimeout: () => {},
 };
 new Function("document", "navigator", "setTimeout",
-  grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") + grab("escapeHtml") + grab("calculateRmsAndZcr") +
-  "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;this.escapeHtml=escapeHtml;this.calculateRmsAndZcr=calculateRmsAndZcr;"
+  grab("appendInline") + grab("appendBlocks") + grab("looksLikeDiff") + grab("buildPre") + grab("escapeHtml") + grab("calculateRmsAndZcr") + grab("parseSttStreamMessage") +
+  "\nthis.appendInline=appendInline;this.appendBlocks=appendBlocks;this.looksLikeDiff=looksLikeDiff;this.buildPre=buildPre;this.escapeHtml=escapeHtml;this.calculateRmsAndZcr=calculateRmsAndZcr;this.parseSttStreamMessage=parseSttStreamMessage;"
 ).call(sandbox, sandbox.document, sandbox.navigator, sandbox.setTimeout);
 
 const tags = (el) => { const out = []; (function w(e) { if (e.tagName) out.push(e.tagName); (e.children || []).forEach(w); })(el); return out; };
@@ -148,5 +148,23 @@ test("index.html contains Git changes drawer and diff viewer", () => {
   assert.ok(html.includes("openGitDrawer"), "includes openGitDrawer function");
   assert.ok(html.includes("/api/git/status"), "includes /api/git/status endpoint call");
   assert.ok(html.includes("/api/git/diff"), "includes /api/git/diff endpoint call");
+});
+
+test("index.html contains streaming STT engine and parseSttStreamMessage", () => {
+  assert.ok(html.includes("startStreamSTT"), "includes startStreamSTT");
+  assert.ok(html.includes("stopStreamSTT"), "includes stopStreamSTT");
+  assert.ok(html.includes("/api/stt-stream"), "includes /api/stt-stream WebSocket URL");
+
+  const delta = sandbox.parseSttStreamMessage(JSON.stringify({ type: "delta", text: "testing audio" }));
+  assert.strictEqual(delta.text, "testing audio");
+  assert.strictEqual(delta.done, false);
+
+  const deltaProp = sandbox.parseSttStreamMessage(JSON.stringify({ delta: "progressive words" }));
+  assert.strictEqual(deltaProp.text, "progressive words");
+  assert.strictEqual(deltaProp.done, false);
+
+  const finalMsg = sandbox.parseSttStreamMessage(JSON.stringify({ type: "final", text: "full sentence" }));
+  assert.strictEqual(finalMsg.text, "full sentence");
+  assert.strictEqual(finalMsg.done, true);
 });
 

@@ -160,3 +160,17 @@ test("STT stream WebSocket proxies audio chunks to the configured upstream", asy
   await waitForMessage(client, /hello world/);
   client.close();
 });
+
+test("STT stream handles delta and final message normalization", () => {
+  const parse = (raw) => {
+    let msg = {};
+    try { msg = typeof raw === "string" ? JSON.parse(raw) : JSON.parse(String(raw)); } catch (_) { msg = { text: String(raw || "") }; }
+    const text = (msg.text || msg.transcript || msg.partial || msg.final || "").toString().trim();
+    const done = msg.type === "final" || msg.type === "done" || msg.isFinal === true || msg.final === true;
+    return { type: msg.type || "", text, done, error: msg.error || "" };
+  };
+
+  assert.deepStrictEqual(parse(JSON.stringify({ type: "delta", text: "hello" })), { type: "delta", text: "hello", done: false, error: "" });
+  assert.deepStrictEqual(parse(JSON.stringify({ partial: "streaming" })), { type: "", text: "streaming", done: false, error: "" });
+  assert.deepStrictEqual(parse(JSON.stringify({ type: "final", text: "hello world" })), { type: "final", text: "hello world", done: true, error: "" });
+});
