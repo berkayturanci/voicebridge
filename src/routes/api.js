@@ -34,8 +34,11 @@ const {
 } = sessionsService;
 const { commandGroupsForAgent } = require("../services/commands");
 const { pushEnabled, pushSubs } = require("../services/push");
+const approvalsService = require("../services/approvals");
+const { getPendingApprovals, resolveApproval } = approvalsService;
+const hub = require("../services/hub");
 const { transcribe } = require("../services/stt");
-const { getPendingApprovals, resolveApproval, clearSessionApprovals } = require("../services/approvals");
+const { clearSessionApprovals } = require("../services/approvals");
 const { getRepoStatus, getFileDiff } = require("../services/git");
 const { streamAsk, proxyCloudBrowse } = require("../runners");
 const { killTmux, ensureTmuxAgent, tmuxName, tmuxHas, tmuxCapture, tmuxRun, sleepMs } = require("../runners/tmux");
@@ -141,8 +144,10 @@ function handleRequest(req, res) {
         try { data = JSON.parse(body.toString("utf8") || "{}"); }
         catch (_) { return sendJson(res, 400, { error: "Bad JSON" }); }
         const approved = data.approved === true || data.approved === "true" || data.approved === 1;
+        const appr = approvalsService.getApproval(id);
         const ok = resolveApproval(id, approved);
         if (!ok) return sendJson(res, 404, { error: "Approval request not found or already settled" });
+        try { hub.broadcastAll({ type: "approval_resolved", id, approved, approval: appr }); } catch (_) {}
         return sendJson(res, 200, { ok: true, id, approved });
       });
     }
@@ -205,6 +210,7 @@ function handleRequest(req, res) {
         try { s = createSession(data); }
         catch (err) { return sendJson(res, 400, { error: err.message }); }
         saveSessions();
+        try { hub.broadcastAll({ type: "session_created", session: publicSession(s) }); } catch (_) {}
         return sendJson(res, 200, { session: publicSession(s) });
       });
     }
@@ -213,7 +219,11 @@ function handleRequest(req, res) {
       const id = urlPath.slice("/api/sessions/".length);
       if (id === sessionsService.defaultSessionId) return sendJson(res, 400, { error: "Cannot delete the default session" });
       const existed = sessions.delete(id);
-      if (existed) { killTmux(id); killLive(id); saveSessions(); }
+      if (existed) {
+        killTmux(id); killLive(id); saveSessions();
+        try { hub.deleteSession(id); } catch (_) {}
+        try { hub.broadcastAll({ type: "session_deleted", id }); } catch (_) {}
+      }
       return sendJson(res, existed ? 200 : 404, existed ? { ok: true } : { error: "Not found" });
     }
 
@@ -236,6 +246,7 @@ function handleRequest(req, res) {
           s.started = false;
         }
         saveSessions();
+        try { hub.broadcastAll({ type: "session_updated", session: publicSession(s) }); } catch (_) {}
         return sendJson(res, 200, { session: publicSession(s) });
       });
     }

@@ -18,6 +18,7 @@ const { listSlashCommands, listNpmScripts } = require("./services/commands");
 const { sendJson, wsAcceptKey, wsEncode } = require("./routes/http-helpers");
 const { handleRequest } = require("./routes/api");
 const { handleSttStreamUpgrade } = require("./services/stt");
+const { handleWsUpgrade, broadcast, broadcastAll } = require("./services/hub");
 const { killAllLive, killLive, liveProcs } = require("./runners/live");
 const tmuxRunner = require("./runners/tmux");
 const sessionsService = require("./services/sessions");
@@ -32,10 +33,10 @@ function buildServer() {
   });
   server.on("upgrade", (req, socket, head) => {
     try {
-      if (!handleSttStreamUpgrade(req, socket, head)) {
-        socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
-        socket.destroy();
-      }
+      if (handleSttStreamUpgrade(req, socket, head)) return;
+      if (handleWsUpgrade(req, socket, head)) return;
+      socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+      socket.destroy();
     } catch (_) {
       try { socket.destroy(); } catch (_) {}
     }

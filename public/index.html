@@ -707,6 +707,7 @@
     fillModeSelect(modeSel, active().meta.agent, active().meta.mode);
     voiceChk.checked = !!active().meta.voice;
     refreshMic();
+    syncSubscribe(id);
     toBottom();
   }
   jumpBtn.addEventListener("click", toBottom);
@@ -934,6 +935,146 @@
       talkApprovals.appendChild(clone);
     }
   }
+
+  // ---------- Multi-client live session sync (WebSocket /ws) ----------
+  let syncWs = null, syncBackoff = 1000, syncSubscribedId = null;
+  function getSyncWsUrl() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const u = new URL(proto + "//" + location.host + "/ws");
+    if (CONFIG.authRequired && token) u.searchParams.set("token", token);
+    return u.toString();
+  }
+  function sendSync(obj) {
+    if (syncWs && syncWs.readyState === WebSocket.OPEN) {
+      try { syncWs.send(JSON.stringify(obj)); } catch (_) {}
+    }
+  }
+  function syncSubscribe(sessionId) {
+    if (!sessionId) return;
+    syncSubscribedId = sessionId;
+    sendSync({ type: "subscribe", sessionId });
+  }
+  function handleSyncMessage(msg) {
+    if (!msg || !msg.type) return;
+    const st = msg.sessionId ? S.get(msg.sessionId) : null;
+
+    if (msg.type === "turn_start" && st) {
+      if (!st.turn.busy) {
+        const last = st.messages[st.messages.length - 1];
+        if (!last || last.cls !== "me" || last.text !== msg.prompt) {
+          addMsg(msg.sessionId, msg.prompt, "me");
+        }
+        st.turn.busy = true;
+        if (msg.sessionId === activeId) { refreshMic(); setStatus("Thinking…"); }
+        if (!st._remoteBubble) {
+          st._remoteBubble = addMsg(msg.sessionId, "", "claude");
+          st._remoteText = "";
+        }
+      }
+    } else if (msg.type === "delta" && st) {
+      if (!st._remoteBubble) {
+        st._remoteBubble = addMsg(msg.sessionId, "", "claude");
+        st._remoteText = "";
+      }
+      st._remoteText = (st._remoteText || "") + (msg.text || "");
+      if (st._remoteBubble._entry) st._remoteBubble._entry.text = st._remoteText;
+      st._remoteBubble.textContent = st._remoteText;
+      if (msg.sessionId === activeId && nearBottom(st.logEl)) st.logEl.scrollTop = st.logEl.scrollHeight;
+    } else if (msg.type === "activity" && st) {
+      if (msg.sessionId === activeId) {
+        setStatus("⚙︎ " + (msg.text || (msg.tool ? "Running " + msg.tool : "Working…")));
+      }
+    } else if (msg.type === "done" && st) {
+      if (st._remoteBubble && st._remoteText) {
+        renderInto(st._remoteBubble, st._remoteText);
+        persistHistory(st);
+        st._remoteBubble = null; st._remoteText = "";
+      }
+      st.turn.busy = false;
+      if (msg.sessionId === activeId) { refreshMic(); setStatus(""); }
+    } else if (msg.type === "error" && st) {
+      addMsg(msg.sessionId, "⚠️ " + (msg.error || "Turn failed"), "err");
+      st.turn.busy = false;
+      st._remoteBubble = null; st._remoteText = "";
+      if (msg.sessionId === activeId) { refreshMic(); setStatus(""); }
+    } else if (msg.type === "approval_request" && msg.sessionId) {
+      const existing = document.getElementById("appr_" + msg.id);
+      if (!existing) renderApprovalCard(msg.sessionId, msg);
+    } else if (msg.type === "approval_resolved") {
+      const card = document.getElementById("appr_" + msg.id);
+      if (card) {
+        const actionsEl = card.querySelector(".approval-actions");
+        if (actionsEl) {
+          actionsEl.innerHTML = `<span class="approval-settled ${msg.approved ? "approved" : "rejected"}">${msg.approved ? "✅ Approved" : "❌ Rejected"}</span>`;
+        }
+        if (card._talkClone) card._talkClone.remove();
+      }
+    } else if (msg.type === "session_created" && msg.session) {
+      if (!S.has(msg.session.id)) {
+        addSessionState(msg.session);
+        rebuildSessionSelect();
+        renderHome();
+      }
+    } else if (msg.type === "session_deleted" && msg.id) {
+      if (S.has(msg.id)) {
+        const delSt = S.get(msg.id);
+        if (delSt && delSt.logEl) delSt.logEl.remove();
+        S.delete(msg.id);
+        rebuildSessionSelect();
+        renderHome();
+        if (activeId === msg.id) {
+          switchTo(CONFIG.defaultSessionId || S.keys().next().value);
+        }
+      }
+    } else if (msg.type === "session_updated" && msg.session) {
+      if (S.has(msg.session.id)) {
+        S.get(msg.session.id).meta = msg.session;
+        rebuildSessionSelect();
+        renderHome();
+      }
+    }
+  }
+  function initSyncSocket() {
+    if (syncWs && (syncWs.readyState === WebSocket.CONNECTING || syncWs.readyState === WebSocket.OPEN)) return;
+    try {
+      syncWs = new WebSocket(getSyncWsUrl());
+    } catch (_) {
+      syncBackoff = Math.min(10000, syncBackoff * 1.5);
+      setTimeout(initSyncSocket, syncBackoff);
+      return;
+    }
+    syncWs.onopen = () => {
+      syncBackoff = 1000;
+      if (activeId) syncSubscribe(activeId);
+    };
+    syncWs.onmessage = (ev) => {
+      let data = {};
+      try { data = JSON.parse(ev.data); } catch (_) { return; }
+      handleSyncMessage(data);
+    };
+    syncWs.onclose = () => {
+      syncWs = null;
+      setTimeout(initSyncSocket, syncBackoff);
+      syncBackoff = Math.min(10000, syncBackoff * 1.5);
+    };
+    syncWs.onerror = () => {
+      try { syncWs.close(); } catch (_) {}
+    };
+  }
+
+  // Heartbeat & lifecycle reconnects
+  setInterval(() => {
+    if (syncWs && syncWs.readyState === WebSocket.OPEN) {
+      try { syncWs.send(JSON.stringify({ type: "ping" })); } catch (_) {}
+    }
+  }, 25000);
+  window.addEventListener("online", () => { syncBackoff = 1000; initSyncSocket(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && (!syncWs || syncWs.readyState > WebSocket.OPEN)) {
+      syncBackoff = 1000;
+      initSyncSocket();
+    }
+  });
 
   // ---------- Text composer ----------
   function sendText() {
@@ -1793,6 +1934,7 @@
     rebuildSessionSelect();
     if (prefs.voice) for (const st of S.values()) st.meta.voice = true;
     if (activeId) switchTo(activeId);
+    initSyncSocket();
     showHome(); // land on the session list
     if (prefs.notify) ensurePush();
   })();

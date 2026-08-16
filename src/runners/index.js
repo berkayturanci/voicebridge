@@ -16,13 +16,19 @@ const SECURITY_HEADERS = {
     "img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'",
 };
 
+const hub = require("../services/hub");
+
 function streamAsk(session, prompt, res) {
   res.writeHead(200, Object.assign({
     "Content-Type": "application/x-ndjson; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Accel-Buffering": "no",
   }, SECURITY_HEADERS));
-  const emit = (obj) => { try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {} };
+  const emit = (obj) => {
+    try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {}
+    try { hub.broadcast(session.id, Object.assign({ sessionId: session.id }, obj)); } catch (_) {}
+  };
+  try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt }); } catch (_) {}
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
   if (session.runner === "tmux") return streamTmux(session, prompt, res, emit);
   if (session.agent === "ollama") return streamOllama(session, prompt, res, emit);
