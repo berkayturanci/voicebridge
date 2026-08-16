@@ -168,3 +168,10 @@ test("index.html contains streaming STT engine and parseSttStreamMessage", () =>
   assert.strictEqual(finalMsg.done, true);
 });
 
+test("index.html contains full-duplex WebSocket live sync", () => {
+  assert.ok(html.includes("initSyncSocket"), "includes initSyncSocket");
+  assert.ok(html.includes("syncSubscribe"), "includes syncSubscribe");
+  assert.ok(html.includes("handleSyncMessage"), "includes handleSyncMessage");
+  assert.ok(html.includes('"/ws"'), "includes /ws endpoint");
+});
+

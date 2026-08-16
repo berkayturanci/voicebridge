@@ -89,10 +89,24 @@ function clearSessionApprovals(sessionId, reason = "Session closed") {
   }
 }
 
+function publicApproval(p) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    sessionId: p.sessionId,
+    tool: p.tool,
+    command: p.command,
+    details: p.details,
+    description: p.description,
+    createdAt: p.createdAt,
+  };
+}
+
 module.exports = {
   pendingApprovals,
   createApproval,
   getApproval,
+  publicApproval,
   resolveApproval,
   getPendingApprovals,
   clearSessionApprovals,
