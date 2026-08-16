@@ -175,3 +175,33 @@ test("index.html contains full-duplex WebSocket live sync", () => {
   assert.ok(html.includes('"/ws"'), "includes /ws endpoint");
 });
 
+test("site/index.html and README.md reference all supported agents and features", () => {
+  const siteHtml = fs.readFileSync(path.join(__dirname, "../site/index.html"), "utf8");
+  const readme = fs.readFileSync(path.join(__dirname, "../README.md"), "utf8");
+  const llms = fs.readFileSync(path.join(__dirname, "../site/llms.txt"), "utf8");
+
+  // All 6 agents present
+  for (const agent of ["Claude", "Codex", "Antigravity", "Ollama", "Aider", "Gemini"]) {
+    assert.ok(siteHtml.includes(agent), `site includes ${agent}`);
+    assert.ok(readme.includes(agent), `README includes ${agent}`);
+    assert.ok(llms.includes(agent), `llms.txt includes ${agent}`);
+  }
+
+  // Key features present
+  assert.ok(siteHtml.includes("Full-Duplex Live Sync"), "site includes Live Sync feature");
+  assert.ok(siteHtml.includes("Interactive Tool Approvals"), "site includes Tool Approvals feature");
+  assert.ok(siteHtml.includes("Git Diff Viewer"), "site includes Git Diff feature");
+  assert.ok(siteHtml.includes("main-content"), "site includes main landmark");
+
+  // Valid JSON-LD schema
+  const jsonLdMatch = siteHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  assert.ok(jsonLdMatch, "JSON-LD schema script exists");
+  const schema = JSON.parse(jsonLdMatch[1]);
+  assert.strictEqual(schema["@type"], "SoftwareApplication");
+  assert.strictEqual(schema.softwareVersion, "0.8.2");
+  assert.strictEqual(schema.name, "VoiceBridge");
+
+  assert.ok(readme.includes("/ws"), "README includes /ws");
+  assert.ok(readme.includes("Interactive tool approvals"), "README includes tool approvals");
+});
+

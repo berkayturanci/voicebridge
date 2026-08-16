@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="google-site-verification" content="YOfteG6Rawd61nFnQCQY1iLQB8MbUMlJA6zIFUkJC0g" />
 <title>VoiceBridge — Hands-Free Voice for Coding Agents</title>
-<meta name="description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
-<meta name="keywords" content="VoiceBridge, voice coding, hands-free coding, Claude Code, Codex, Antigravity, Ollama, Whisper, local speech to text, voice agent, speech to code, coding assistant, source-available" />
+<meta name="description" content="Talk to Claude Code, Codex, Antigravity, Ollama, Aider, and Gemini CLI from your phone with live duplex WebSocket sync and local Whisper streaming STT. Free, source-available, no ElevenLabs." />
+<meta name="keywords" content="VoiceBridge, voice coding, hands-free coding, Claude Code, Codex, Antigravity, Ollama, Aider, Gemini CLI, Whisper, local speech to text, voice agent, speech to code, coding assistant, source-available" />
 <meta name="author" content="Berkay Turancı" />
 <meta name="theme-color" content="#0a0a0e" />
 <meta name="robots" content="index, follow" />
@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 
 <meta property="og:title" content="VoiceBridge — Hands-Free Voice for Coding Agents" />
-<meta property="og:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
+<meta property="og:description" content="Talk to Claude Code, Codex, Antigravity, Ollama, Aider, and Gemini CLI from your phone with live duplex WebSocket sync and local Whisper streaming STT. Free, source-available, no ElevenLabs." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://berkayturanci.github.io/voicebridge/" />
 <meta property="og:site_name" content="VoiceBridge" />
@@ -26,7 +26,7 @@
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="VoiceBridge — Hands-Free Voice for Coding Agents" />
-<meta name="twitter:description" content="Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs." />
+<meta name="twitter:description" content="Talk to Claude Code, Codex, Antigravity, Ollama, Aider, and Gemini CLI from your phone with live duplex WebSocket sync and local Whisper streaming STT. Free, source-available, no ElevenLabs." />
 <meta name="twitter:image" content="https://berkayturanci.github.io/voicebridge/hero.svg" />
 <meta name="twitter:image:alt" content="VoiceBridge — hands-free voice for coding agents" />
 
@@ -38,7 +38,10 @@
   "url": "https://berkayturanci.github.io/voicebridge/",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "macOS, Windows, Web, iOS, Android",
-  "description": "Hands-free voice control for coding agents. Talk to Claude Code, Codex, Antigravity, and Ollama from your phone, with optional local Whisper streaming STT. Free, source-available, no ElevenLabs.",
+  "softwareVersion": "0.8.2",
+  "screenshot": "https://berkayturanci.github.io/voicebridge/desktop-host-control.png",
+  "downloadUrl": "https://github.com/berkayturanci/voicebridge/releases",
+  "description": "Hands-free voice control for coding agents. Talk to Claude Code, Codex, Antigravity, Ollama, Aider, and Gemini CLI from your phone with live duplex WebSocket sync and local Whisper streaming STT. Free, source-available, no ElevenLabs.",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "Berkay Turancı" }
 }
@@ -453,7 +456,7 @@
 
 <nav id="navbar">
   <div class="wrap">
-    <a href="#" class="brand">
+    <a href="./" class="brand">
       <img src="icon.svg" alt="VoiceBridge Logo" />
       VoiceBridge
     </a>
@@ -469,16 +472,18 @@
   </div>
 </nav>
 
+<main id="main-content">
+
 <section class="hero">
   <div class="wrap hero-content">
     <div>
       <div class="pill">
-        <span class="dot"></span> v0.8 · Mac + Windows desktop host · QR pairing
+        <span class="dot"></span> v0.8.1 · Full-Duplex Live Sync · 6 Agents · Mac & Windows Host
       </div>
       <h1>Hands-free voice<br/>for your <span class="grad">coding agent.</span></h1>
       <p class="hero-lead">
-        Talk to Claude Code, Codex, Antigravity, or Ollama directly from your phone. 
-        It keeps the session going across bridge restarts, does the work, and replies in chat <b>and aloud</b>. The desktop host starts the bridge, checks Tailscale, and pairs the mobile app with a QR.
+        Talk to Claude Code, Codex, Antigravity, Ollama, Aider, or Google Gemini CLI directly from your phone. 
+        Multi-client live WebSocket sync keeps turns, tool approvals, and git diffs in real-time sync across your devices.
       </p>
       <div class="hero-cta">
         <a href="https://github.com/berkayturanci/voicebridge/releases/download/v0.8.1/voicebridge-0.2.1-arm64.dmg" class="btn btn-primary">
@@ -509,29 +514,49 @@
     <div class="section-header">
       <span class="eyebrow">Powerful Features</span>
       <h2>A seamless bridge between you and your code.</h2>
-      <p class="section-lead">A tiny Node bridge drives the CLI on your machine and streams everything to your phone, with browser voice by default or local Whisper when you want it.</p>
+      <p class="section-lead">A tiny Node bridge drives CLI agents on your machine and streams everything to your phone, with browser voice or local Whisper streaming STT.</p>
     </div>
     
     <div class="grid-features">
       <div class="card">
         <div class="card-icon">🎙️</div>
         <h3>Type or Speak</h3>
-        <p>Use the chat interface to type, or tap the mic to speak. The agent's replies are formatted beautifully and read aloud sentence-by-sentence.</p>
+        <p>Use the chat interface to type, or tap the mic to speak. The agent's replies are formatted with rich markdown and read aloud sentence-by-sentence.</p>
       </div>
       <div class="card">
         <div class="card-icon">🤖</div>
-        <h3>Multi-Agent Ready</h3>
-        <p>Switch seamlessly between Claude Code, Codex, Antigravity, and Ollama (fully local). Each has adjustable autonomy modes.</p>
+        <h3>6 Coding Agents</h3>
+        <p>Switch seamlessly between Claude Code, Codex, Antigravity, Ollama (fully local), Aider, and Gemini CLI. Each has configurable autonomy modes.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🗂️</div>
-        <h3>Parallel Sessions</h3>
-        <p>Run "Claude on Repo A" and "Codex on Repo B" simultaneously. Claude, Codex, and Antigravity continuity survives bridge restarts.</p>
+        <div class="card-icon">🔄</div>
+        <h3>Full-Duplex Live Sync</h3>
+        <p>Real-time WebSocket hub (<code>/ws</code>) syncs turns, streaming deltas, and tool approvals across multiple devices simultaneously.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>Interactive Tool Approvals</h3>
+        <p>Review and Approve or Reject shell commands and tool executions directly from interactive cards in chat and Talking Mode.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <h3>Git Diff Viewer Drawer</h3>
+        <p>Inspect modified workspace files and review syntax-highlighted git diffs right from your phone's sliding drawer.</p>
       </div>
       <div class="card">
         <div class="card-icon">📞</div>
-        <h3>Talking Mode</h3>
-        <p>Enter a continuous voice loop. The orb pulsates as you speak, the agent executes, and reads the reply back to you autonomously.</p>
+        <h3>Talking Mode & VAD</h3>
+        <p>Hands-free voice loop with WebAudio Voice Activity Detection (VAD) for dynamic silence detection and auto-commit.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎧</div>
+        <h3>MediaSession Controls</h3>
+        <p>Control conversations from your lock screen, Apple Watch, or Bluetooth headset with background audio keepalive.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📄</div>
+        <h3>Transcript Export</h3>
+        <p>Export any session transcript to Markdown (<code>.md</code>) or JSON (<code>.json</code>) via the native share sheet or instant file download.</p>
       </div>
       <div class="card">
         <div class="card-icon">🔒</div>
@@ -539,14 +564,9 @@
         <p>Everything runs over your private Tailscale network via HTTPS. Your codebase never touches a third-party voice cloud.</p>
       </div>
       <div class="card">
-        <div class="card-icon">⚡</div>
-        <h3>Local-First Option</h3>
-        <p>Use built-in browser STT/TTS, batch Whisper, or streaming Whisper over a local WebSocket for hands-free talking mode without a voice vendor.</p>
-      </div>
-      <div class="card">
         <div class="card-icon">🖥️</div>
         <h3>Desktop Host App</h3>
-        <p>Install the Mac DMG or Windows preview build, choose one workspace, pick Claude/Codex/Antigravity/Ollama, verify Tailscale, and pair your phone by scanning the desktop QR.</p>
+        <p>Install the Mac DMG or Windows preview build, choose one workspace, verify Tailscale, and pair your phone with a QR scan.</p>
       </div>
     </div>
   </div>
@@ -665,6 +685,8 @@ speaker <span style="color:#71717a">◀─speechSynthesis─</span> reply <span 
     </details>
   </div>
 </section>
+
+</main>
 
 <footer>
   <div class="wrap">
