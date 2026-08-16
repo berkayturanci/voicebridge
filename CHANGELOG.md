@@ -5,6 +5,23 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-08-16
+
+### Added
+- **Full-Duplex WebSocket Live Session Sync (`/ws`)**: Multi-device pub/sub hub broadcasting turns, streaming deltas, tool activities, approvals, and session lifecycle events in real-time.
+- **Aider & Google Gemini CLI Adapters**: Added support for Aider (`aider`, with `code`, `architect`, `ask`, `auto` modes) and Google Gemini CLI (`gemini`, with `default`, `yolo`, `sandbox` modes) with conversation continuity.
+- **Interactive Tool Approval Cards**: Added `src/services/approvals.js` and REST/WebSocket approval endpoints (`/api/approvals`), rendering live Approve/Reject prompt cards in chat and Talking Mode.
+- **WebAudio / WASM Voice Activity Detection (VAD)**: Real-time audio energy and zero-crossing analysis for dynamic hands-free silence detection and configurable speech-end auto-commit.
+- **Git Changes & Unified Diff Viewer Drawer**: Sliding bottom drawer in mobile UI to inspect modified files and review syntax-highlighted git diffs (`GET /api/git/status`, `GET /api/git/diff`).
+- **Real-Time Streaming STT (`/api/stt-stream`)**: WebSocket audio chunk streaming bridge connecting browser `MediaRecorder` with local `whisper.cpp` server or subprocess.
+- **MediaSession API & Headset Controls**: Bluetooth headset and lock screen action integration (`play`, `pause`, `stop`, `nexttrack`, `previoustrack`) with background silent audio keepalive.
+- **Session Transcript Export**: 1-tap Markdown (`.md`) and JSON (`.json`) transcript export via Web Share API with file download fallback.
+- **Modular Architecture (`src/`)**: Decomposed monolithic `server.js` into modular subsystems (`src/adapters/`, `src/runners/`, `src/services/`, `src/routes/`).
+
+### Changed
+- English default strings standardized across all modes, dialogs, and push notifications.
+- Reconnection resilience enhanced with `online` and `visibilitychange` listeners and 25s keepalive ping.
+
 ## [0.8.1] - 2026-07-16
 
 ### Added

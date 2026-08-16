@@ -7,11 +7,11 @@
 [![CI](https://github.com/berkayturanci/voicebridge/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/voicebridge/actions/workflows/ci.yml)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-3fb950)](package.json)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-1f6feb)](LICENSE)
-[![Agents: Claude · Codex · Antigravity · Ollama](https://img.shields.io/badge/agents-Claude%20%C2%B7%20Codex%20%C2%B7%20Antigravity%20%C2%B7%20Ollama-8b949e)](#agents-sessions--modes)
+[![Agents: Claude · Codex · Antigravity · Ollama · Aider · Gemini](https://img.shields.io/badge/agents-Claude%20%C2%B7%20Codex%20%C2%B7%20Antigravity%20%C2%B7%20Ollama%20%C2%B7%20Aider%20%C2%B7%20Gemini-8b949e)](#agents-sessions--modes)
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
 
-**v0.8.1:** Download the Mac host app DMG or Windows preview installer, choose
+**v0.8.2:** Download the Mac host app DMG or Windows preview installer, choose
 one workspace, start the bridge, verify Tailscale, and pair the native mobile
 app by scanning the desktop QR code. Mac and Windows desktop preview builds are
 validated in CI.
@@ -24,40 +24,28 @@ you want one.
 <p align="center"><img src="docs/demo.svg" alt="voicebridge phone UI — a chat with an agent, with a text box and a mic" width="300" /></p>
 <p align="center"><em>Type or speak; the agent replies in chat and aloud.</em></p>
 
-- 🤖 **Multiple agents** — Claude Code, **Codex**, **Antigravity**, and **Ollama**
-  (a fully-local open-source model), selectable per session, each with autonomy
-  **modes** (ask → full-auto).
-- 🗂️ **Multiple sessions** — run several conversations in parallel (e.g. "Claude on
-  repo A", "Codex on repo B") and switch between them in the UI.
-- ⌨️🎙️ **Type or speak** — a Claude-Code-like chat with a text box *and* a mic;
-  replies render with code blocks and are read aloud.
-- 🎙️ **Speech-to-text** runs in your phone's browser by default, or through your
-  own local Whisper command / streaming WebSocket transcriber; 🔊
-  **text-to-speech** stays in the browser — no per-minute voice cost.
-- ⚡ **Streaming** — the reply is spoken **sentence-by-sentence as it's generated**,
-  not after the whole turn finishes, with a **Stop** button to cut it off.
-- 🧩 A **tiny Node bridge** (one dependency: `qrcode-terminal`) relays the text to
-  the agent CLI on your machine and streams its reply back.
-- 🔒 Reached over **Tailscale** (your private network) with real HTTPS, with an
-  optional **shared access token** — your code never touches a third-party voice
-  service.
-- 🗣️ Optional **fully-local speech-to-text** via your own Whisper command
-  (`STT_MODE=whisper`) or a local streaming Whisper WebSocket transcriber
-  (`STT_MODE=whisper-stream`), so even the transcription stays on your machine.
+- 🤖 **6 supported agents** — **Claude Code**, **Codex**, **Antigravity**, **Ollama** (fully local), **Aider**, and **Google Gemini CLI**, selectable per session with autonomy modes.
+- 🔄 **Full-duplex WebSocket live sync (`/ws`)** — connect multiple devices (phones, tablets, laptops) simultaneously; live turn streaming, approvals, and session updates sync across all connected clients in real-time.
+- ⚡ **Interactive tool approvals** — in interactive/safe modes, approval cards pop up in the chat and Talking Mode with one-tap Approve / Reject actions for shell commands and tool calls.
+- 🎙️ **WASM / WebAudio Voice Activity Detection (VAD)** — hands-free silence detection with dynamic energy thresholding and configurable silence duration, so it doesn't cut you off mid-sentence.
+- 🔍 **Git changes & diff drawer** — inspect modified/untracked files in the workspace and review syntax-highlighted git diffs right from your phone.
+- 🎧 **MediaSession API & headset controls** — lock screen media controls and Bluetooth headset action integration (play/pause/skip) with background audio keepalive.
+- 📄 **Session transcript export** — export any session's conversation history to formatted Markdown (`.md`) or JSON (`.json`) with native Web Share API and download fallback.
+- 🗂️ **Multiple parallel sessions** — run several conversations in parallel (e.g. "Claude on repo A", "Aider on repo B") and switch between them in the UI.
+- 🎙️ **Speech-to-text** — runs in your phone's browser by default, or through your own local Whisper CLI (`STT_MODE=whisper`) or streaming Whisper WebSocket transcriber (`STT_MODE=whisper-stream`); 🔊 **text-to-speech** stays in the browser — no per-minute voice cost.
+- ⚡ **Streaming** — the reply is spoken **sentence-by-sentence as it's generated**, not after the whole turn finishes, with a **Stop** button to cut it off.
+- 🧩 **Modular Node architecture** — zero-dependency CommonJS architecture under `src/` (adapters, runners, services, routes) for high testability and reliability.
+- 🔒 Reached over **Tailscale** (your private network) with real HTTPS and an optional **shared access token** — your code never touches a third-party voice service.
 
-> Honest scope: for Claude/Codex/Antigravity the **model** runs in its vendor's
+> Honest scope: for Claude/Codex/Antigravity/Aider/Gemini the **model** runs in its vendor's
 > cloud (that's how those CLIs work); with the **Ollama** backend the model runs
 > fully locally. voicebridge just removes the *voice* middleman (ElevenLabs)
 > and its limits. Speech recognition on iOS uses Apple's free dictation service;
 > text-to-speech is fully on-device.
 >
-> Agent support: the **Claude** backend is fully implemented and tested. The
-> **Codex** (`codex exec`) and **Antigravity** (`agy --print`) backends use the
-> same secure stdin prompt style as [ai-jury](https://github.com/berkayturanci/ai-jury)
-> and stream their plain-text stdout. Conversation continuity is built-in for
-> Claude (`--continue`), Codex (`codex exec resume`), and Antigravity
-> (`--conversation` / `--continue`); see
-> [docs/configuration.md](docs/configuration.md) for override hooks.
+> Agent support: **Claude Code**, **Codex**, **Antigravity**, **Ollama**, **Aider**,
+> and **Gemini CLI** are fully implemented, tested, and support session continuity.
+> See [docs/configuration.md](docs/configuration.md) for details.
 
 ---
 
@@ -168,14 +156,20 @@ That's it — talk, and Claude Code talks back. 🎧
 | `HOST`         | `127.0.0.1`          | Bind address (keep local; expose via `tailscale serve`) |
 | `PUBLIC_URL`   | _(none)_             | Public URL shown in the startup QR (e.g. your Tailscale `https://…ts.net`). Falls back to `http://HOST:PORT`. |
 | `PROJECT_DIR`  | current directory    | Default working directory for new sessions         |
-| `AGENT`        | `claude`             | Default agent for the boot session (`claude`/`codex`/`antigravity`) |
+| `AGENT`        | `claude`             | Default agent for the boot session (`claude`/`codex`/`antigravity`/`ollama`/`aider`/`gemini`) |
 | `CLAUDE_BIN`   | `claude`             | Path to the `claude` executable                    |
 | `CODEX_BIN`    | `codex`              | Path to the `codex` executable                     |
 | `AGY_BIN`      | `agy`                | Path to the Antigravity executable                 |
-| `ACCESS_TOKEN` | _(none)_             | If set, `/api/*` requires `Authorization: Bearer <token>`. The page prompts for it once and stores it. |
+| `OLLAMA_BIN`   | `ollama`             | Path to the Ollama executable                      |
+| `OLLAMA_MODEL` | `llama3.2`           | Default Ollama model                               |
+| `OLLAMA_URL`   | `http://127.0.0.1:11434` | Ollama HTTP endpoint                           |
+| `AIDER_BIN`    | `aider`              | Path to the Aider executable                       |
+| `GEMINI_BIN`   | `gemini`             | Path to the Google Gemini CLI executable           |
+| `ACCESS_TOKEN` | _(none)_             | If set, `/api/*` and `/ws` require authentication. The page prompts for it once and stores it. |
 | `STT_MODE`     | `browser`            | `browser` (Web Speech), `whisper` (local batch), or `whisper-stream` (local streaming) |
-| `STT_CMD`      | _(none)_             | Whisper mode: shell command; `{file}` → recorded audio path; must print the transcript to stdout |
+| `STT_CMD`      | _(none)_             | Whisper mode: shell command; `{file}` → recorded audio path; must print transcript to stdout |
 | `STT_STREAM_URL` | _(none)_           | Whisper-stream mode: local WebSocket transcriber URL, e.g. `ws://127.0.0.1:8910/listen` |
+| `STT_STREAM_CMD` | _(none)_           | Whisper-stream mode: local streaming subprocess command, e.g. `whisper-stream -m ~/models/ggml-base.bin` |
 
 ### Optional: a shared access token
 
@@ -196,11 +190,7 @@ export STT_CMD='ffmpeg -nostdin -i {file} -ar 16000 -ac 1 -f wav - 2>/dev/null |
 npm start
 ```
 
-In whisper mode the mic button is **tap-to-start / tap-to-stop** (record, then it
-transcribes). Hands-free loop is browser-mode only.
-
-For local streaming transcription, run a Whisper-compatible WebSocket transcriber
-on the Mac and point voicebridge at it:
+For real-time streaming speech-to-text, run `whisper.cpp` streaming transcriber:
 
 ```bash
 export STT_MODE=whisper-stream
@@ -208,85 +198,42 @@ export STT_STREAM_URL='ws://127.0.0.1:8910/listen'
 npm start
 ```
 
-In whisper-stream mode the browser streams mic chunks to `/api/stt-stream`; the
+In whisper-stream mode the browser streams mic chunks in 250ms timeslices to `/api/stt-stream`; the
 bridge proxies them to the local transcriber and relays partial/final transcript
-JSON back to the UI. Hands-free talking mode works here because partial text can
-drive the same silence timer as browser STT.
+JSON back to the UI.
 
 ## Agents, sessions & modes
 
 - **Session list home**: the app opens to a list of conversations (mobile
   Claude-Code style) — each card shows the name, agent · mode · runner badges,
   and a last-message preview. Tap a card to open it; **←** returns to the list.
-- Create a session with **＋ Yeni**: pick an **agent** (Claude / Codex /
-  Antigravity / **Ollama**), a **mode**, a **project folder**, and a name. The
-  folder field has a **📁 Browse** tree browser (no typing long paths); save
-  frequent projects as **favorites** (★) (or seed them with `FAVORITES`).
-- **Conversation history persists**: each session keeps its own transcript,
-  restored on reload — come back and the conversation is still there.
-- **Type or speak**: the composer sends on Enter (Shift+Enter for a newline) or
-  tap ➤; the 🎤 button does voice. The **🎤 → ⏹** button becomes a Stop control
-  while the agent answers or speaks.
-- **Talking mode** (📞): a continuous, hands-free voice conversation — speak, it
-  auto-sends on a pause, the reply is read aloud, then it listens again. A minimal
-  voice screen shows *listening / thinking / speaking*; the orb **grows and glows
-  as it hears you**. Tap the orb while it's speaking to **interrupt** (barge-in),
-  or the **🎙️ (top-left)** to **mute** the mic and pause without leaving — tap
-  again to resume. Backgrounding the tab (e.g. opening the camera) frees the mic
-  automatically. (Needs HTTPS for the mic.)
-- **Command palette** (⌘): pick from the project's own commands — `.claude/commands`
-  slash commands (e.g. `/keel:ship`) and `package.json` npm scripts — searchable;
-  selecting one prefills the composer.
-- **Settings sheet** (⚙): theme, **chat font size**, language, mode, hands-free,
-  audio cues, voice-friendly, notifications, TTS voice + rate, and session
-  rename / delete / new-chat — all in one tidy place, so the chat area stays big.
-- **Local or cloud runner**: each session runs the agent **locally** (CLI on your
-  machine) or, when `CLOUD_RUNNER_URL` is set, on a **cloud** runner — same UI,
-  same NDJSON protocol, and the folder picker browses the runner host. See
-  [docs/configuration.md](docs/configuration.md#runners-local-vs-cloud).
-- **Eyes-free audio cues**: optional earcons signal *listening*, *reply done*, and
-  *error* — so you can run or cycle without looking at the screen.
-- **Quick commands**: one-tap chips send canned prompts ("What changed?", "Tests",
-  "Commit & push", …) to the active session — handy one-handed.
-- **Voice-friendly replies**: a "Brief voice" toggle asks the agent to answer
-  concisely for text-to-speech (no long code dumps, ending with a one-line
-  summary) — the full text still shows in chat.
-- **Notifications**: opt-in "Notify" raises a notification when a reply
-  finishes in the background or ends with a question — so a hands-free task
-  pulls you back when it needs you. With VAPID keys configured it uses **real
-  Web Push** (works even when the app is closed); otherwise in-page notifications.
-- **Rich replies**: full markdown (headings, lists, http(s)-only links) with
-  code blocks (copy button) and **diff coloring** for ` ```diff ` blocks.
-- **Activity trail & collapsible output**: tool use shows a subtle running log
-  (e.g. `⚙︎ Edit server.js`), and long output blocks (npm logs, etc.) collapse by
-  default with a show-more toggle so the conversation stays readable.
-- **Installable PWA**: a web manifest, icon, and service worker make it
-  installable and cache the app shell; notifications go through the service
-  worker. (On iOS, use the Safari **tab** for voice — installed PWAs can't use
-  the microphone there.)
-- **Native app (Flutter)**: an optional iOS/Android client lives in
-  [`app/`](app/) — same bridge backend, but **native mic + TTS** so voice works
-  even as an installed app (no Safari-tab caveat). The same code also runs as a
-  **desktop client** (macOS/Windows/Linux). The PWA stays the zero-install option.
-- **Desktop app (Electron)**: [`desktop/`](desktop/) packages the bridge itself
-  into a **Mac `.dmg` / Windows / Linux** app with a control panel + tray —
-  run the server with no terminal. It stores the pairing token, shows mobile
-  last-seen, prepares the Tailscale Serve command, and verifies both public URL
-  reachability and token-authenticated access. See the
-  [Mac desktop host setup guide](docs/mac-desktop-host.md) and
-  [Windows desktop host setup guide](docs/windows-desktop-host.md).
+- Create a session with **＋ New Session**: pick an **agent** (Claude / Codex /
+  Antigravity / Ollama / **Aider** / **Gemini**), an autonomy **mode**, a **project folder**, and a name. The
+  folder field has a **📁 Browse** tree browser; save frequent projects as **favorites** (★).
+- **Full-Duplex Live Session Sync (`/ws`)**: all connected devices receive real-time
+  turn deltas, tool approvals, and session updates simultaneously.
+- **Interactive Tool Approvals**: safe/interactive agent turns display prompt
+  cards in the chat and Talking Mode with **Approve** and **Reject** buttons.
+- **Git Changes & Diff Viewer**: tap the Git icon to view changed/untracked
+  files and review syntax-highlighted diffs on your phone.
+- **Voice Activity Detection (VAD)**: dynamic silence sensitivity and auto-commit
+  for hands-free speech input without cutting off speech.
+- **MediaSession API**: lock screen controls and Bluetooth headset action integration.
+- **Session Transcript Export**: 1-tap Markdown (`.md`) and JSON (`.json`) export via Web Share API or download.
 
 ### Modes (autonomy)
 
 Each agent exposes modes that map to its CLI's approval/sandbox flags — pick a
-fuller-auto mode for true hands-free use (cycling, running), with the obvious
-caveat that the agent then edits/runs without asking.
+fuller-auto mode for true hands-free use:
 
 | Agent | Modes (flag) |
 |-------|--------------|
-| Claude | `ask` (none) · `autoEdit` (`--permission-mode acceptEdits`) · `full` (`--dangerously-skip-permissions`) |
+| Claude | `ask` (standard prompt) · `autoEdit` (`--permission-mode acceptEdits`) · `full` (`--dangerously-skip-permissions`) |
 | Codex | `safe` (`-s read-only`) · `auto` (`-s workspace-write -c approval_policy="never"`) · `full` (`--dangerously-bypass-approvals-and-sandbox`) |
 | Antigravity | `safe` (`--sandbox`) · `full` (`--dangerously-skip-permissions`) |
+| Ollama | `default` (local LLM inference with session history) |
+| Aider | `code` (standard coding) · `architect` (`--chat-mode architect`) · `ask` (`--chat-mode ask`) · `auto` (`--auto-commits --chat-mode code`) |
+| Gemini | `default` (standard prompt) · `yolo` (`--yolo` auto-approve) · `sandbox` (`--sandbox` isolated mode) |
 
 > ⚠️ Full-auto modes let the agent change files and run commands without
 > prompting. Use them only on trusted projects over your private tailnet.
@@ -294,9 +241,9 @@ caveat that the agent then edits/runs without asking.
 ## How it works
 
 ```
-[ iPhone Safari ]                         [ your Mac ]
-  mic ─Web Speech or Whisper STT─▶ text ──https/Tailscale──▶ voicebridge ──spawn──▶ claude / codex / agy
-  speaker ◀─speechSynthesis── reply ◀──────────── reply  ◀──────────────  (coding agent CLI)
+[ Phone / Tablet / Laptop ]                     [ Your Computer ]
+  mic ─Web Speech or Whisper STT─▶ text ──HTTPS/Tailscale──▶ voicebridge (src/ modular) ──spawn──▶ claude / aider / gemini / codex / agy
+  speaker ◀─speechSynthesis── reply ◀── WebSocket /ws ◀──── delta/activity/approvals ◀──── (agent CLI)
 ```
 
 - Each session maps to one agent + project dir. Claude, Codex, Antigravity, and

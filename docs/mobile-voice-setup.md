@@ -219,5 +219,9 @@ tailscale serve --https=443 off
   You still want HTTPS for a good mobile experience, because both modes use
   `getUserMedia`, which is also gated on a secure context.
 
+- **MediaSession API & Headset Controls:** Control continuous voice mode and interrupt assistant speech directly from your lock screen, Apple Watch, or Bluetooth headphones (AirPods / Pixel Buds) without pulling your phone out of your pocket.
+- **Voice Activity Detection (VAD) Tuning:** Adjust the silence sensitivity slider in the Settings sheet (`⚙`) between 0.8s and 3.0s to match your conversational pace.
+- **Session Transcript Export:** Save transcripts in Markdown (`.md`) or JSON (`.json`) via the native iOS/Android share sheet.
+
 See also: [security.md](security.md) for the threat model and the access-token
 design.

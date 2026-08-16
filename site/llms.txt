@@ -1,7 +1,7 @@
 # VoiceBridge
 
 > VoiceBridge gives coding agents a hands-free voice interface. Talk to Claude
-> Code, Codex, Antigravity, and Ollama from your phone — dictate prompts and hear
+> Code, Codex, Antigravity, Ollama, Aider, and Google Gemini CLI from your phone — dictate prompts and hear
 > responses without touching the keyboard. Free and source-available, with no
 > dependency on ElevenLabs or other paid speech services.
 
@@ -21,7 +21,13 @@
 ## Key concepts
 
 - Hands-free control: dictate to and listen to coding agents by voice
-- Multi-agent: works with Claude Code, Codex, Antigravity, and Ollama
+- Multi-agent: works with Claude Code, Codex, Antigravity, Ollama, Aider, and Gemini CLI
+- Full-duplex WebSocket live sync: multi-device synchronization over `/ws`
+- Interactive tool approvals: review shell commands and tool permissions in chat and voice mode
+- Git diff inspection: sliding drawer with unified syntax-highlighted diffs
+- Voice Activity Detection (VAD): dynamic silence sensitivity for continuous voice
+- MediaSession controls: lock screen and Bluetooth headset play/pause/skip integration
+- Transcript export: Markdown and JSON exports via Web Share API
 - Phone-first: drive an agent from your phone while away from the desk
 - Desktop host app: starts the bridge, stores the token, diagnoses Tailscale/public URL/token status, and shows the pairing QR on macOS and Windows
 - Free & source-available: no ElevenLabs or paid TTS/STT dependency

@@ -122,7 +122,8 @@ async function streamTmux(session, prompt, res, emit) {
     if (stable >= 2 && !genRe.test(cur) && (sawGen || stable >= 4)) break;
   }
   if (closed) return;
-  const reply = agent.tmux.extractReply(await tmuxCapture(name, -250), text);
+  const capLines = Math.max(50, Number(process.env.TMUX_CAPTURE_LINES || 1000));
+  const reply = agent.tmux.extractReply(await tmuxCapture(name, -capLines), text);
   emit({ type: "delta", text: reply || "(couldn't capture the reply — check with `tmux attach` on your Mac)" });
   session.started = true;
   if (!session.claudeSessionId) {
