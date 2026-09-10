@@ -5,8 +5,9 @@
 # voicebridge
 
 [![CI](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml/badge.svg)](https://github.com/berkayturanci/speak-with-claude-code/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/berkayturanci/voicebridge/badge)](https://scorecard.dev/viewer/?uri=github.com/berkayturanci/voicebridge)
 [![Node ≥ 18](https://img.shields.io/badge/node-%E2%89%A518-3fb950)](package.json)
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-1f6feb)](LICENSE)
+[![License: PolyForm Internal Use 1.0.0](https://img.shields.io/badge/license-PolyForm%20Internal%20Use%201.0.0-1f6feb)](LICENSE)
 [![Agents: Claude · Codex · Antigravity · Ollama](https://img.shields.io/badge/agents-Claude%20%C2%B7%20Codex%20%C2%B7%20Antigravity%20%C2%B7%20Ollama-8b949e)](#agents-sessions--modes)
 
 **Hands-free, two-way voice for your coding agent from your phone — free, source-available, no ElevenLabs.**
@@ -324,8 +325,10 @@ Details in [docs/security.md](docs/security.md).
 
 ## License
 
-**[PolyForm Noncommercial License 1.0.0](LICENSE)** — free to use, modify, and
-share for any **noncommercial** purpose (personal, research, education,
-nonprofit). **Commercial use is not permitted**, and the required copyright
-notice (`Copyright (c) 2026 Berkay Turancı`) must be kept on copies. Want to use
-voicebridge commercially? Contact the author for a separate license.
+**[PolyForm Internal Use License 1.0.0](LICENSE)** — free to use and modify for
+personal use, research, education, nonprofits, and **internal business or
+commercial work**. You may use voicebridge while earning money from your own
+work, but you may not distribute, resell, rebrand, sublicense, or offer
+voicebridge itself as a paid product or hosted service without a separate
+license from the author. The required copyright notice
+(`Copyright (c) 2026 Berkay Turancı`) must be kept.

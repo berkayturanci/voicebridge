@@ -5,6 +5,13 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Changed
+- **License: now [PolyForm Internal Use 1.0.0](LICENSE)** — personal,
+  nonprofit, research, education, and internal business/commercial use are
+  permitted, while redistributing, reselling, rebranding, sublicensing, or
+  offering voicebridge itself as a paid product or hosted service requires a
+  separate license from the author.
+
 ## [0.5.0] - 2026-06-22
 
 ### Added

@@ -1,13 +1,13 @@
 cff-version: 1.2.0
 message: "If you use voicebridge, please cite it using the metadata below."
 title: voicebridge
-abstract: "Hands-free, two-way voice for your coding agent from your phone — free for noncommercial use, source-available, no ElevenLabs."
+abstract: "Hands-free, two-way voice for your coding agent from your phone — free for internal business use, source-available, no ElevenLabs."
 type: software
 authors:
   - family-names: Turancı
     given-names: Berkay
 repository-code: "https://github.com/berkayturanci/voicebridge"
 url: "https://github.com/berkayturanci/voicebridge"
-license: PolyForm-Noncommercial-1.0.0
+license: PolyForm-Internal-Use-1.0.0
 version: "0.5.0"
 date-released: "2026-06-22"

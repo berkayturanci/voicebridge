@@ -145,6 +145,23 @@ function parseClaudeEvents(line) {
   return out;
 }
 
+// A shared helper for scraping tmux pane replies from agents that echo the prompt
+// followed by the response. `prefix` is the shell prompt (e.g. ">" or "agy>").
+function extractTmuxPromptReply(pane, promptEcho, prefix) {
+  const lines = pane.split("\n");
+  const out = [];
+  let capture = false;
+  // Use a shorter substring (15 chars) and collapse whitespace to survive tmux line wraps.
+  const key = (promptEcho || "").trim().replace(/\s+/g, " ").slice(0, 15);
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith(prefix) && capture) break;
+    if (capture) out.push(line);
+    if (t.startsWith(prefix) && t.replace(/\s+/g, " ").includes(key)) capture = true;
+  }
+  return out.join("\n").trim();
+}
+
 // Per-agent "mode" = how much autonomy the agent has. The flags mirror
 // ai-jury's privilege handling. Full-auto modes skip approval prompts — handy
 // hands-free, risky otherwise.
@@ -232,16 +249,7 @@ const AGENTS = {
         return "codex interactive";
       },
       extractReply(pane, promptEcho) {
-        const lines = pane.split("\n");
-        const out = [];
-        let capture = false;
-        for (const line of lines) {
-          const t = line.trim();
-          if (t.startsWith(">") && capture) break;
-          if (capture) out.push(line);
-          if (t.startsWith(">") && t.includes((promptEcho || "").trim().slice(0, 20))) capture = true;
-        }
-        return out.join("\n").trim();
+        return extractTmuxPromptReply(pane, promptEcho, ">");
       }
     }
   },
@@ -273,16 +281,7 @@ const AGENTS = {
         return "agy";
       },
       extractReply(pane, promptEcho) {
-        const lines = pane.split("\n");
-        const out = [];
-        let capture = false;
-        for (const line of lines) {
-          const t = line.trim();
-          if (t.startsWith("agy>") && capture) break;
-          if (capture) out.push(line);
-          if (t.startsWith("agy>") && t.includes((promptEcho || "").trim().slice(0, 20))) capture = true;
-        }
-        return out.join("\n").trim();
+        return extractTmuxPromptReply(pane, promptEcho, "agy>");
       }
     }
   },
