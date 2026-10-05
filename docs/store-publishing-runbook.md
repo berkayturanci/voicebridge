@@ -43,7 +43,7 @@ git push origin v0.6.1
 
 1. Create or verify the Play Console developer account.
 2. Create the app in Play Console:
-   - App name: `berkayturanci`.
+   - App name: `VoiceBridge`.
    - Default language: match the first store listing language.
    - App type: app.
    - Free or paid: **Free.** Matches the app's PolyForm Noncommercial 1.0.0
@@ -97,7 +97,7 @@ Plan for closed testing if the Play Console account falls into that category.
 
 1. Ensure the Apple Developer Program membership is active.
 2. Create or verify the App Store Connect app record:
-   - Name: `berkayturanci`.
+   - Name: `VoiceBridge`.
    - Bundle ID: `com.berkayturanci.voicebridge`.
    - SKU: `voicebridge`.
    - Platform: iOS.

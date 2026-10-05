@@ -2,7 +2,7 @@
 
 Use this path to prepare TestFlight and App Store builds for VoiceBridge. The
 iOS bundle ID is `com.berkayturanci.voicebridge`, and the app display name is
-`berkayturanci`.
+`VoiceBridge`.
 
 ## Release Strategy
 
