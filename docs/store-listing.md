@@ -4,7 +4,7 @@ This document is the working store-copy and beta-readiness source for the
 native VoiceBridge app. Re-check store-console character limits and screenshot
 device requirements immediately before submission.
 
-Store app name: `berkayturanci`
+Store app name: `VoiceBridge`
 
 ## Product Positioning
 
