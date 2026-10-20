@@ -57,7 +57,12 @@ function lookupAsarEntry(header, relPath) {
   const parts = relPath.split("/").filter(Boolean);
   let cursor = header;
   for (const part of parts) {
-    if (!cursor || typeof cursor.files !== "object" || cursor.files === null) {
+    if (
+      !cursor ||
+      typeof cursor.files !== "object" ||
+      cursor.files === null ||
+      !Object.prototype.hasOwnProperty.call(cursor.files, part)
+    ) {
       return null;
     }
     cursor = cursor.files[part];
@@ -78,7 +83,7 @@ function readAsarFileBytes(parsed, asarPath, relPath, missingMessage, emptyMessa
   }
   if (node.unpacked) {
     const unpackedPath = path.join(`${asarPath}.unpacked`, ...relPath.split("/").filter(Boolean));
-    if (!fs.existsSync(unpackedPath)) {
+    if (!fs.statSync(unpackedPath, { throwIfNoEntry: false })?.isFile()) {
       throw new Error(missingMessage);
     }
     const buf = fs.readFileSync(unpackedPath);
@@ -87,12 +92,59 @@ function readAsarFileBytes(parsed, asarPath, relPath, missingMessage, emptyMessa
     }
     return buf;
   }
-  const start = parsed.dataOffset + Number(node.offset || 0);
+  const offset = Number(node.offset || 0);
+  const start = parsed.dataOffset + offset;
   const end = start + node.size;
-  if (start < parsed.dataOffset || end > parsed.buf.length) {
+  if (
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    !Number.isSafeInteger(node.size) ||
+    node.size <= 0 ||
+    end > parsed.buf.length
+  ) {
     throw new Error(`Corrupt app.asar entry out of bounds: ${relPath} in ${asarPath}`);
   }
   return parsed.buf.subarray(start, end);
+}
+
+function assertValidAsarEntryName(name, asarPath) {
+  if (
+    typeof name !== "string" ||
+    name.length === 0 ||
+    name === "." ||
+    name === ".." ||
+    name.includes("/") ||
+    name.includes("\\")
+  ) {
+    throw new Error(`Corrupt app.asar entry name: ${name} in ${asarPath}`);
+  }
+}
+
+function materializeAsarLibSubtree(parsed, asarPath, tempDir, dirNode, relParts = ["lib"]) {
+  if (!dirNode || typeof dirNode.files !== "object" || dirNode.files === null) {
+    return;
+  }
+  for (const [name, entry] of Object.entries(dirNode.files)) {
+    assertValidAsarEntryName(name, asarPath);
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(entry, "link")) {
+      continue;
+    }
+    const nextParts = [...relParts, name];
+    if (typeof entry.files === "object" && entry.files !== null) {
+      materializeAsarLibSubtree(parsed, asarPath, tempDir, entry, nextParts);
+      continue;
+    }
+    const rel = nextParts.join("/");
+    const missingMsg = `Missing packaged desktop module ${rel} in ${asarPath}`;
+    const emptyMsg = `Empty packaged desktop module ${rel} in ${asarPath}`;
+    const modBytes = readAsarFileBytes(parsed, asarPath, rel, missingMsg, emptyMsg);
+    const destPath = path.join(tempDir, ...nextParts);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.writeFileSync(destPath, modBytes);
+  }
 }
 
 function verifyAsarArchive(asarPath, libFiles) {
@@ -103,13 +155,28 @@ function verifyAsarArchive(asarPath, libFiles) {
     const mainBytes = readAsarFileBytes(parsed, asarPath, "main.js", mainMissingMsg, mainMissingMsg);
     fs.writeFileSync(path.join(tempDir, "main.js"), mainBytes);
 
+    const rootFiles =
+      parsed.header && typeof parsed.header.files === "object" && parsed.header.files !== null
+        ? parsed.header.files
+        : null;
+    if (rootFiles && Object.prototype.hasOwnProperty.call(rootFiles, "lib")) {
+      materializeAsarLibSubtree(parsed, asarPath, tempDir, rootFiles.lib, ["lib"]);
+    }
+
+    const resolvedPaths = [];
     for (const rel of libFiles) {
       const missingMsg = `Missing packaged desktop module ${rel} in ${asarPath}`;
       const emptyMsg = `Empty packaged desktop module ${rel} in ${asarPath}`;
       const modBytes = readAsarFileBytes(parsed, asarPath, rel, missingMsg, emptyMsg);
       const destPath = path.join(tempDir, ...rel.split("/").filter(Boolean));
-      fs.mkdirSync(path.dirname(destPath), { recursive: true });
-      fs.writeFileSync(destPath, modBytes);
+      if (!fs.existsSync(destPath)) {
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.writeFileSync(destPath, modBytes);
+      }
+      resolvedPaths.push(destPath);
+    }
+
+    for (const destPath of resolvedPaths) {
       delete require.cache[require.resolve(destPath)];
       require(destPath);
     }

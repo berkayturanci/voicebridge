@@ -15,11 +15,8 @@ function buildTestAsar(files) {
   let offset = 0;
 
   for (const [relPath, entry] of Object.entries(files)) {
-    const isUnpackedObj =
-      entry !== null &&
-      typeof entry === "object" &&
-      !Buffer.isBuffer(entry) &&
-      entry.unpacked === true;
+    const isDescriptor = entry !== null && typeof entry === "object" && !Buffer.isBuffer(entry);
+    const isUnpackedObj = isDescriptor && entry.unpacked === true;
 
     const parts = relPath.split("/").filter(Boolean);
     let cursor = header;
@@ -36,7 +33,25 @@ function buildTestAsar(files) {
           : entry.content !== undefined
             ? Buffer.byteLength(entry.content)
             : 1;
-      cursor.files[parts[parts.length - 1]] = { size, unpacked: true };
+      const node = { size, unpacked: true };
+      if (entry.archiveContent !== undefined) {
+        const archiveBuf = Buffer.isBuffer(entry.archiveContent)
+          ? entry.archiveContent
+          : Buffer.from(String(entry.archiveContent), "utf8");
+        node.offset = String(offset);
+        chunks.push(archiveBuf);
+        offset += archiveBuf.length;
+      }
+      cursor.files[parts[parts.length - 1]] = node;
+    } else if (isDescriptor) {
+      const buf = Buffer.isBuffer(entry.content)
+        ? entry.content
+        : Buffer.from(String(entry.content ?? ""), "utf8");
+      const entrySize = entry.size !== undefined ? entry.size : buf.length;
+      const entryOffset = entry.offset !== undefined ? entry.offset : String(offset);
+      cursor.files[parts[parts.length - 1]] = { size: entrySize, offset: entryOffset };
+      chunks.push(buf);
+      offset += buf.length;
     } else {
       const buf = Buffer.isBuffer(entry) ? entry : Buffer.from(String(entry), "utf8");
       cursor.files[parts[parts.length - 1]] = { size: buf.length, offset: String(offset) };
@@ -65,6 +80,7 @@ function makeFakeWinUnpacked({
   omitUnpackedFile = false,
   omitBridgeSrc = false,
   omitBridgePkg = false,
+  asarOverrides = {},
 } = {}) {
   const desktopRoot = path.resolve(__dirname, "..");
   const appDir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-win-unpacked-"));
@@ -91,16 +107,28 @@ function makeFakeWinUnpacked({
       if (rel === omitLib) continue;
       const sourceBytes = fs.readFileSync(path.join(desktopRoot, ...rel.split("/")));
       if (rel === unpackedLib) {
-        asarFiles[rel] = { size: sourceBytes.length, unpacked: true };
+        const unpackedBytes = Buffer.concat([
+          sourceBytes,
+          Buffer.from(
+            "\nmodule.exports.__fromUnpacked = true;\nglobalThis.__vbUnpackedMarker = module.exports.__fromUnpacked;\n",
+            "utf8"
+          ),
+        ]);
+        asarFiles[rel] = {
+          size: unpackedBytes.length,
+          unpacked: true,
+          archiveContent: "{{{ invalid js in archive",
+        };
         if (!omitUnpackedFile) {
           const unpackedDest = path.join(appDir, "resources", "app.asar.unpacked", ...rel.split("/"));
           fs.mkdirSync(path.dirname(unpackedDest), { recursive: true });
-          fs.writeFileSync(unpackedDest, sourceBytes);
+          fs.writeFileSync(unpackedDest, unpackedBytes);
         }
       } else {
         asarFiles[rel] = sourceBytes;
       }
     }
+    Object.assign(asarFiles, asarOverrides);
     fs.writeFileSync(path.join(appDir, "resources", "app.asar"), buildTestAsar(asarFiles));
 
     return appDir;
@@ -166,14 +194,44 @@ test("verify-win-unpacked checks packaged desktop lib modules and bridge src/pac
     fs.rmSync(missingUnpackedDir, { recursive: true, force: true });
   }
 
+  delete globalThis.__vbUnpackedMarker;
   const presentUnpackedDir = makeFakeWinUnpacked({
     unpackedLib: unpackedTarget,
     omitUnpackedFile: false,
   });
   try {
     assert.strictEqual(verifyWinUnpacked(presentUnpackedDir), presentUnpackedDir);
+    assert.strictEqual(globalThis.__vbUnpackedMarker, true);
   } finally {
+    delete globalThis.__vbUnpackedMarker;
     fs.rmSync(presentUnpackedDir, { recursive: true, force: true });
+  }
+
+  const corruptOffsetDir = makeFakeWinUnpacked({
+    asarOverrides: {
+      [unpackedTarget]: { content: "module.exports = {};\n", offset: "abc" },
+    },
+  });
+  try {
+    assert.throws(
+      () => verifyWinUnpacked(corruptOffsetDir),
+      /Corrupt app\.asar entry out of bounds/
+    );
+  } finally {
+    fs.rmSync(corruptOffsetDir, { recursive: true, force: true });
+  }
+
+  const siblingRequireDir = makeFakeWinUnpacked({
+    asarOverrides: {
+      "lib/helper-only.js": "module.exports = { helperLoaded: true };\n",
+      [unpackedTarget]:
+        "const helper = require('./helper-only');\nif (!helper || helper.helperLoaded !== true) throw new Error('sibling helper not loaded');\nmodule.exports = helper;\n",
+    },
+  });
+  try {
+    assert.strictEqual(verifyWinUnpacked(siblingRequireDir), siblingRequireDir);
+  } finally {
+    fs.rmSync(siblingRequireDir, { recursive: true, force: true });
   }
 
   const missingSrcDir = makeFakeWinUnpacked({ omitBridgeSrc: true });
