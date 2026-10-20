@@ -53,33 +53,69 @@ function parseAsar(asarPath) {
   return { buf, header, dataOffset };
 }
 
-function extractAsarNode(parsed, node, destPath, unpackedRoot) {
-  if (node && node.files && typeof node.files === "object") {
-    fs.mkdirSync(destPath, { recursive: true });
-    for (const [name, child] of Object.entries(node.files)) {
-      extractAsarNode(parsed, child, path.join(destPath, name), unpackedRoot);
+function lookupAsarEntry(header, relPath) {
+  const parts = relPath.split("/").filter(Boolean);
+  let cursor = header;
+  for (const part of parts) {
+    if (!cursor || typeof cursor.files !== "object" || cursor.files === null) {
+      return null;
     }
-    return;
+    cursor = cursor.files[part];
   }
-  if (!node || typeof node.size !== "number") return;
-  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  if (!cursor || typeof cursor.size !== "number") {
+    return null;
+  }
+  return cursor;
+}
+
+function readAsarFileBytes(parsed, asarPath, relPath, missingMessage, emptyMessage) {
+  const node = lookupAsarEntry(parsed.header, relPath);
+  if (!node) {
+    throw new Error(missingMessage);
+  }
+  if (node.size === 0) {
+    throw new Error(emptyMessage);
+  }
   if (node.unpacked) {
-    const rel = path.relative(parsed.extractRoot, destPath);
-    fs.copyFileSync(path.join(unpackedRoot, rel), destPath);
-    return;
+    const unpackedPath = path.join(`${asarPath}.unpacked`, ...relPath.split("/").filter(Boolean));
+    if (!fs.existsSync(unpackedPath)) {
+      throw new Error(missingMessage);
+    }
+    const buf = fs.readFileSync(unpackedPath);
+    if (buf.length === 0) {
+      throw new Error(emptyMessage);
+    }
+    return buf;
   }
   const start = parsed.dataOffset + Number(node.offset || 0);
   const end = start + node.size;
   if (start < parsed.dataOffset || end > parsed.buf.length) {
-    throw new Error(`Corrupt app.asar entry out of bounds: ${destPath}`);
+    throw new Error(`Corrupt app.asar entry out of bounds: ${relPath} in ${asarPath}`);
   }
-  fs.writeFileSync(destPath, parsed.buf.subarray(start, end));
+  return parsed.buf.subarray(start, end);
 }
 
-function extractAsar(asarPath, destDir) {
+function verifyAsarArchive(asarPath, libFiles) {
   const parsed = parseAsar(asarPath);
-  parsed.extractRoot = destDir;
-  extractAsarNode(parsed, parsed.header, destDir, `${asarPath}.unpacked`);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-win-asar-"));
+  try {
+    const mainMissingMsg = `Missing packaged desktop main.js in ${asarPath}`;
+    const mainBytes = readAsarFileBytes(parsed, asarPath, "main.js", mainMissingMsg, mainMissingMsg);
+    fs.writeFileSync(path.join(tempDir, "main.js"), mainBytes);
+
+    for (const rel of libFiles) {
+      const missingMsg = `Missing packaged desktop module ${rel} in ${asarPath}`;
+      const emptyMsg = `Empty packaged desktop module ${rel} in ${asarPath}`;
+      const modBytes = readAsarFileBytes(parsed, asarPath, rel, missingMsg, emptyMsg);
+      const destPath = path.join(tempDir, ...rel.split("/").filter(Boolean));
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.writeFileSync(destPath, modBytes);
+      delete require.cache[require.resolve(destPath)];
+      require(destPath);
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function verifyExtractedAppRoot(appRoot, archiveLabel, libFiles) {
@@ -108,13 +144,7 @@ function verifyAppArchive(appDir, libFiles) {
     if (fs.statSync(asarPath).size === 0) {
       throw new Error(`Packaged app.asar is empty: ${asarPath}`);
     }
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-win-asar-"));
-    try {
-      extractAsar(asarPath, tempDir);
-      verifyExtractedAppRoot(tempDir, asarPath, libFiles);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    verifyAsarArchive(asarPath, libFiles);
     return;
   }
 
