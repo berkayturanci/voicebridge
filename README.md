@@ -195,8 +195,8 @@ or `null` = follow the voice flag).
 
 ### Narrator (progress updates & spoken summaries)
 
-With a small, fast **summarizer model** configured — the `claude` CLI you are
-already logged in with (`SUMMARY_PROVIDER=claude-cli`, no API key), Anthropic
+With a small, fast **summarizer model** — by default the `claude` CLI you are
+already logged in with (no API key, nothing to configure), or Anthropic
 Haiku (`ANTHROPIC_API_KEY`), any OpenAI-compatible endpoint (`SUMMARY_BASE_URL`), or
 a local/remote Ollama (`SUMMARY_OLLAMA_URL`) — voice sessions also get:
 

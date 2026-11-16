@@ -52,6 +52,11 @@ async function fakeModelServer(handler) {
 
 test("summarizer: provider resolution", () => {
   assert.strictEqual(summarizer.resolveProvider({}), "off");
+  assert.strictEqual(summarizer.resolveProvider({ PATH: "/nonexistent" }), "off");
+  // auto falls back to the logged-in claude CLI when it is installed
+  assert.strictEqual(summarizer.resolveProvider({ CLAUDE_BIN: process.execPath }), "claude-cli");
+  assert.strictEqual(summarizer.resolveProvider({ CLAUDE_BIN: process.execPath, ANTHROPIC_API_KEY: "k" }), "anthropic");
+  assert.strictEqual(summarizer.resolveProvider({ CLAUDE_BIN: "/nope/claude" }), "off");
   assert.strictEqual(summarizer.resolveProvider({ ANTHROPIC_API_KEY: "k" }), "anthropic");
   assert.strictEqual(summarizer.resolveProvider({ SUMMARY_BASE_URL: "http://x" }), "openai");
   assert.strictEqual(summarizer.resolveProvider({ SUMMARY_OLLAMA_URL: "http://x" }), "ollama");

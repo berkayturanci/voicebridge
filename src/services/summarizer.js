@@ -7,7 +7,7 @@
 //   key; uses CLAUDE_BIN, model alias "haiku" by default).
 //   auto: anthropic when ANTHROPIC_API_KEY is set, else openai when
 //   SUMMARY_BASE_URL is set, else ollama when SUMMARY_OLLAMA_URL is set,
-//   else off.
+//   else claude-cli when the `claude` CLI is installed, else off.
 // SUMMARY_MODEL      model id (defaults: claude-haiku-5-5 / gpt-4o-mini / llama3.2)
 // SUMMARY_TIMEOUT_MS per call (default 6000)
 //
@@ -41,7 +41,21 @@ function resolveProvider(env = process.env) {
   if (env.ANTHROPIC_API_KEY) return "anthropic";
   if (env.SUMMARY_BASE_URL) return "openai";
   if (env.SUMMARY_OLLAMA_URL) return "ollama";
+  if (cliAvailable(env)) return "claude-cli";
   return "off";
+}
+
+// Is the claude CLI (CLAUDE_BIN or `claude` on PATH) executable?
+function cliAvailable(env) {
+  const fs = require("fs");
+  const path = require("path");
+  const bin = env.CLAUDE_BIN || "claude";
+  const ok = (p) => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch (_) { return false; } };
+  if (bin.includes("/") || bin.includes("\\")) return ok(bin);
+  for (const d of String(env.PATH || "").split(path.delimiter)) {
+    if (d && (ok(path.join(d, bin)) || ok(path.join(d, bin + ".cmd")) || ok(path.join(d, bin + ".exe")))) return true;
+  }
+  return false;
 }
 
 function config(env = process.env) {
