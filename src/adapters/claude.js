@@ -48,7 +48,11 @@ function parseClaudeEvents(line) {
   if (obj.type === "assistant" && obj.message && Array.isArray(obj.message.content)) {
     for (const b of obj.message.content) {
       if (b && b.type === "text" && b.text) out.push({ type: "delta", text: b.text });
-      else if (b && b.type === "tool_use") out.push({ type: "activity", text: toolLabel(b) });
+      else if (b && b.type === "tool_use") {
+        const ev = { type: "activity", text: toolLabel(b), tool: b.name || "tool" };
+        if (b.id) ev.id = b.id;
+        out.push(ev);
+      }
       else if (b && (b.type === "approval_request" || b.type === "permission_request")) {
         out.push({
           type: "approval_request",
@@ -57,6 +61,17 @@ function parseClaudeEvents(line) {
           details: b.details || (b.input && JSON.stringify(b.input)) || "",
           description: b.description || toolLabel(b),
         });
+      }
+    }
+  }
+  // Tool results come back as user messages; surface failures so the
+  // narrator can say "the tests failed" without parsing their output.
+  if (obj.type === "user" && obj.message && Array.isArray(obj.message.content)) {
+    for (const b of obj.message.content) {
+      if (b && b.type === "tool_result") {
+        const ev = { type: "tool_result", error: b.is_error === true };
+        if (b.tool_use_id) ev.id = b.tool_use_id;
+        out.push(ev);
       }
     }
   }

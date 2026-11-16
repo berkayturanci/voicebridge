@@ -51,6 +51,22 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `VOICE_MODE_DEFAULT` | `1` | Whether voice sessions (the **Brief voice** toggle) get the spoken answer style when the session has no explicit `voiceMode`. `0`/`false`/`off` disables it unless a session opts in. |
 | `VOICE_STYLE_PROMPT` | _(built-in, see below)_ | The spoken-style instruction. Write `\n` for a newline in `.env`. |
 | `VOICE_STYLE_PROMPT_FILE` | _(none)_ | Path to a text file holding the instruction. Wins over `VOICE_STYLE_PROMPT`; re-read when the file changes (no restart needed). Falls back to `VOICE_STYLE_PROMPT` / the default if unreadable. |
+| `NARRATOR` | `1` | Spoken progress updates and final summaries for voice-mode sessions. `0` = Stage 1 behaviour only (filtered raw speech). |
+| `NARRATOR_INTERVAL_MS` | `30000` | How often a running turn's new tool activity is summarized into one spoken sentence. `0` disables progress updates. |
+| `NARRATOR_FINAL_SUMMARY` | `1` | Boil long final replies down to 1–2 spoken sentences. `0` = read the (filtered) reply. |
+| `NARRATOR_FINAL_MIN_CHARS` | `280` | Speakable replies up to this length are read as they are (no model call). |
+| `NARRATOR_LANG` | `en` | Language of the built-in spoken templates (`en`, `tr`): approval notices and "read the full answer" replies. Summaries follow the conversation's language. |
+| `NARRATOR_APPROVAL_TEXT` | _(template)_ | Override the approval notice; `{session}` and `{action}` are filled in, e.g. `{session} onayını bekliyor: {action}.` |
+| `NARRATOR_READ_FULL_PHRASES` | _(built-in)_ | `\|`-separated phrases that speak the last full reply instead of going to the agent. Default: "read the full answer", "full answer", "tam cevabı oku", "cevabın tamamını oku", … |
+| `NARRATOR_LOG` | `1` | Log each summarizer call with its added latency (`[narrator] final ok provider=… +812ms`). `0` silences it. |
+| `SUMMARY_PROVIDER` | `auto` | Summarizer model provider: `anthropic`, `openai` (any OpenAI-compatible endpoint), `ollama`, `off`, or `auto` (Anthropic if `ANTHROPIC_API_KEY` is set, else OpenAI-compatible if `SUMMARY_BASE_URL` is set, else Ollama if `SUMMARY_OLLAMA_URL` is set, else off). |
+| `SUMMARY_MODEL` | per provider | `claude-haiku-5-5` (Anthropic), `gpt-4o-mini` (OpenAI-compatible), `llama3.2` (Ollama). |
+| `ANTHROPIC_API_KEY` | _(none)_ | API key for the Anthropic summarizer. |
+| `SUMMARY_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible base URL (`…/chat/completions` is appended), e.g. LM Studio, vLLM, OpenRouter. |
+| `SUMMARY_API_KEY` | _(none)_ | Bearer key for the OpenAI-compatible endpoint. |
+| `SUMMARY_OLLAMA_URL` | `OLLAMA_URL` | Ollama base URL for summaries — can be another machine, e.g. `http://macbook-b.tailnet:11434`. |
+| `SUMMARY_TIMEOUT_MS` | `6000` | Per-call timeout; on timeout the raw reply is read. |
+| `SUMMARY_COOLDOWN_MS` | `60000` | After a failed call, skip the summarizer (read raw replies) for this long. |
 
 ## Voice mode
 
@@ -104,6 +120,62 @@ final `speech` tail is sent before `done`. Responses set `X-VB-Speech: 1` so
 clients know to speak `speech` events and only render `delta` text — the chat
 always shows the full reply. `POST /api/tts` (Piper) applies the same filter
 unless the body has `"raw": true`.
+
+## Narrator (progress updates and spoken summaries)
+
+For voice-mode sessions the narrator decides what you hear while you aren't
+looking at the screen. The chat always shows every `delta` unchanged.
+
+- **Progress** — while a turn runs, every `NARRATOR_INTERVAL_MS` (30 s) the
+  new tool activity (Claude's stream-json tool calls and failed tool results)
+  is summarized by the summarizer model into one sentence, e.g. *"Running the
+  tests; two files edited so far."* Nothing is said when nothing new happened,
+  and progress is never spoken while your mic is open.
+- **Final** — a long reply is replaced by a 1–2 sentence summary
+  (`{type:"narration", kind:"final"}`). Replies shorter than
+  `NARRATOR_FINAL_MIN_CHARS` are read as they are.
+- **Approvals** — a pending tool approval is announced at once
+  (`kind:"approval"`), e.g. *"api is waiting for your approval: git push."*
+- **Read the full answer** — saying/typing "read the full answer" or "tam
+  cevabı oku" speaks the session's last full reply (filtered) without sending
+  anything to the agent. `GET /api/sessions/:id/last-reply` returns it as text.
+
+**Fallback.** If no summarizer is configured, the model is unreachable,
+times out, refuses, or returns nothing, the narrator silently reads the raw
+(filtered) reply instead and skips the model for `SUMMARY_COOLDOWN_MS`.
+Cloud-runner sessions always use raw speech.
+
+**Latency.** Each summarizer call is logged with the time it added:
+
+```
+[narrator] progress ok provider=anthropic model=claude-haiku-5-5 +640ms
+[narrator] final ok provider=ollama model=llama3.2 +1210ms
+[narrator] final failed provider=ollama +6003ms (timeout); reading raw replies for 60s
+```
+
+`narration` events also carry `ms`. `GET /api/narrator` reports the current
+settings, summarizer status (provider, model, cooldown, last error) and whether
+the user is speaking.
+
+**Not talking over you.** The web UI sends `{type:"listening", active}` on
+`/ws` while the mic is open (or call `POST /api/listening {active}`); the flag
+expires after 60 s. Progress updates are dropped while it is set, and final
+summaries / approval notices wait until the mic closes.
+
+**Summarizer examples**
+
+```
+# Anthropic (Haiku)
+ANTHROPIC_API_KEY=sk-ant-...
+# Local Ollama on another Mac on your tailnet
+SUMMARY_PROVIDER=ollama
+SUMMARY_OLLAMA_URL=http://macbook-b:11434
+SUMMARY_MODEL=llama3.2
+# Any OpenAI-compatible server
+SUMMARY_PROVIDER=openai
+SUMMARY_BASE_URL=http://127.0.0.1:1234/v1
+SUMMARY_MODEL=qwen2.5-7b-instruct
+```
 
 ## Web Push (notifications when the app is closed)
 

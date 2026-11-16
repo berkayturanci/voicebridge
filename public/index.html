@@ -775,6 +775,24 @@
       if (sentence) { speakQueue.push(sentence); drainSpeak(); }
     }
   }
+  // Is the user's mic open right now (push-to-talk, whisper recording or talking mode listening)?
+  function userSpeaking() {
+    return !!recognizing || (talking && talkOrb.classList.contains("listening"));
+  }
+  function speakWhenQuiet(text) {
+    if (!userSpeaking()) return feedSpeech(text);
+    const t = setInterval(() => { if (!userSpeaking()) { clearInterval(t); feedSpeech(text); } }, 300);
+  }
+  // Tell the bridge when the mic opens/closes so the narrator never talks over the user.
+  let lastListening = false, lastListeningSent = 0;
+  setInterval(() => {
+    const now = userSpeaking();
+    // Send on change, and re-send every 20 s while open (the server flag expires after 60 s).
+    if (now !== lastListening || (now && Date.now() - lastListeningSent > 20000)) {
+      sendSync({ type: "listening", active: now });
+      lastListening = now; lastListeningSent = Date.now();
+    }
+  }, 1000);
   function flushSpeech() {
     const rest = cleanForSpeech(speakBuf); speakBuf = "";
     if (rest) { speakQueue.push(rest); drainSpeak(); }
@@ -805,6 +823,7 @@
       // Newer bridges send `speech` events (markdown/code stripped server-side);
       // speak those and only render `delta`. Older bridges: speak deltas.
       const serverSpeech = r.headers.get("X-VB-Speech") === "1";
+      const serverNarrator = r.headers.get("X-VB-Narrator") === "1";
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
       for (;;) {
         const { value, done } = await reader.read();
@@ -824,11 +843,19 @@
             }
           } else if (ev.type === "speech") {
             if (sessionId === activeId && ev.text) feedSpeech(ev.text + "\n");
+          } else if (ev.type === "narration") {
+            // Spoken summaries from the bridge's narrator. Progress updates are
+            // dropped (not queued) while the user is talking; final summaries
+            // and approval notices wait until the mic closes.
+            if (sessionId === activeId && ev.text) {
+              if (ev.kind === "progress") { if (!userSpeaking()) { setStatus("🔊 " + ev.text); feedSpeech(ev.text + "\n"); } }
+              else speakWhenQuiet(ev.text + "\n");
+            }
           } else if (ev.type === "activity") {
             addMsg(sessionId, "⚙︎ " + ev.text, "act");
           } else if (ev.type === "approval_request") {
             renderApprovalCard(sessionId, ev);
-            if (talking) {
+            if (talking && !serverNarrator) {
               const notice = "Approval required for " + (ev.tool || "tool") + ". Please confirm on screen.";
               feedSpeech(notice);
             }

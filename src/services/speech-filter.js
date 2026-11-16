@@ -155,4 +155,10 @@ function createSpeechStream() {
   return { push, flush };
 }
 
-module.exports = { toSpeakable, createSpeechStream, cleanInline, cleanLine };
+// Case- and accent-insensitive key for matching spoken commands and names
+// ("API" = "api", "cevabı" = "cevabi", "İptal" = "iptal"), independent of locale.
+function foldText(s) {
+  return String(s || "").toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/ı/g, "i");
+}
+
+module.exports = { toSpeakable, createSpeechStream, cleanInline, cleanLine, foldText };

@@ -193,6 +193,22 @@ or `null` = follow the voice flag).
   **speech filter** that drops code blocks, markdown markers, URLs and long
   paths. The chat always shows the full, unfiltered reply.
 
+### Narrator (progress updates & spoken summaries)
+
+With a small, fast **summarizer model** configured — Anthropic Haiku
+(`ANTHROPIC_API_KEY`), any OpenAI-compatible endpoint (`SUMMARY_BASE_URL`), or
+a local/remote Ollama (`SUMMARY_OLLAMA_URL`) — voice sessions also get:
+
+- a one-sentence **progress update** every 30 s while the agent works
+  ("running the tests, two files edited"), never while you are talking;
+- a **1–2 sentence summary** of long final answers — say **"read the full
+  answer"** / **"tam cevabı oku"** to hear all of it;
+- a spoken **approval notice** ("api is waiting for your approval").
+
+Without a summarizer (or if it is unreachable) replies are read as they
+stream, as before. Each summary's added latency is logged. Details:
+[docs/configuration.md#narrator-progress-updates-and-spoken-summaries](docs/configuration.md#narrator-progress-updates-and-spoken-summaries).
+
 ### Optional: a shared access token
 
 ```bash

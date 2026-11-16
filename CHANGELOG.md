@@ -16,6 +16,15 @@ All notable changes to voicebridge are documented here. This project adheres to
   blocks, markdown, links and long paths stripped; the web UI speaks those
   while the chat still shows the full reply. `/api/tts` applies the same filter.
 
+- **Narrator**: for voice-mode sessions, a provider-neutral summarizer
+  (Anthropic Haiku, OpenAI-compatible, or Ollama) speaks a one-sentence
+  progress update every `NARRATOR_INTERVAL_MS` while the agent works, boils
+  long final replies down to 1–2 sentences, and announces pending approvals.
+  "Read the full answer" / "tam cevabı oku" speaks the last full reply. Falls
+  back to raw speech when the model is unavailable; summary latency is logged.
+  New `narration` and `tool_result` stream events, `GET /api/narrator`,
+  `POST /api/listening`, `GET /api/sessions/:id/last-reply`.
+
 ### Fixed
 - `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer
   throws (missing `sanitizeSessionId` import).

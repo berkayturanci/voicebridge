@@ -41,6 +41,8 @@ const hub = require("../services/hub");
 const { transcribe } = require("../services/stt");
 const { normalizeVoiceMode } = require("../services/voice-style");
 const { toSpeakable } = require("../services/speech-filter");
+const narrator = require("../services/narrator");
+const summarizer = require("../services/summarizer");
 const { clearSessionApprovals } = require("../services/approvals");
 const { getRepoStatus, getFileDiff } = require("../services/git");
 const { streamAsk, proxyCloudBrowse } = require("../runners");
@@ -117,6 +119,29 @@ function handleRequest(req, res) {
 
   if (urlPath.startsWith("/api/")) {
     if (!authorized(req)) return sendJson(res, 401, { error: "Unauthorized" });
+
+    if (req.method === "GET" && urlPath === "/api/narrator") {
+      return sendJson(res, 200, {
+        narrator: narrator.narratorConfig(),
+        summarizer: summarizer.status(),
+        listening: narrator.isListening(),
+      });
+    }
+
+    if (req.method === "POST" && urlPath === "/api/listening") {
+      return readBody(req, 4 * 1024, (e, body) => {
+        if (e) return onBodyError(res, e);
+        let data = {}; try { data = JSON.parse(body.toString("utf8") || "{}"); } catch (_) {}
+        narrator.setListening(data.active === true);
+        return sendJson(res, 200, { ok: true, listening: narrator.isListening() });
+      });
+    }
+
+    if (req.method === "GET" && /^\/api\/sessions\/[^/]+\/last-reply$/.test(urlPath)) {
+      const s = sessions.get(urlPath.split("/")[3]);
+      if (!s) return sendJson(res, 404, { error: "Not found" });
+      return sendJson(res, 200, { lastReply: s.lastReply || null });
+    }
 
     if (req.method === "GET" && urlPath === "/api/mobile-state") {
       return sendJson(res, 200, publicMobileState());
