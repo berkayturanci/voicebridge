@@ -231,8 +231,8 @@ test("parseClaudeEvents emits delta for text and activity for tool_use", () => {
   ] } });
   const evs = srv.parseClaudeEvents(line);
   assert.deepStrictEqual(evs[0], { type: "delta", text: "ok" });
-  assert.deepStrictEqual(evs[1], { type: "activity", text: "Edit server.js" });
-  assert.deepStrictEqual(evs[2], { type: "activity", text: "Bash npm test" });
+  assert.deepStrictEqual(evs[1], { type: "activity", text: "Edit server.js", tool: "Edit" });
+  assert.deepStrictEqual(evs[2], { type: "activity", text: "Bash npm test", tool: "Bash" });
   assert.deepStrictEqual(srv.parseClaudeEvents("nope"), []);
 });
 

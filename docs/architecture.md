@@ -37,6 +37,8 @@ src/
 │   ├── commands.js         # Project npm scripts & slash command discovery
 │   ├── voice-style.js      # Per-session voice mode & spoken-style instruction per agent
 │   ├── speech-filter.js    # Markdown/code → speakable text (one-shot and streaming)
+│   ├── narrator.js         # Per-turn voice pipeline: progress/final/approval narration, "read the full answer"
+│   ├── summarizer.js       # Provider-neutral short-summary client (Anthropic, OpenAI-compatible, Ollama)
 │   └── push.js             # Web Push notifications
 └── routes/                 # HTTP & WebSocket route handlers
     ├── api.js              # REST API endpoint dispatcher
@@ -72,6 +74,8 @@ The WebSocket Session Hub (`src/services/hub.js`) provides full-duplex live stat
 - **Event Protocol**:
   - `turn_start`: `{ type: "turn_start", sessionId, prompt }`
   - `delta`: `{ type: "delta", sessionId, text }`
+  - `narration`: `{ type: "narration", sessionId, kind: "progress"|"final"|"approval", text, ms? }` — spoken summaries from the narrator
+  - `tool_result`: `{ type: "tool_result", sessionId, id?, error }` — a Claude tool call finished (used by the narrator)
   - `speech`: `{ type: "speech", sessionId, text }` — speakable form of the reply (code/markdown/links stripped, sentence-cut); see [configuration](configuration.md#speech-filter)
   - `activity`: `{ type: "activity", sessionId, tool, text }`
   - `done`: `{ type: "done", sessionId }`
@@ -121,6 +125,9 @@ When `STT_MODE=whisper-stream` is enabled, the browser captures audio in 250ms c
 | `GET /api/mobile-state` | Desktop host heartbeat status. |
 | `POST /api/mobile-seen` | Mobile client activity heartbeat. |
 | `GET /api/ollama/models` | List models from the local Ollama instance. |
+| `GET /api/narrator` | Narrator settings, summarizer status, listening flag. |
+| `POST /api/listening` | `{ active }` — the user's mic is open; the narrator holds progress updates. |
+| `GET /api/sessions/:id/last-reply` | The session's last full reply (and its spoken summary). |
 | `GET /api/push/key` | Get VAPID public key and push status. |
 | `POST /api/push/subscribe`| Register Web Push subscription. |
 | `WS /ws` | Full-duplex live session synchronization hub. |

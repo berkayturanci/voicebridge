@@ -138,6 +138,12 @@ function handleWsUpgrade(req, socket, head) {
           return;
         }
 
+        if (msg.type === "listening") {
+          // The user's mic is open (or closed): the narrator holds progress updates.
+          require("./narrator").setListening(msg.active === true);
+          return;
+        }
+
         if (msg.type === "unsubscribe" && typeof msg.sessionId === "string") {
           unsubscribe(msg.sessionId, client);
           client.send(JSON.stringify({ type: "unsubscribed", sessionId: msg.sessionId }));

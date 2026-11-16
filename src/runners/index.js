@@ -17,8 +17,9 @@ const SECURITY_HEADERS = {
 };
 
 const hub = require("../services/hub");
-const { createSpeechStream } = require("../services/speech-filter");
+const { createSpeechStream, toSpeakable } = require("../services/speech-filter");
 const { voiceModeActive } = require("../services/voice-style");
+const narrator = require("../services/narrator");
 
 // Wrap a raw emitter so every streamed reply also yields `speech` events: the
 // same text with code fences, markdown, links and long paths removed, cut at
@@ -39,19 +40,54 @@ function withSpeech(rawEmit) {
   return emit;
 }
 
-function streamAsk(session, prompt, res) {
-  res.writeHead(200, Object.assign({
+function streamHeaders(session, extra) {
+  return Object.assign({
     "Content-Type": "application/x-ndjson; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Accel-Buffering": "no",
-    // Tells the client this stream carries `speech` events to speak instead of raw deltas.
+    // Tells the client this stream carries `speech`/`narration` events to speak instead of raw deltas.
     "X-VB-Speech": "1",
     "X-VB-Voice-Mode": voiceModeActive(session) ? "1" : "0",
-  }, SECURITY_HEADERS));
-  const emit = withSpeech((obj) => {
+  }, extra || {}, SECURITY_HEADERS);
+}
+
+function rawEmitter(session, res) {
+  return (obj) => {
     try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {}
     try { hub.broadcast(session.id, Object.assign({ sessionId: session.id }, obj)); } catch (_) {}
-  });
+  };
+}
+
+// "read the full answer": speak the session's last full reply without
+// involving the agent. The chat already shows it, so only speech is sent.
+function streamReadFull(session, prompt, res) {
+  res.writeHead(200, streamHeaders(session, { "X-VB-Narrator": "1" }));
+  const emit = rawEmitter(session, res);
+  try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt, local: true }); } catch (_) {}
+  const last = session.lastReply && session.lastReply.text;
+  if (!last) {
+    const msg = narrator.template("noFull", {});
+    emit({ type: "delta", text: msg });
+    emit({ type: "speech", text: msg });
+  } else {
+    emit({ type: "delta", text: "🔊 " + narrator.template("readingFull", {}) });
+    const spoken = toSpeakable(last);
+    // Sentence-sized chunks so clients can stop/barge-in between them.
+    for (const part of spoken.match(/[^.!?…]+[.!?…]+|\S[^.!?…]*$/g) || []) {
+      const t = part.trim();
+      if (t) emit({ type: "speech", text: t });
+    }
+  }
+  emit({ type: "done", local: true });
+  res.end();
+}
+
+function streamAsk(session, prompt, res) {
+  if (narrator.isReadFullCommand(prompt)) return streamReadFull(session, prompt, res);
+  const pipeline = narrator.createVoicePipeline({ session, prompt, rawEmit: rawEmitter(session, res) });
+  res.writeHead(200, streamHeaders(session, { "X-VB-Narrator": pipeline.narrate ? "1" : "0" }));
+  pipeline.deferEnd(res);
+  const emit = pipeline.emit;
   try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt }); } catch (_) {}
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
   if (session.runner === "tmux") return streamTmux(session, prompt, res, emit);
