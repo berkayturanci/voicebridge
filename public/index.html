@@ -293,6 +293,7 @@
       <label class="opt">Hands-free <span class="switch"><input type="checkbox" id="handsfree" /><span class="slider"></span></span></label>
       <label class="opt">Voice alert <span class="switch"><input type="checkbox" id="cues" /><span class="slider"></span></span></label>
       <label class="opt">Brief voice <span class="switch"><input type="checkbox" id="voice" /><span class="slider"></span></span></label>
+      <label class="opt" title="A small model routes what you say: stop, status, other sessions, confirmations">Voice agent <span class="switch"><input type="checkbox" id="voiceAgent" /><span class="slider"></span></span></label>
       <label class="opt">Notifications <span class="switch"><input type="checkbox" id="notify" /><span class="slider"></span></span></label>
       <label class="opt">Voice <select id="ttsVoice"></select></label>
       <label class="opt">Rate <input type="range" id="rate" min="0.6" max="1.6" step="0.1" /></label>
@@ -810,14 +811,15 @@
 
   // ---------- Ask the agent and stream the reply ----------
   async function ask(sessionId, text) {
-    const st = S.get(sessionId); if (!st || st.turn.busy) return;
+    // With the voice agent on you may talk while a turn runs ("stop, add X, then continue").
+    const st = S.get(sessionId); if (!st || (st.turn.busy && !(voiceAgentOn() && st.meta.voice))) return;
     st.turn.busy = true; st.turn.stopped = false; st.turn.abort = new AbortController();
     if (sessionId === activeId) { refreshMic(); setStatus("Thinking…"); speakBuf = ""; speakQueue.length = 0; }
     const bubble = addMsg(sessionId, "", "claude"); let full = "";
     try {
       const r = await fetch("/api/ask", {
         method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice }), signal: st.turn.abort.signal,
+        body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice, voiceAgent: voiceAgentOn() }), signal: st.turn.abort.signal,
       });
       if (r.status === 401) { ensureToken(true); throw new Error("Invalid token — sign in again."); }
       // Newer bridges send `speech` events (markdown/code stripped server-side);
@@ -1543,11 +1545,13 @@
     orbMeterStop();
     talkTurn(text);
   }
+  let talkGen = 0;
   async function talkTurn(text) {
+    const my = ++talkGen; // a newer utterance (voice agent barge-in) owns the talk loop
     setTalkState("thinking", "Thinking…"); talkHeard.textContent = text;
     addMsg(activeId, text, "me");
     const reply = await ask(activeId, text);
-    if (!talking) return;
+    if (!talking || my !== talkGen) return;
     // empty reply (e.g. Antigravity flakiness): say so out loud instead of silently re-listening
     if (!reply || !reply.trim()) { feedSpeech("No reply received, could you say that again?"); flushSpeech(); }
     setTalkState("speaking", "Speaking… (tap to interrupt)");
@@ -1571,6 +1575,8 @@
   talkOrb.addEventListener("click", () => {
     if (!talking) return;
     if (talkMuted) { setTalkMuted(false); return; } // tap the muted orb to resume listening
+    // Voice agent on: tap while the agent works to talk to it ("stop", "what's the status", …).
+    if (voiceAgentOn() && talkOrb.classList.contains("thinking") && !speaking) { startTalkListen(); return; }
     if (!speaking && !talkOrb.classList.contains("speaking") && !talkOrb.classList.contains("thinking")) return;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakQueue.length = 0; speakBuf = ""; speaking = false;
@@ -1751,6 +1757,10 @@
   talkSilenceInput.addEventListener("change", () => { prefs.talkSilence = parseFloat(talkSilenceInput.value) || 1.3; savePrefs(); });
   handsfree.addEventListener("change", () => { prefs.handsfree = handsfree.checked; savePrefs(); if (!handsfree.checked && !talking) stopBrowserSTT(); });
   cuesChk.addEventListener("change", () => { prefs.cues = cuesChk.checked; savePrefs(); if (cuesChk.checked) { ensureAudio(); cue("done"); } });
+  const voiceAgentChk = $("voiceAgent");
+  function voiceAgentOn() { return typeof prefs.voiceAgent === "boolean" ? prefs.voiceAgent : !!(CONFIG && CONFIG.voiceAgentDefault); }
+  voiceAgentChk.checked = voiceAgentOn();
+  voiceAgentChk.addEventListener("change", () => { prefs.voiceAgent = voiceAgentChk.checked; savePrefs(); });
   voiceChk.addEventListener("change", () => { const st = active(); if (st) st.meta.voice = voiceChk.checked; prefs.voice = voiceChk.checked; savePrefs(); });
   notifyChk.addEventListener("change", () => {
     prefs.notify = notifyChk.checked; savePrefs();
@@ -1954,6 +1964,7 @@
       try { CONFIG = Object.assign({}, CONFIG, await (await fetch("/api/config", { headers: authHeaders() })).json()); } catch (_) {}
     }
     (CONFIG.agents || []).forEach((a) => { agentById[a.id] = a; });
+    voiceAgentChk.checked = voiceAgentOn();
     if (CONFIG.sttMode === "browser" && !SR) { micBtn.classList.add("na"); setStatus(noVoiceMsg()); }
     if (CONFIG.sttMode === "whisper-stream" && streamVoiceMsg()) { micBtn.classList.add("na"); setStatus(streamVoiceMsg()); }
     if (CONFIG.sttMode === "whisper") { handsfree.disabled = true; handsfree.closest("label").style.opacity = .4; }

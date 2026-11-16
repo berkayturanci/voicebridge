@@ -67,6 +67,7 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `SUMMARY_OLLAMA_URL` | `OLLAMA_URL` | Ollama base URL for summaries — can be another machine, e.g. `http://macbook-b.tailnet:11434`. |
 | `SUMMARY_TIMEOUT_MS` | `6000` | Per-call timeout; on timeout the raw reply is read. |
 | `SUMMARY_COOLDOWN_MS` | `60000` | After a failed call, skip the summarizer (read raw replies) for this long. |
+| `VOICE_AGENT` | `0` | Turn on the voice agent (router) for voice-mode sessions. The web UI's **Voice agent** switch, or `"voiceAgent": true/false` on `POST /api/ask`, overrides it per request. Uses the summarizer model above. |
 
 ## Voice mode
 
@@ -161,6 +162,47 @@ the user is speaking.
 `/ws` while the mic is open (or call `POST /api/listening {active}`); the flag
 expires after 60 s. Progress updates are dropped while it is set, and final
 summaries / approval notices wait until the mic closes.
+
+## Voice agent (router)
+
+With `VOICE_AGENT=1` (or the **Voice agent** switch in the web UI) a small
+model sits between your voice and the sessions. For each utterance it returns a
+plan of tool calls that the bridge executes:
+
+| Tool | Does |
+|------|------|
+| `send_to_session(session, text)` | Runs a turn. The session you are on streams back as usual; any other session runs in the background (its events still reach `/ws`), and you hear "Sent to web." |
+| `stop_session(session)` | Interrupts the running turn (closes it; persistent live children are killed and resume the conversation next turn; tmux gets Esc/Ctrl-C). The interrupted stream ends with `{type:"done", stopped:true}`. |
+| `get_status(session)` | "api is working, for 2 minutes. Last step: Bash npm test." / "api is idle. Last answer: …" |
+| `read_full_answer(session)` | Speaks that session's last full reply. |
+| `list_sessions()` | "3 sessions: api, web, docs." |
+
+- **One step for "stop, add this, then continue"** — the plan is
+  `stop_session` + `send_to_session` with a combined instruction; the agent
+  keeps its conversation, so it can pick up where it left off.
+- **Sessions by name** — "run the tests in api" targets the session named
+  (or whose project folder is) *api*. If the name is unknown or matches more
+  than one session, it asks ("Which session? api, web.") instead of guessing.
+  Without a name, the session you are on is the target.
+- **Spoken confirmation** for risky instructions (commit, push, merge, rebase,
+  delete/remove, `rm -`, `reset --hard`, force, deploy, publish, and Turkish
+  equivalents such as *commitle, pushla, sil, kaldır, yayınla*) or when the
+  model flags one: *"I'll send this to api: commit and push the fix. Do you
+  confirm?"* Answer "yes / evet / onaylıyorum" or "no / hayır / iptal" (no
+  model call). Anything else drops the pending action. Confirmations expire
+  after 2 minutes.
+- **Busy session** — sending to a session that is still working, without
+  saying stop, asks: *"api is still working. Should I stop it and send: …?"*
+- The web UI lets you talk while a turn runs: in Talk mode, tap the orb while
+  it shows *Thinking…*.
+
+The model only produces a JSON plan, so any summarizer provider works
+(Anthropic, OpenAI-compatible, Ollama). **Off, or no usable plan** (no
+summarizer, timeout, unparseable output): the utterance goes to the current
+session unchanged — Stage 1–2 behaviour. Slash commands and "read the full
+answer" bypass the router. Each routing decision is logged with its latency:
+`[narrator] router ok provider=… +420ms` and `[voice-agent] plan=stop_session,send_to_session +455ms`.
+The `/api/ask` stream starts with `{type:"router", actions:[…], confirmed}`.
 
 **Summarizer examples**
 

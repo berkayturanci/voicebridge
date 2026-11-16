@@ -205,8 +205,14 @@ a local/remote Ollama (`SUMMARY_OLLAMA_URL`) — voice sessions also get:
   answer"** / **"tam cevabı oku"** to hear all of it;
 - a spoken **approval notice** ("api is waiting for your approval").
 
+Turn on the **voice agent** (`VOICE_AGENT=1` or the *Voice agent* switch) and
+the same model also routes what you say: *"stop, add validation, then
+continue"* (stops and re-sends in one step), *"run the tests in api"* (by
+session name; asks when unclear), *"what's web doing?"*, *"read the full
+answer"*. Commits, pushes and deletions are read back for a spoken yes first.
+
 Without a summarizer (or if it is unreachable) replies are read as they
-stream, as before. Each summary's added latency is logged. Details:
+stream and utterances go straight to the session, as before. Each summary's added latency is logged. Details:
 [docs/configuration.md#narrator-progress-updates-and-spoken-summaries](docs/configuration.md#narrator-progress-updates-and-spoken-summaries).
 
 ### Optional: a shared access token

@@ -45,7 +45,26 @@ const narrator = require("../services/narrator");
 const summarizer = require("../services/summarizer");
 const { clearSessionApprovals } = require("../services/approvals");
 const { getRepoStatus, getFileDiff } = require("../services/git");
-const { streamAsk, proxyCloudBrowse } = require("../runners");
+const runners = require("../runners");
+const { streamAsk, proxyCloudBrowse } = runners;
+const voiceAgent = require("../services/voice-agent");
+const turns = require("../services/turns");
+
+// What the voice agent may do, bound to this bridge's sessions and runners.
+const voiceAgentDeps = {
+  listSessions: () => Array.from(sessions.values()),
+  getSession: (id) => sessions.get(id) || null,
+  complete: (args) => summarizer.complete(args),
+  streamAsk: (s, text, res) => streamAsk(s, text, res),
+  stopTurn: (id) => turns.stop(id),
+  isBusy: (id) => turns.isBusy(id),
+  turnInfo: (id) => turns.info(id),
+  createSink: () => turns.createSink(),
+  streamHeaders: (s, extra) => runners.streamHeaders(s, extra),
+  rawEmitter: (s, res) => runners.rawEmitter(s, res),
+  emitFullAnswer: (s, emit) => runners.emitFullAnswer(s, emit),
+  logger: console,
+};
 const { killTmux, ensureTmuxAgent, tmuxName, tmuxHas, tmuxCapture, tmuxRun, sleepMs } = require("../runners/tmux");
 const { killLive } = require("../runners/live");
 const { send, sendJson, authorized, readBody } = require("./http-helpers");
@@ -108,6 +127,7 @@ function handleRequest(req, res) {
         modes: Object.keys(AGENTS[id].modes).map((m) => ({ id: m, label: AGENTS[id].modes[m].label })),
       })),
       runners: ["local"].concat((process.env.CLOUD_RUNNER_URL || "") ? ["cloud"] : []),
+      voiceAgentDefault: /^(1|true|on|yes)$/i.test(String(process.env.VOICE_AGENT || "")),
     };
     if (isAuth) {
       data.defaultProjectDir = DEFAULT_PROJECT_DIR;
@@ -297,6 +317,13 @@ function handleRequest(req, res) {
         if (typeof data.model === "string" && data.model.trim()) session.model = data.model.trim();
         inflight++;
         res.on("close", () => { inflight = Math.max(0, inflight - 1); });
+        // Voice agent (Stage 3): routes the utterance (stop / status / other
+        // sessions / confirmations). Off, or no usable plan → straight to the session.
+        if (voiceAgent.enabledFor(session, data.voiceAgent) && !/^\s*\//.test(text) && !narrator.isReadFullCommand(text)) {
+          return voiceAgent.handle({ text, active: session, res, deps: voiceAgentDeps })
+            .then((handled) => { if (!handled && !res.headersSent) streamAsk(session, text, res); })
+            .catch(() => { if (!res.headersSent) streamAsk(session, text, res); else { try { res.end(); } catch (_) {} } });
+        }
         streamAsk(session, text, res);
       });
     }

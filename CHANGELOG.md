@@ -25,6 +25,14 @@ All notable changes to voicebridge are documented here. This project adheres to
   New `narration` and `tool_result` stream events, `GET /api/narrator`,
   `POST /api/listening`, `GET /api/sessions/:id/last-reply`.
 
+- **Voice agent (router)**, off by default (`VOICE_AGENT=1`, the web UI's
+  *Voice agent* switch, or `voiceAgent` per request): a small model plans
+  `send_to_session`, `stop_session`, `get_status`, `read_full_answer` and
+  `list_sessions` calls. "Stop, add X, then continue" happens in one step;
+  sessions are addressed by name (asks when ambiguous); commit/push/delete
+  instructions need a spoken yes. Falls back to sending the utterance to the
+  current session when off or when the model is unavailable.
+
 ### Fixed
 - `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer
   throws (missing `sanitizeSessionId` import).
