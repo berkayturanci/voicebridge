@@ -37,9 +37,11 @@
     "appId": "dev.voicebridge.desktop",
     "productName": "voicebridge",
     "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js", "renderer/**", "assets/*.png"],
+    "files": ["main.js", "preload.js", "lib/**", "renderer/**", "assets/*.png"],
     "extraResources": [
       { "from": "../server.js", "to": "bridge/server.js" },
+      { "from": "../src", "to": "bridge/src" },
+      { "from": "../package.json", "to": "bridge/package.json" },
       { "from": "../public", "to": "bridge/public" }
     ],
     "mac": {
