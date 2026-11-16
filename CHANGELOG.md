@@ -37,6 +37,12 @@ All notable changes to voicebridge are documented here. This project adheres to
 - `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer
   throws (missing `sanitizeSessionId` import).
 
+### Changed
+- **App**: migrated from `package:flutter/material.dart` (deprecated in
+  Flutter 3.50) to `package:material_ui`. The app now needs Flutter 3.47+ /
+  Dart 3.13+, and CI builds it on current stable again instead of a pinned
+  3.47.6.
+
 ## [0.8.2] - 2026-08-16
 
 ### Added

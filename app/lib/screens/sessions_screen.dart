@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../models.dart';
@@ -189,7 +189,7 @@ class _SessionsScreenState extends State<SessionsScreen>
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 96),
       itemCount: _sessions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (_, i) => _sessionCard(_sessions[i]),
     );
   }
