@@ -289,7 +289,7 @@ test("buildPrompt prepends the voice preamble only in voice mode", () => {
   assert.strictEqual(srv.buildPrompt(false, "hello"), "hello");
   const v = srv.buildPrompt(true, "hello");
   assert.ok(v.endsWith("hello") && v.length > "hello".length);
-  assert.match(v, /text-to-speech/i);
+  assert.match(v, /listening, not reading/i);
 });
 
 test("createSession stores the voice flag", () => {

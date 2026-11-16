@@ -6,6 +6,7 @@ const os = require("os");
 const { DEFAULT_PROJECT_DIR, DEFAULT_AGENT, maxSessions, sessionsFile } = require("../config");
 const { AGENTS, resolveMode, resolveRunner } = require("../adapters");
 const { encodeProjectPath } = require("../adapters/claude");
+const { normalizeVoiceMode, voiceModeActive } = require("./voice-style");
 
 const sessions = new Map();
 let sessionSeq = 0;
@@ -160,7 +161,7 @@ function extractAgentConversationId(text) {
   return "";
 }
 
-function createSession({ name, agent, projectDir, mode, voice, runner, model, claudeSessionId, agentSessionId } = {}) {
+function createSession({ name, agent, projectDir, mode, voice, voiceMode, runner, model, claudeSessionId, agentSessionId } = {}) {
   if (sessions.size >= maxSessions()) throw new Error("too many sessions");
   agent = agent || DEFAULT_AGENT;
   if (!AGENTS[agent]) throw new Error("unknown agent: " + agent);
@@ -176,6 +177,7 @@ function createSession({ name, agent, projectDir, mode, voice, runner, model, cl
     projectDir: dir,
     mode: resolveMode(agent, mode),
     voice: !!voice,
+    voiceMode: normalizeVoiceMode(voiceMode),
     runner: run,
     model: (model && String(model).trim()) || undefined,
     claudeSessionId: sanitizeSessionId(claudeSessionId),
@@ -190,6 +192,8 @@ function publicSession(s) {
   return {
     id: s.id, name: s.name, agent: s.agent, agentLabel: AGENTS[s.agent].label,
     projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model || null, started: s.started,
+    voiceMode: s.voiceMode === undefined ? null : s.voiceMode,
+    voiceModeActive: voiceModeActive(s),
     claudeSessionId: s.claudeSessionId || null,
     agentSessionId: s.agentSessionId || null,
     handoff: s.handoff || null,
@@ -211,7 +215,7 @@ function saveSessions(file) {
       seq: sessionSeq,
       defaultId: defaultSessionId,
       sessions: Array.from(sessions.values()).map((s) => ({
-        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, runner: s.runner, model: s.model, claudeSessionId: s.claudeSessionId, agentSessionId: s.agentSessionId, started: s.started,
+        id: s.id, name: s.name, agent: s.agent, projectDir: s.projectDir, mode: s.mode, voice: s.voice, voiceMode: s.voiceMode, runner: s.runner, model: s.model, claudeSessionId: s.claudeSessionId, agentSessionId: s.agentSessionId, started: s.started,
       })),
     };
     const tmp = `${file}.tmp.${process.pid}`;
@@ -232,7 +236,7 @@ function loadSessions(file) {
     sessions.set(s.id, {
       id: s.id, name: s.name, agent: s.agent, projectDir,
       mode: AGENTS[s.agent].modes[s.mode] ? s.mode : AGENTS[s.agent].defaultMode,
-      voice: !!s.voice, runner: (s.runner === "cloud" || s.runner === "tmux") ? s.runner : "local",
+      voice: !!s.voice, voiceMode: normalizeVoiceMode(s.voiceMode), runner: (s.runner === "cloud" || s.runner === "tmux") ? s.runner : "local",
       model: (s.model && String(s.model).trim()) || undefined,
       claudeSessionId: sanitizeSessionId(s.claudeSessionId),
       agentSessionId: (s.agentSessionId && String(s.agentSessionId).trim()) || undefined,

@@ -1,6 +1,8 @@
 "use strict";
 
-const { buildPrompt, looksLikeQuestion, ollamaUrl } = require("../config");
+const { looksLikeQuestion, ollamaUrl } = require("../config");
+const { ollamaAdapter } = require("../adapters/ollama");
+const { applyVoiceStyle } = require("../services/voice-style");
 const { sendPush } = require("../services/push");
 
 function streamOllama(session, prompt, res, emit) {
@@ -8,10 +10,14 @@ function streamOllama(session, prompt, res, emit) {
   try { url = new URL("/api/chat", ollamaUrl()); } catch (_) { emit({ type: "error", error: "Invalid OLLAMA_URL" }); return res.end(); }
   const lib = url.protocol === "https:" ? require("https") : require("http");
   const history = session.history || [];
-  const messages = history.concat([{ role: "user", content: buildPrompt(session.voice, prompt) }]);
+  const styled = applyVoiceStyle(session, ollamaAdapter, prompt);
+  const messages = history.concat([{ role: "user", content: styled.prompt }]);
+  // The voice style rides as a system message for this turn only; it is not
+  // stored in history, so toggling voice mode takes effect on the next turn.
+  const sent = styled.systemPrompt ? [{ role: "system", content: styled.systemPrompt }].concat(messages) : messages;
   const payload = JSON.stringify({
     model: session.model || process.env.OLLAMA_MODEL || "llama3.2",
-    messages, stream: true,
+    messages: sent, stream: true,
   });
   let buf = "", reply = "", errored = false;
   const upReq = lib.request(url, { method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } }, (r) => {

@@ -1,7 +1,8 @@
 "use strict";
 
 const { spawn } = require("child_process");
-const { buildPrompt, looksLikeQuestion } = require("../config");
+const { looksLikeQuestion } = require("../config");
+const { applyVoiceStyle } = require("../services/voice-style");
 const { AGENTS, parseClaudeEvents } = require("../adapters");
 const { saveSessions } = require("../services/sessions");
 const { sendPush } = require("../services/push");
@@ -41,17 +42,23 @@ function killAllLive() {
   for (const id of Array.from(liveProcs.keys())) killLive(id);
 }
 
-function getOrSpawnLive(session) {
+function getOrSpawnLive(session, systemPrompt = "") {
   const existing = liveProcs.get(session.id);
-  if (existing && !existing.child.killed) return existing;
+  if (existing && !existing.child.killed) {
+    // The system prompt is fixed for a child's lifetime; when voice mode was
+    // toggled, restart it idle (it resumes the same Claude conversation).
+    if ((existing.systemPrompt || "") === (systemPrompt || "") || existing.busy) return existing;
+    killLive(session.id);
+  }
   const modeArgs = (AGENTS.claude.modes[session.mode] || AGENTS.claude.modes[AGENTS.claude.defaultMode]).args;
   const argv = [...modeArgs, "--print", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"];
+  if (systemPrompt) argv.push("--append-system-prompt", systemPrompt);
   if (session.claudeSessionId) argv.push("--resume", session.claudeSessionId);
   const child = spawn(AGENTS.claude.bin(), argv, { cwd: session.projectDir, env: process.env });
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
   try { if (child.stdin) child.stdin.on("error", () => {}); } catch (_) {}
-  const p = { child, buf: "", busy: false, idleTimer: null };
+  const p = { child, buf: "", busy: false, idleTimer: null, systemPrompt: systemPrompt || "" };
   liveProcs.set(session.id, p);
   const drop = () => { if (liveProcs.get(session.id) === p) liveProcs.delete(session.id); };
   child.on("exit", drop);
@@ -61,7 +68,8 @@ function getOrSpawnLive(session) {
 
 function streamLive(session, prompt, res, emit) {
   if (session.handoff === "pc") { session.handoff = null; saveSessions(); }
-  const p = getOrSpawnLive(session);
+  const styled = applyVoiceStyle(session, AGENTS.claude, prompt);
+  const p = getOrSpawnLive(session, styled.systemPrompt);
   if (p.busy) {
     emit({ type: "error", error: "This session is busy right now (the previous turn is still running)." });
     return res.end();
@@ -197,7 +205,7 @@ function streamLive(session, prompt, res, emit) {
 
   res.on("close", () => { finished = true; });
 
-  const userLine = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: buildPrompt(session.voice, prompt) }] } }) + "\n";
+  const userLine = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: styled.prompt }] } }) + "\n";
   try { p.child.stdin.write(userLine); } catch (e) { failAndRespawnNextTurn(e.message); }
 }
 

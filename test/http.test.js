@@ -120,14 +120,14 @@ test("POST /api/ask routes to a gemini session", async () => {
   assert.strictEqual(evs[evs.length - 1].type, "done");
 });
 
-test("voice mode prepends the TTS preamble to the prompt sent to the agent", async () => {
+test("voice mode prepends the spoken-style instruction for agents without a system prompt flag", async () => {
   // codex stub echoes its stdin, so we can see the effective prompt.
   const create = await request(server, "POST", "/api/sessions", { agent: "codex", projectDir: process.cwd(), voice: true });
   const { session } = JSON.parse(create.data);
   assert.strictEqual(session.voice, true);
   const { data } = await request(server, "POST", "/api/ask", { text: "do x", sessionId: session.id });
   const text = ndjson(data).filter((e) => e.type === "delta").map((e) => e.text).join("");
-  assert.match(text, /text-to-speech/i);
+  assert.match(text, /listening, not reading/i);
   assert.match(text, /do x/);
 });
 

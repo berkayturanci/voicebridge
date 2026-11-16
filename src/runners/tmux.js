@@ -2,7 +2,7 @@
 
 const path = require("path");
 const { execFile } = require("child_process");
-const { buildPrompt } = require("../config");
+const { applyVoiceStyle } = require("../services/voice-style");
 const { AGENTS } = require("../adapters");
 const { saveSessions, findJsonlByContent } = require("../services/sessions");
 
@@ -101,7 +101,7 @@ async function streamTmux(session, prompt, res, emit) {
   try { name = await ensureTmuxAgent(session); }
   catch (e) { emit({ type: "error", error: "couldn't start tmux: " + e.message }); return res.end(); }
 
-  const text = buildPrompt(session.voice, prompt).replace(/\s*\n\s*/g, " ").trim();
+  const text = applyVoiceStyle(session, null, prompt).prompt.replace(/\s*\n\s*/g, " ").trim();
   await tmuxRun(["send-keys", "-t", name, "-l", text]);
   await sleepMs(180);
   await tmuxRun(["send-keys", "-t", name, "Enter"]);

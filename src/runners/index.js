@@ -17,17 +17,41 @@ const SECURITY_HEADERS = {
 };
 
 const hub = require("../services/hub");
+const { createSpeechStream } = require("../services/speech-filter");
+const { voiceModeActive } = require("../services/voice-style");
+
+// Wrap a raw emitter so every streamed reply also yields `speech` events: the
+// same text with code fences, markdown, links and long paths removed, cut at
+// sentence boundaries. Clients speak `speech` and render `delta` — the chat
+// always shows the full text. The final `speech` (the tail) precedes `done`.
+function withSpeech(rawEmit) {
+  const speech = createSpeechStream();
+  const emitSpeech = (text) => { if (text) rawEmit({ type: "speech", text }); };
+  const emit = (obj) => {
+    if (obj && obj.type === "done") emitSpeech(speech.flush());
+    rawEmit(obj);
+    if (obj && obj.type === "delta" && obj.text) emitSpeech(speech.push(obj.text));
+  };
+  // For runners that forward upstream NDJSON verbatim (cloud): feed deltas
+  // seen on the wire and flush at the end without re-emitting the delta.
+  emit.tapDelta = (text) => emitSpeech(speech.push(text));
+  emit.flushSpeech = () => emitSpeech(speech.flush());
+  return emit;
+}
 
 function streamAsk(session, prompt, res) {
   res.writeHead(200, Object.assign({
     "Content-Type": "application/x-ndjson; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Accel-Buffering": "no",
+    // Tells the client this stream carries `speech` events to speak instead of raw deltas.
+    "X-VB-Speech": "1",
+    "X-VB-Voice-Mode": voiceModeActive(session) ? "1" : "0",
   }, SECURITY_HEADERS));
-  const emit = (obj) => {
+  const emit = withSpeech((obj) => {
     try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {}
     try { hub.broadcast(session.id, Object.assign({ sessionId: session.id }, obj)); } catch (_) {}
-  };
+  });
   try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt }); } catch (_) {}
   if (session.runner === "cloud") return streamCloud(session, prompt, res, emit);
   if (session.runner === "tmux") return streamTmux(session, prompt, res, emit);
@@ -40,6 +64,7 @@ function streamAsk(session, prompt, res) {
 
 module.exports = {
   streamAsk,
+  withSpeech,
   streamLocal,
   streamCloud,
   streamTmux,

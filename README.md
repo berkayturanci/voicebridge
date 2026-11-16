@@ -170,6 +170,28 @@ That's it — talk, and Claude Code talks back. 🎧
 | `STT_CMD`      | _(none)_             | Whisper mode: shell command; `{file}` → recorded audio path; must print transcript to stdout |
 | `STT_STREAM_URL` | _(none)_           | Whisper-stream mode: local WebSocket transcriber URL, e.g. `ws://127.0.0.1:8910/listen` |
 | `STT_STREAM_CMD` | _(none)_           | Whisper-stream mode: local streaming subprocess command, e.g. `whisper-stream -m ~/models/ggml-base.bin` |
+| `VOICE_MODE_DEFAULT` | `1`            | Spoken answer style for voice sessions unless a session overrides `voiceMode` |
+| `VOICE_STYLE_PROMPT` | _(built-in)_   | The spoken-style instruction given to the agent (see [Voice mode](#voice-mode-spoken-answers)) |
+| `VOICE_STYLE_PROMPT_FILE` | _(none)_  | Read the instruction from a text file instead (wins over `VOICE_STYLE_PROMPT`) |
+
+Full list: [docs/configuration.md](docs/configuration.md).
+
+### Voice mode (spoken answers)
+
+When you are listening rather than reading (earbuds in, phone in a pocket),
+voice mode asks the agent to answer like a phone call: 1–4 short sentences, no
+code, paths, links or markdown read aloud, long detail written to a file
+instead, and in your language. It is **on by default for voice sessions**
+("Brief voice") and can be set per session with `voiceMode` (`true`, `false`,
+or `null` = follow the voice flag).
+
+- **Claude** gets the instruction through `--append-system-prompt` (also for
+  persistent live sessions); **Ollama** gets it as a system message; other
+  agents (Codex, Gemini, Aider, Antigravity) and the tmux/cloud runners get it
+  prepended to the prompt.
+- Independently of voice mode, everything spoken is first run through a
+  **speech filter** that drops code blocks, markdown markers, URLs and long
+  paths. The chat always shows the full, unfiltered reply.
 
 ### Optional: a shared access token
 

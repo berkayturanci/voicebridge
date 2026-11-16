@@ -48,6 +48,62 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `SESSIONS_FILE` | _(none)_ | If set, sessions (name/agent/dir/mode/voice/runner plus agent continuity state) are saved here and restored on restart, e.g. `~/.voicebridge/sessions.json`. Unset = in-memory only. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | _(none)_ | Enable real Web Push (OS notifications even when the app is closed). Generate with `node scripts/gen-vapid-keys.js` (needs the optional `web-push` dependency). |
 | `VAPID_SUBJECT` | `mailto:voicebridge@localhost` | Contact URI sent with push (a `mailto:` or `https:`). |
+| `VOICE_MODE_DEFAULT` | `1` | Whether voice sessions (the **Brief voice** toggle) get the spoken answer style when the session has no explicit `voiceMode`. `0`/`false`/`off` disables it unless a session opts in. |
+| `VOICE_STYLE_PROMPT` | _(built-in, see below)_ | The spoken-style instruction. Write `\n` for a newline in `.env`. |
+| `VOICE_STYLE_PROMPT_FILE` | _(none)_ | Path to a text file holding the instruction. Wins over `VOICE_STYLE_PROMPT`; re-read when the file changes (no restart needed). Falls back to `VOICE_STYLE_PROMPT` / the default if unreadable. |
+
+## Voice mode
+
+Voice mode shapes the agent's answers for listening instead of reading.
+
+**Per-session setting** — `voiceMode` on a session:
+
+| Value | Effect |
+|-------|--------|
+| `null` (default) | Follow the session's `voice` flag (gated by `VOICE_MODE_DEFAULT`). |
+| `true` | Always use the spoken style, even in a typed session. |
+| `false` | Never use it, even in a voice session. |
+
+Set it at creation (`POST /api/sessions { ..., "voiceMode": true }`), later
+(`POST /api/sessions/:id { "voiceMode": false }`), or per turn on
+`POST /api/ask`. Sessions report `voiceMode` and the effective
+`voiceModeActive`; `/api/ask` responses carry `X-VB-Voice-Mode: 1|0`.
+
+**Default instruction** (override with `VOICE_STYLE_PROMPT` or `VOICE_STYLE_PROMPT_FILE`):
+
+> You are talking with the user over the phone: they are listening, not
+> reading. Answer like a spoken conversation, in 1 to 4 short sentences. Do not
+> read out code, file paths, links, or markdown. If the answer needs long
+> detail, write it to a file and only say which file you wrote it to. Answer in
+> the user's language.
+
+Example `.env` in Turkish:
+
+```
+VOICE_STYLE_PROMPT="Telefonda konuşur gibi cevap ver. 1–4 kısa cümle. Kod, dosya yolu, link, markdown okuma. Uzun detay gerekiyorsa bir dosyaya yaz ve sadece 'detayı şu dosyaya yazdım' de. Kullanıcının dilinde cevap ver."
+```
+
+**How each agent receives it:**
+
+| Agent / runner | Delivery |
+|----------------|----------|
+| Claude (local and persistent live) | `--append-system-prompt <instruction>`. A persistent live child is restarted (idle, same conversation) when the instruction or voice mode changes. |
+| Ollama | A `system` message on `/api/chat` for that turn (not stored in history). |
+| Codex, Gemini, Aider, Antigravity, tmux runner, cloud runner | Prepended to the prompt. |
+
+Slash commands (`/compact`, `/help`, …) are never prefixed.
+
+### Speech filter
+
+Every `/api/ask` stream also carries `speech` events
+(`{ "type": "speech", "text": "…" }`) next to the usual `delta` events: the
+same reply cut at sentence boundaries with fenced code blocks, markdown
+markers, table rules, HTML, URLs and long file paths (shortened to their file
+name) removed. Code fences split across many deltas are never spoken. The
+final `speech` tail is sent before `done`. Responses set `X-VB-Speech: 1` so
+clients know to speak `speech` events and only render `delta` text — the chat
+always shows the full reply. `POST /api/tts` (Piper) applies the same filter
+unless the body has `"raw": true`.
 
 ## Web Push (notifications when the app is closed)
 

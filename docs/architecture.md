@@ -35,6 +35,8 @@ src/
 │   ├── git.js              # Git status & unified diff generator with path sanitization
 │   ├── stt.js              # Whisper batch STT and real-time streaming proxy (/api/stt-stream)
 │   ├── commands.js         # Project npm scripts & slash command discovery
+│   ├── voice-style.js      # Per-session voice mode & spoken-style instruction per agent
+│   ├── speech-filter.js    # Markdown/code → speakable text (one-shot and streaming)
 │   └── push.js             # Web Push notifications
 └── routes/                 # HTTP & WebSocket route handlers
     ├── api.js              # REST API endpoint dispatcher
@@ -70,6 +72,7 @@ The WebSocket Session Hub (`src/services/hub.js`) provides full-duplex live stat
 - **Event Protocol**:
   - `turn_start`: `{ type: "turn_start", sessionId, prompt }`
   - `delta`: `{ type: "delta", sessionId, text }`
+  - `speech`: `{ type: "speech", sessionId, text }` — speakable form of the reply (code/markdown/links stripped, sentence-cut); see [configuration](configuration.md#speech-filter)
   - `activity`: `{ type: "activity", sessionId, tool, text }`
   - `done`: `{ type: "done", sessionId }`
   - `error`: `{ type: "error", sessionId, error }`

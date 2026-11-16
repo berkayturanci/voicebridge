@@ -5,6 +5,21 @@ All notable changes to voicebridge are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- **Voice mode (spoken answers)**: per-session `voiceMode` (on by default for
+  voice sessions) asks the agent to answer like a phone call. Claude receives
+  it via `--append-system-prompt` (local and persistent live), Ollama as a
+  system message, other agents as a prompt prefix. The instruction is
+  configurable with `VOICE_STYLE_PROMPT` / `VOICE_STYLE_PROMPT_FILE`;
+  `VOICE_MODE_DEFAULT` sets the default.
+- **Speech filter**: `/api/ask` streams now carry `speech` events with code
+  blocks, markdown, links and long paths stripped; the web UI speaks those
+  while the chat still shows the full reply. `/api/tts` applies the same filter.
+
+### Fixed
+- `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer
+  throws (missing `sanitizeSessionId` import).
+
 ## [0.8.2] - 2026-08-16
 
 ### Added
