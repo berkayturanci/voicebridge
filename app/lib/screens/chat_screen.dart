@@ -517,6 +517,14 @@ class _ChatScreenState extends State<ChatScreen> {
     return '$lead … (long reply, full text on screen)';
   }
 
+  // Serialize spoken output so a narrator update never cuts off another one.
+  Future<void> _speechChain = Future.value();
+  Future<void> _enqueueSpeak(String text, {bool summarize = false}) {
+    final next = _speechChain.then((_) => _speak(text, summarize: summarize)).catchError((_) {});
+    _speechChain = next;
+    return next;
+  }
+
   Future<void> _speak(String text, {bool summarize = false}) async {
     final clean = _forSpeech(text, summarize: summarize);
     if (clean.isEmpty) return;
@@ -597,11 +605,18 @@ class _ChatScreenState extends State<ChatScreen> {
       _busy = true;
     });
     _toBottom();
+    final spoken = SpokenReply();
     try {
       final full = await _api.ask(
         sessionId: widget.session.id,
         text: text,
         mode: _mode,
+        spoken: spoken,
+        // Progress / approval notices from the bridge's narrator: say them now
+        // (queued, so they never overlap) while the hands-free loop is on.
+        onNarration: (n) {
+          if (_talking) _enqueueSpeak(n);
+        },
         onDelta: (d) {
           setState(() => reply.text += d);
           _toBottom();
@@ -633,7 +648,13 @@ class _ChatScreenState extends State<ChatScreen> {
             IosTextToSpeechAudioMode.voicePrompt,
           );
         }
-        await _speak(full, summarize: true); // hands-free: read the lead, not 200 lines
+        // Voice-mode bridges send what to say (filtered, maybe summarized);
+        // otherwise read the lead of the reply, not 200 lines.
+        if (spoken.fromServer) {
+          await _enqueueSpeak(spoken.text);
+        } else {
+          await _enqueueSpeak(full, summarize: true);
+        }
         if (_talking && !_talkMuted && !_busy) _listen(); // skip if a new turn already started
       }
     } catch (e) {

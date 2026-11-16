@@ -303,7 +303,10 @@ class Api {
 
   /// POST /api/ask — streams newline-delimited JSON:
   ///   {"type":"delta","text":"..."} | {"type":"activity","text":"..."} | {"type":"error","error":"..."}
+  ///   plus, from voice-mode bridges, {"type":"speech"|"narration",...} (see [SpokenReply]).
   /// Returns the full reply text; callbacks fire as the stream arrives.
+  /// [spoken] collects what the bridge wants read aloud; [onNarration] gets
+  /// progress / approval notices to speak right away.
   Future<String> ask({
     required String sessionId,
     required String text,
@@ -311,6 +314,8 @@ class Api {
     bool voice = false,
     required void Function(String delta) onDelta,
     void Function(String activity)? onActivity,
+    SpokenReply? spoken,
+    void Function(String text)? onNarration,
   }) async {
     final req = http.Request('POST', _u('/api/ask'));
     req.headers.addAll(_headers({'Content-Type': 'application/json'}));
@@ -370,6 +375,9 @@ class Api {
             break;
           case 'error':
             throw Exception((ev['error'] ?? 'Server error') as String);
+          default:
+            final now = spoken?.onEvent(ev);
+            if (now != null) onNarration?.call(now);
         }
       }
     }
@@ -463,5 +471,42 @@ class SessionWatch {
     } catch (e) {
       debugPrint('voicebridge session watch close failed: $e');
     }
+  }
+}
+
+
+/// What a voice-mode bridge wants spoken for one turn, separate from the chat
+/// text. The bridge strips code/markdown (`speech`), may replace a long reply
+/// with a short summary (`narration` kind `final`), and sends progress,
+/// approval and background-session notices to speak right away.
+class SpokenReply {
+  final List<String> _parts = [];
+  bool _fromServer = false;
+
+  /// True once the bridge sent any spoken text, so the app should speak
+  /// [text] instead of its own cleanup of the full reply.
+  bool get fromServer => _fromServer;
+
+  /// The reply as it should be heard (empty if the bridge sent none).
+  String get text => _parts.join(' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  /// Feed one stream event. Returns text to speak immediately, or null.
+  String? onEvent(Map<String, dynamic> ev) {
+    final t = (ev['text'] ?? '').toString().trim();
+    if (t.isEmpty) return null;
+    switch (ev['type']) {
+      case 'speech':
+        _fromServer = true;
+        _parts.add(t);
+        return null;
+      case 'narration':
+        _fromServer = true;
+        if (ev['kind'] == 'final') {
+          _parts.add(t);
+          return null;
+        }
+        return t; // progress, approval, background
+    }
+    return null;
   }
 }

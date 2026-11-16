@@ -34,6 +34,10 @@ All notable changes to voicebridge are documented here. This project adheres to
   current session when off or when the model is unavailable.
 - Turns the voice agent starts in another session announce their approvals
   and their result on the session you are on (`narration` kind `background`).
+- **Mobile app** speaks what the bridge sends for voice-mode sessions:
+  filtered `speech`, final summaries, and progress / approval /
+  background-session notices (queued so they never overlap). Older bridges
+  keep the app's own read-the-lead behaviour.
 
 ### Fixed
 - `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer
