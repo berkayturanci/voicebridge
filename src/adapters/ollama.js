@@ -4,6 +4,7 @@ const ollamaAdapter = {
   label: "Ollama (local)",
   bin: () => process.env.OLLAMA_BIN || "ollama",
   supportsContinue: true,
+  systemPrompt: "message", // voice style goes in as a system message (runners/ollama.js)
   stream: "text",
   defaultMode: "default",
   modes: {

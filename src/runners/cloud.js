@@ -1,6 +1,7 @@
 "use strict";
 
-const { buildPrompt, looksLikeQuestion, cloudRunnerUrl } = require("../config");
+const { looksLikeQuestion, cloudRunnerUrl } = require("../config");
+const { applyVoiceStyle } = require("../services/voice-style");
 const { sendJson, SECURITY_HEADERS } = require("../routes/http-helpers");
 const { sendPush } = require("../services/push");
 
@@ -27,7 +28,7 @@ function streamCloud(session, prompt, res, emit) {
   try { url = new URL(base); } catch (_) { emit({ type: "error", error: "Cloud runner not configured (CLOUD_RUNNER_URL)." }); return res.end(); }
   const lib = url.protocol === "https:" ? require("https") : require("http");
   const payload = JSON.stringify({
-    text: buildPrompt(session.voice, prompt),
+    text: applyVoiceStyle(session, null, prompt).prompt,
     agent: session.agent, mode: session.mode, projectDir: session.projectDir,
     sessionId: session.id, continue: session.started,
   });
@@ -35,16 +36,23 @@ function streamCloud(session, prompt, res, emit) {
   if (process.env.CLOUD_RUNNER_TOKEN) headers["Authorization"] = "Bearer " + process.env.CLOUD_RUNNER_TOKEN;
 
   let pbuf = "", reply = "";
-  const scan = (line) => { try { const ev = JSON.parse(line); if (ev.type === "delta" && ev.text) reply += ev.text; } catch (_) {} };
+  // Forward upstream NDJSON line by line (unchanged), interleaving our own
+  // `speech` events: after each delta, and the spoken tail before `done`.
+  const forward = (line) => {
+    let ev = null; try { ev = JSON.parse(line); } catch (_) {}
+    if (ev && ev.type === "done" && emit.flushSpeech) emit.flushSpeech();
+    try { res.write(line + "\n"); } catch (_) {}
+    if (ev && ev.type === "delta" && ev.text) { reply += ev.text; if (emit.tapDelta) emit.tapDelta(ev.text); }
+  };
   const up = lib.request(url, { method: "POST", headers }, (r) => {
     r.setEncoding("utf8");
     r.on("data", (d) => {
-      try { res.write(d); } catch (_) {}
       pbuf += d.toString();
-      let i; while ((i = pbuf.indexOf("\n")) >= 0) { const line = pbuf.slice(0, i).trim(); pbuf = pbuf.slice(i + 1); if (line) scan(line); }
+      let i; while ((i = pbuf.indexOf("\n")) >= 0) { const line = pbuf.slice(0, i).trim(); pbuf = pbuf.slice(i + 1); if (line) forward(line); }
     });
     r.on("end", () => {
-      if (pbuf.trim()) scan(pbuf.trim());
+      if (pbuf.trim()) forward(pbuf.trim());
+      if (emit.flushSpeech) emit.flushSpeech(); // no-op if `done` already flushed it
       session.started = true;
       if (looksLikeQuestion(reply)) sendPush({ title: "voicebridge — " + session.name + " asked a question", body: reply.trim().slice(-160), sessionId: session.id });
       res.end();

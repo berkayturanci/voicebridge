@@ -108,3 +108,49 @@ test("persistent live failures emit errors and release busy for the next turn", 
   await sleep(50);
   await closeServer(server);
 });
+
+test("persistent live: voice style rides --append-system-prompt and toggling voice mode respawns idle child", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-live-sys-"));
+  const bin = path.join(dir, "claude");
+  writeExecutable(bin, `#!/usr/bin/env node
+const argv = process.argv.slice(2);
+const i = argv.indexOf("--append-system-prompt");
+const sys = i >= 0 ? argv[i + 1] : "";
+process.stdin.setEncoding("utf8");
+let buf = "";
+process.stdin.on("data", (chunk) => {
+  buf += chunk;
+  let idx;
+  while ((idx = buf.indexOf("\\n")) >= 0) {
+    const line = buf.slice(0, idx); buf = buf.slice(idx + 1);
+    let text = ""; try { text = JSON.parse(line).message.content[0].text; } catch (_) {}
+    process.stdout.write(JSON.stringify({type:"assistant",message:{content:[{type:"text",text:"pid=" + process.pid + " sys=" + JSON.stringify(sys) + " prompt=" + JSON.stringify(text)}]}})+"\\n");
+    process.stdout.write(JSON.stringify({type:"result",subtype:"success",result:"ok"})+"\\n");
+  }
+});
+process.stdin.resume();
+process.on("SIGTERM", () => process.exit(0));
+`);
+  process.env.CLAUDE_BIN = bin;
+  process.env.AGENT_TIMEOUT_MS = "5000";
+  process.env.VOICE_STYLE_PROMPT = "SPOKEN";
+  const { srv, server } = await startServer();
+  const s = srv.createSession({ name: "voice", agent: "claude", projectDir: process.cwd(), voice: true });
+  try {
+    const say = async (text) => ndjson((await request(server, "POST", "/api/ask", { text, sessionId: s.id })).data)
+      .filter((e) => e.type === "delta").map((e) => e.text).join("");
+    const a = await say("one");
+    assert.match(a, /sys="SPOKEN" prompt="one"/);
+    const b = await say("two");
+    assert.strictEqual(b.match(/pid=(\d+)/)[1], a.match(/pid=(\d+)/)[1]); // same child reused
+    s.voiceMode = false;
+    const c = await say("three");
+    assert.match(c, /sys="" prompt="three"/);
+    assert.notStrictEqual(c.match(/pid=(\d+)/)[1], a.match(/pid=(\d+)/)[1]); // respawned
+  } finally {
+    srv._internals.killAllLive();
+    delete process.env.VOICE_STYLE_PROMPT;
+    process.env.AGENT_TIMEOUT_MS = "1500";
+    await closeServer(server);
+  }
+});

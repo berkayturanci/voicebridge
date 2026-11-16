@@ -71,14 +71,16 @@ const claudeAdapter = {
   supportsContinue: true,
   stream: "ndjson",
   live: true,
+  systemPrompt: "flag", // voice style goes in via --append-system-prompt
   defaultMode: "ask",
   modes: {
     ask: { label: "Ask for approval", args: [] },
     autoEdit: { label: "Approve edits", args: ["--permission-mode", "acceptEdits"] },
     full: { label: "Fully autonomous", args: ["--dangerously-skip-permissions"] },
   },
-  command(prompt, { cont, resume, modeArgs } = {}) {
+  command(prompt, { cont, resume, modeArgs, systemPrompt } = {}) {
     const argv = [...(modeArgs || [])];
+    if (systemPrompt) argv.push("--append-system-prompt", systemPrompt);
     if (resume) argv.push("--resume", resume);
     else if (cont) argv.push("--continue");
     argv.push("--output-format", "stream-json", "--verbose", "-p", prompt);

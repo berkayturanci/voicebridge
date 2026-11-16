@@ -2,7 +2,8 @@
 
 const fs = require("fs");
 const { spawn } = require("child_process");
-const { buildPrompt, looksLikeQuestion } = require("../config");
+const { looksLikeQuestion } = require("../config");
+const { applyVoiceStyle } = require("../services/voice-style");
 const { AGENTS } = require("../adapters");
 const { sendPush } = require("../services/push");
 const { LIVE_ENABLED, streamLive } = require("./live");
@@ -13,7 +14,8 @@ function streamLocal(session, prompt, res, emit) {
   const cont = session.started && agent.supportsContinue;
   const resume = (!session.started && (session.agentSessionId || session.claudeSessionId)) ? (session.agentSessionId || session.claudeSessionId) : null;
   const modeArgs = (agent.modes[session.mode] || agent.modes[agent.defaultMode]).args;
-  const { argv, stdin } = agent.command(buildPrompt(session.voice, prompt), { cont, resume, modeArgs });
+  const styled = applyVoiceStyle(session, agent, prompt);
+  const { argv, stdin } = agent.command(styled.prompt, { cont, resume, modeArgs, systemPrompt: styled.systemPrompt });
 
   let child;
   try {

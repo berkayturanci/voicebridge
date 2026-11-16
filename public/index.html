@@ -802,6 +802,9 @@
         body: JSON.stringify({ text, sessionId, mode: st.meta.mode, voice: !!st.meta.voice }), signal: st.turn.abort.signal,
       });
       if (r.status === 401) { ensureToken(true); throw new Error("Invalid token — sign in again."); }
+      // Newer bridges send `speech` events (markdown/code stripped server-side);
+      // speak those and only render `delta`. Older bridges: speak deltas.
+      const serverSpeech = r.headers.get("X-VB-Speech") === "1";
       const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
       for (;;) {
         const { value, done } = await reader.read();
@@ -817,8 +820,10 @@
             full += ev.text; bubble.textContent = full;
             if (sessionId === activeId) {
               if (pinned) st.logEl.scrollTop = st.logEl.scrollHeight; else updateJump();
-              setStatus("Replying… (tap ⏹ to stop)"); feedSpeech(ev.text);
+              setStatus("Replying… (tap ⏹ to stop)"); if (!serverSpeech) feedSpeech(ev.text);
             }
+          } else if (ev.type === "speech") {
+            if (sessionId === activeId && ev.text) feedSpeech(ev.text + "\n");
           } else if (ev.type === "activity") {
             addMsg(sessionId, "⚙︎ " + ev.text, "act");
           } else if (ev.type === "approval_request") {

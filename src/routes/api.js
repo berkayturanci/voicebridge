@@ -31,6 +31,7 @@ const {
   readTranscriptTurns,
   findJsonlByContent,
   turnFromTranscriptLine,
+  sanitizeSessionId,
 } = sessionsService;
 const { commandGroupsForAgent } = require("../services/commands");
 const { pushEnabled, pushSubs } = require("../services/push");
@@ -38,6 +39,8 @@ const approvalsService = require("../services/approvals");
 const { getPendingApprovals, resolveApproval } = approvalsService;
 const hub = require("../services/hub");
 const { transcribe } = require("../services/stt");
+const { normalizeVoiceMode } = require("../services/voice-style");
+const { toSpeakable } = require("../services/speech-filter");
 const { clearSessionApprovals } = require("../services/approvals");
 const { getRepoStatus, getFileDiff } = require("../services/git");
 const { streamAsk, proxyCloudBrowse } = require("../runners");
@@ -237,6 +240,7 @@ function handleRequest(req, res) {
         if (typeof data.name === "string" && data.name.trim()) s.name = data.name.trim();
         if (data.mode && AGENTS[s.agent].modes[data.mode]) s.mode = data.mode;
         if (typeof data.voice === "boolean") s.voice = data.voice;
+        if ("voiceMode" in data) s.voiceMode = normalizeVoiceMode(data.voiceMode);
         if (typeof data.claudeSessionId === "string") {
           s.claudeSessionId = sanitizeSessionId(data.claudeSessionId);
           s.started = false;
@@ -264,6 +268,7 @@ function handleRequest(req, res) {
         if (data.reset) session.started = false;
         if (data.mode && AGENTS[session.agent].modes[data.mode]) session.mode = data.mode;
         if (typeof data.voice === "boolean") session.voice = data.voice;
+        if ("voiceMode" in data) session.voiceMode = normalizeVoiceMode(data.voiceMode);
         if (typeof data.model === "string" && data.model.trim()) session.model = data.model.trim();
         inflight++;
         res.on("close", () => { inflight = Math.max(0, inflight - 1); });
@@ -275,7 +280,9 @@ function handleRequest(req, res) {
       return readBody(req, 64 * 1024, (e, body) => {
         if (e) return onBodyError(res, e);
         let data = {}; try { data = JSON.parse((body || "").toString("utf8") || "{}"); } catch (_) {}
-        const text = (typeof data.text === "string" ? data.text : "").trim();
+        const given = (typeof data.text === "string" ? data.text : "").trim();
+        // Strip markdown/code/links before synthesis unless the caller opts out.
+        const text = data.raw === true ? given : toSpeakable(given);
         if (!text) return sendJson(res, 400, { error: "Empty text" });
         const bin = process.env.PIPER_BIN || path.join(os.homedir(), ".local/bin/piper");
         const model = process.env.PIPER_VOICE || "tr_TR-dfki-medium";

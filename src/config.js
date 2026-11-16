@@ -66,9 +66,10 @@ function sessionsFile() {
 function cloudRunnerUrl() { return process.env.CLOUD_RUNNER_URL || ""; }
 function ollamaUrl() { return process.env.OLLAMA_URL || "http://127.0.0.1:11434"; }
 
-const VOICE_PREAMBLE =
-  "Answer concisely, optimized for being read aloud by text-to-speech: avoid long " +
-  "code blocks unless explicitly asked, and finish with a one-sentence spoken summary.";
+// Kept for backwards compatibility: the default spoken-style instruction. The
+// live value is configurable (VOICE_STYLE_PROMPT / VOICE_STYLE_PROMPT_FILE) and
+// is applied per agent by services/voice-style.js.
+const { DEFAULT_VOICE_STYLE_PROMPT: VOICE_PREAMBLE, applyVoiceStyle } = require("./services/voice-style");
 
 function isSlashCommand(text) {
   return /^\s*\/[a-zA-Z]/.test(text);
@@ -76,7 +77,7 @@ function isSlashCommand(text) {
 
 function buildPrompt(voice, text) {
   if (isSlashCommand(text)) return text.trim();
-  return voice ? VOICE_PREAMBLE + "\n\n" + text : text;
+  return applyVoiceStyle({ voice: !!voice }, null, text).prompt;
 }
 
 function looksLikeQuestion(text) {
