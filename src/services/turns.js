@@ -68,13 +68,22 @@ async function stop(sessionId, { timeoutMs = 5000 } = {}) {
 
 // A response-shaped sink for turns started in the background (sent to a
 // session other than the one the user is looking at). Events still reach
-// /ws subscribers through the hub.
-function createSink() {
+// /ws subscribers through the hub. `onEvent` receives each NDJSON event written.
+function createSink(onEvent) {
   const sink = new EventEmitter();
   sink.headersSent = false;
   sink.writableEnded = false;
   sink.writeHead = () => { sink.headersSent = true; return sink; };
-  sink.write = () => true;
+  sink.write = (chunk) => {
+    if (typeof onEvent === "function") {
+      for (const line of String(chunk || "").split("\n")) {
+        if (!line.trim()) continue;
+        let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
+        try { onEvent(ev); } catch (_) {}
+      }
+    }
+    return true;
+  };
   sink.end = () => {
     if (sink.writableEnded) return sink;
     sink.writableEnded = true;

@@ -1031,6 +1031,9 @@
       st.turn.busy = false;
       st._remoteBubble = null; st._remoteText = "";
       if (msg.sessionId === activeId) { refreshMic(); setStatus(""); }
+    } else if (msg.type === "narration" && msg.kind === "background" && msg.text) {
+      // Another session (sent there by the voice agent) needs approval or finished.
+      if (msg.sessionId === activeId) { addMsg(msg.sessionId, "🔊 " + msg.text, "sys"); speakWhenQuiet(msg.text + "\n"); }
     } else if (msg.type === "approval_request" && msg.sessionId) {
       const existing = document.getElementById("appr_" + msg.id);
       if (!existing) renderApprovalCard(msg.sessionId, msg);

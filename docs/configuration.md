@@ -171,7 +171,7 @@ plan of tool calls that the bridge executes:
 
 | Tool | Does |
 |------|------|
-| `send_to_session(session, text)` | Runs a turn. The session you are on streams back as usual; any other session runs in the background (its events still reach `/ws`), and you hear "Sent to web." |
+| `send_to_session(session, text)` | Runs a turn. The session you are on streams back as usual; any other session runs in the background (its events still reach `/ws`): you hear "Sent to web.", then its approval notices and, when it finishes, a short result ("web finished: build passed.") on the session you are on. |
 | `stop_session(session)` | Interrupts the running turn (closes it; persistent live children are killed and resume the conversation next turn; tmux gets Esc/Ctrl-C). The interrupted stream ends with `{type:"done", stopped:true}`. |
 | `get_status(session)` | "api is working, for 2 minutes. Last step: Bash npm test." / "api is idle. Last answer: …" |
 | `read_full_answer(session)` | Speaks that session's last full reply. |
