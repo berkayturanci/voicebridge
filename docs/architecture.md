@@ -39,6 +39,8 @@ src/
 │   ├── speech-filter.js    # Markdown/code → speakable text (one-shot and streaming)
 │   ├── narrator.js         # Per-turn voice pipeline: progress/final/approval narration, "read the full answer"
 │   ├── summarizer.js       # Provider-neutral short-summary client (Anthropic, OpenAI-compatible, Ollama)
+│   ├── voice-agent.js      # Voice router: plans send/stop/status/read/list tool calls, spoken confirmations
+│   ├── turns.js            # Running-turn registry (busy, last activity, stop)
 │   └── push.js             # Web Push notifications
 └── routes/                 # HTTP & WebSocket route handlers
     ├── api.js              # REST API endpoint dispatcher
@@ -74,6 +76,7 @@ The WebSocket Session Hub (`src/services/hub.js`) provides full-duplex live stat
 - **Event Protocol**:
   - `turn_start`: `{ type: "turn_start", sessionId, prompt }`
   - `delta`: `{ type: "delta", sessionId, text }`
+  - `router`: `{ type: "router", sessionId, actions: [{ tool, sessionId?, text? }], confirmed?, pending? }` — the voice agent's plan for this utterance
   - `narration`: `{ type: "narration", sessionId, kind: "progress"|"final"|"approval", text, ms? }` — spoken summaries from the narrator
   - `tool_result`: `{ type: "tool_result", sessionId, id?, error }` — a Claude tool call finished (used by the narrator)
   - `speech`: `{ type: "speech", sessionId, text }` — speakable form of the reply (code/markdown/links stripped, sentence-cut); see [configuration](configuration.md#speech-filter)

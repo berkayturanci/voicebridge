@@ -5,7 +5,8 @@ const { streamCloud, proxyCloudBrowse } = require("./cloud");
 const { streamTmux } = require("./tmux");
 const { streamOllama } = require("./ollama");
 const { streamLocal } = require("./local");
-const { isLiveEnabled, streamLive } = require("./live");
+const { isLiveEnabled, streamLive, killLive } = require("./live");
+const turns = require("../services/turns");
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -55,15 +56,12 @@ function rawEmitter(session, res) {
   return (obj) => {
     try { res.write(JSON.stringify(obj) + "\n"); } catch (_) {}
     try { hub.broadcast(session.id, Object.assign({ sessionId: session.id }, obj)); } catch (_) {}
+    try { turns.note(session.id, obj); } catch (_) {}
   };
 }
 
-// "read the full answer": speak the session's last full reply without
-// involving the agent. The chat already shows it, so only speech is sent.
-function streamReadFull(session, prompt, res) {
-  res.writeHead(200, streamHeaders(session, { "X-VB-Narrator": "1" }));
-  const emit = rawEmitter(session, res);
-  try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt, local: true }); } catch (_) {}
+// Speak a session's last full reply (sentence-sized `speech` events).
+function emitFullAnswer(session, emit) {
   const last = session.lastReply && session.lastReply.text;
   if (!last) {
     const msg = narrator.template("noFull", {});
@@ -78,14 +76,41 @@ function streamReadFull(session, prompt, res) {
       if (t) emit({ type: "speech", text: t });
     }
   }
+}
+
+// "read the full answer": speak the session's last full reply without
+// involving the agent. The chat already shows it, so only speech is sent.
+function streamReadFull(session, prompt, res) {
+  if (!res.headersSent) res.writeHead(200, streamHeaders(session, { "X-VB-Narrator": "1" }));
+  const emit = rawEmitter(session, res);
+  try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt, local: true }); } catch (_) {}
+  emitFullAnswer(session, emit);
   emit({ type: "done", local: true });
   res.end();
 }
 
+// How to interrupt a running turn, per runner. Closing the response is
+// enough for local/ollama/cloud (they kill or abort on "close").
+function stopHook(session) {
+  return () => {
+    try { hub.broadcast(session.id, { type: "done", sessionId: session.id, stopped: true }); } catch (_) {}
+    if (session.runner === "tmux") {
+      const tmux = require("./tmux");
+      const key = session.agent === "claude" ? "Escape" : "C-c";
+      tmux.tmuxRun(["send-keys", "-t", tmux.tmuxName(session.id), key]);
+    } else if (isLiveEnabled() && AGENTS[session.agent] && AGENTS[session.agent].live) {
+      killLive(session.id);
+    }
+  };
+}
+
+// Run one turn and stream it into `res`. If `res` already has headers (the
+// voice agent proxying a turn into its own stream), they are left alone.
 function streamAsk(session, prompt, res) {
   if (narrator.isReadFullCommand(prompt)) return streamReadFull(session, prompt, res);
   const pipeline = narrator.createVoicePipeline({ session, prompt, rawEmit: rawEmitter(session, res) });
-  res.writeHead(200, streamHeaders(session, { "X-VB-Narrator": pipeline.narrate ? "1" : "0" }));
+  if (!res.headersSent) res.writeHead(200, streamHeaders(session, { "X-VB-Narrator": pipeline.narrate ? "1" : "0" }));
+  turns.register(session, prompt, res, { stop: stopHook(session) });
   pipeline.deferEnd(res);
   const emit = pipeline.emit;
   try { hub.broadcast(session.id, { type: "turn_start", sessionId: session.id, prompt }); } catch (_) {}
@@ -100,6 +125,9 @@ function streamAsk(session, prompt, res) {
 
 module.exports = {
   streamAsk,
+  streamHeaders,
+  rawEmitter,
+  emitFullAnswer,
   withSpeech,
   streamLocal,
   streamCloud,

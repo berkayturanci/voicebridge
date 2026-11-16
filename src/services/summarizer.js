@@ -128,14 +128,15 @@ function tidy(text) {
     .trim();
 }
 
-async function complete({ system, user, maxTokens = 160, env = process.env, logger = console, label = "summary" } = {}) {
+// raw: return the model text untouched (for JSON output); otherwise tidy() it.
+async function complete({ system, user, maxTokens = 160, env = process.env, logger = console, label = "summary", raw: keepRaw = false } = {}) {
   const cfg = config(env);
   if (cfg.provider === "off") return null;
   if (Date.now() < cooldownUntil) return null;
   const t0 = Date.now();
   try {
     const raw = await CALLERS[cfg.provider](cfg, system, user, maxTokens, env);
-    const text = tidy(raw);
+    const text = keepRaw ? String(raw || "").trim() : tidy(raw);
     const ms = Date.now() - t0;
     if (!text) throw new Error("empty response");
     logLine(env, logger, `[narrator] ${label} ok provider=${cfg.provider} model=${cfg.model} +${ms}ms`);
