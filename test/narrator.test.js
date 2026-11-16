@@ -129,6 +129,39 @@ test("summarizer: timeout and refusal fall back to null; off provider never call
   assert.strictEqual(summarizer.available({}), false);
 });
 
+test("summarizer: claude-cli uses the logged-in CLI (no API key), from a temp dir", async () => {
+  summarizer._reset();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vb-cli-"));
+  const log = path.join(dir, "argv.json");
+  const bin = path.join(dir, "claude");
+  fs.writeFileSync(bin, `#!/usr/bin/env node
+require("fs").writeFileSync(${JSON.stringify(log)}, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));
+process.stdout.write("  Testleri çalıştırıyor.\\n");
+`);
+  fs.chmodSync(bin, 0o755);
+  try {
+    const env = { SUMMARY_PROVIDER: "claude-cli", CLAUDE_BIN: bin };
+    assert.strictEqual(summarizer.resolveProvider({ SUMMARY_PROVIDER: "claude" }), "claude-cli");
+    assert.strictEqual(summarizer.config(env).timeoutMs, 20000);
+    const r = await summarizer.complete({ system: "SYS", user: "USER", env, logger: quiet });
+    assert.strictEqual(r.text, "Testleri çalıştırıyor.");
+    assert.strictEqual(r.provider, "claude-cli");
+    const seen = JSON.parse(fs.readFileSync(log, "utf8"));
+    assert.deepStrictEqual(seen.argv, ["-p", "--model", "haiku", "--system-prompt", "SYS", "--output-format", "text", "USER"]);
+    assert.strictEqual(fs.realpathSync(seen.cwd), fs.realpathSync(os.tmpdir()));
+
+    fs.writeFileSync(bin, "#!/usr/bin/env node\nprocess.stderr.write('not logged in'); process.exit(1);\n");
+    summarizer._reset();
+    assert.strictEqual(await summarizer.complete({ system: "S", user: "U", env, logger: quiet }), null);
+    assert.match(summarizer.status(env).lastError, /claude exited 1: not logged in/);
+
+    fs.writeFileSync(bin, "#!/usr/bin/env node\nsetInterval(() => {}, 1000);\n");
+    summarizer._reset();
+    assert.strictEqual(await summarizer.complete({ system: "S", user: "U", env: Object.assign({ SUMMARY_TIMEOUT_MS: "200" }, env), logger: quiet }), null);
+    assert.strictEqual(summarizer.status(env).lastError, "timeout");
+  } finally { summarizer._reset(); }
+});
+
 // ---------- narrator helpers ----------
 
 test("isReadFullCommand matches English and Turkish phrases, configurable", () => {

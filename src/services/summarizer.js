@@ -2,7 +2,9 @@
 
 // Provider-neutral "make this short enough to say out loud" client.
 //
-// SUMMARY_PROVIDER   auto (default) | anthropic | openai | ollama | off
+// SUMMARY_PROVIDER   auto (default) | claude-cli | anthropic | openai | ollama | off
+//   claude-cli: the `claude` CLI already logged in on this machine (no API
+//   key; uses CLAUDE_BIN, model alias "haiku" by default).
 //   auto: anthropic when ANTHROPIC_API_KEY is set, else openai when
 //   SUMMARY_BASE_URL is set, else ollama when SUMMARY_OLLAMA_URL is set,
 //   else off.
@@ -17,6 +19,7 @@
 // Uses the global fetch (Node >= 18) so the bridge stays dependency-free.
 
 const DEFAULT_MODELS = {
+  "claude-cli": "haiku",
   anthropic: "claude-haiku-5-5",
   openai: "gpt-4o-mini",
   ollama: "llama3.2",
@@ -33,6 +36,7 @@ function num(v, dflt) {
 function resolveProvider(env = process.env) {
   const p = String(env.SUMMARY_PROVIDER || "auto").toLowerCase().trim();
   if (p === "off" || p === "none" || p === "0" || p === "false") return "off";
+  if (p === "claude-cli" || p === "claude" || p === "cli") return "claude-cli";
   if (p === "anthropic" || p === "openai" || p === "ollama") return p;
   if (env.ANTHROPIC_API_KEY) return "anthropic";
   if (env.SUMMARY_BASE_URL) return "openai";
@@ -45,7 +49,8 @@ function config(env = process.env) {
   return {
     provider,
     model: (env.SUMMARY_MODEL && env.SUMMARY_MODEL.trim()) || DEFAULT_MODELS[provider] || "",
-    timeoutMs: num(env.SUMMARY_TIMEOUT_MS, 6000),
+    // The CLI pays a process start per call, so it gets more headroom.
+    timeoutMs: num(env.SUMMARY_TIMEOUT_MS, provider === "claude-cli" ? 20000 : 6000),
     cooldownMs: num(env.SUMMARY_COOLDOWN_MS, 60000),
   };
 }
@@ -117,7 +122,37 @@ async function callOllama(cfg, system, user, maxTokens, env) {
   return String((data && data.message && data.message.content) || "").trim();
 }
 
-const CALLERS = { anthropic: callAnthropic, openai: callOpenAI, ollama: callOllama };
+// The locally logged-in Claude Code CLI: `claude -p` in print mode with its own
+// system prompt, run from a temp dir so no project CLAUDE.md is loaded.
+function callClaudeCli(cfg, system, user, maxTokens, env) {
+  const { spawn } = require("child_process");
+  const os = require("os");
+  return new Promise((resolve, reject) => {
+    const bin = env.CLAUDE_BIN || "claude";
+    const argv = ["-p", "--model", cfg.model, "--system-prompt", system, "--output-format", "text", user];
+    let child;
+    try {
+      child = spawn(bin, argv, { cwd: os.tmpdir(), env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) { return reject(e); }
+    let out = "", err = "", done = false;
+    const finish = (fn, v) => { if (done) return; done = true; clearTimeout(timer); fn(v); };
+    const timer = setTimeout(() => {
+      try { child.kill("SIGKILL"); } catch (_) {}
+      const e = new Error("timeout"); e.name = "AbortError"; finish(reject, e);
+    }, cfg.timeoutMs || 20000);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (d) => { out += d; });
+    child.stderr.on("data", (d) => { err += d; });
+    child.on("error", (e) => finish(reject, e));
+    child.on("close", (code) => {
+      if (code !== 0) return finish(reject, new Error(`claude exited ${code}: ${err.trim().slice(0, 200)}`));
+      finish(resolve, out.trim());
+    });
+  });
+}
+
+const CALLERS = { "claude-cli": callClaudeCli, anthropic: callAnthropic, openai: callOpenAI, ollama: callOllama };
 
 // Strip a model's habit of wrapping the sentence in quotes or markdown.
 function tidy(text) {
