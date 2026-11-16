@@ -59,13 +59,13 @@ required — the defaults run a local, Claude-backed bridge on port 8787.
 | `NARRATOR_APPROVAL_TEXT` | _(template)_ | Override the approval notice; `{session}` and `{action}` are filled in, e.g. `{session} onayını bekliyor: {action}.` |
 | `NARRATOR_READ_FULL_PHRASES` | _(built-in)_ | `\|`-separated phrases that speak the last full reply instead of going to the agent. Default: "read the full answer", "full answer", "tam cevabı oku", "cevabın tamamını oku", … |
 | `NARRATOR_LOG` | `1` | Log each summarizer call with its added latency (`[narrator] final ok provider=… +812ms`). `0` silences it. |
-| `SUMMARY_PROVIDER` | `auto` | Summarizer model provider: `anthropic`, `openai` (any OpenAI-compatible endpoint), `ollama`, `off`, or `auto` (Anthropic if `ANTHROPIC_API_KEY` is set, else OpenAI-compatible if `SUMMARY_BASE_URL` is set, else Ollama if `SUMMARY_OLLAMA_URL` is set, else off). |
-| `SUMMARY_MODEL` | per provider | `claude-haiku-5-5` (Anthropic), `gpt-4o-mini` (OpenAI-compatible), `llama3.2` (Ollama). |
+| `SUMMARY_PROVIDER` | `auto` | Summarizer model provider: `claude-cli` (the `claude` CLI already logged in on this machine — no API key; runs `claude -p --model haiku` from a temp dir), `anthropic`, `openai` (any OpenAI-compatible endpoint), `ollama`, `off`, or `auto` (Anthropic if `ANTHROPIC_API_KEY` is set, else OpenAI-compatible if `SUMMARY_BASE_URL` is set, else Ollama if `SUMMARY_OLLAMA_URL` is set, else the `claude` CLI if it is installed, else off). |
+| `SUMMARY_MODEL` | per provider | `haiku` (claude-cli alias), `claude-haiku-5-5` (Anthropic), `gpt-4o-mini` (OpenAI-compatible), `llama3.2` (Ollama). |
 | `ANTHROPIC_API_KEY` | _(none)_ | API key for the Anthropic summarizer. |
 | `SUMMARY_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible base URL (`…/chat/completions` is appended), e.g. LM Studio, vLLM, OpenRouter. |
 | `SUMMARY_API_KEY` | _(none)_ | Bearer key for the OpenAI-compatible endpoint. |
 | `SUMMARY_OLLAMA_URL` | `OLLAMA_URL` | Ollama base URL for summaries — can be another machine, e.g. `http://macbook-b.tailnet:11434`. |
-| `SUMMARY_TIMEOUT_MS` | `6000` | Per-call timeout; on timeout the raw reply is read. |
+| `SUMMARY_TIMEOUT_MS` | `6000` (`20000` for `claude-cli`) | Per-call timeout; on timeout the raw reply is read. |
 | `SUMMARY_COOLDOWN_MS` | `60000` | After a failed call, skip the summarizer (read raw replies) for this long. |
 | `VOICE_AGENT` | `0` | Turn on the voice agent (router) for voice-mode sessions. The web UI's **Voice agent** switch, or `"voiceAgent": true/false` on `POST /api/ask`, overrides it per request. Uses the summarizer model above. |
 
@@ -207,7 +207,10 @@ The `/api/ask` stream starts with `{type:"router", actions:[…], confirmed}`.
 **Summarizer examples**
 
 ```
-# Anthropic (Haiku)
+# Nothing to set: with no key/URL configured, auto uses the claude CLI
+# you are already logged in with. To force it:
+SUMMARY_PROVIDER=claude-cli
+# Anthropic API (Haiku)
 ANTHROPIC_API_KEY=sk-ant-...
 # Local Ollama on another Mac on your tailnet
 SUMMARY_PROVIDER=ollama

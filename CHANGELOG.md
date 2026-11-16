@@ -32,6 +32,10 @@ All notable changes to voicebridge are documented here. This project adheres to
   sessions are addressed by name (asks when ambiguous); commit/push/delete
   instructions need a spoken yes. Falls back to sending the utterance to the
   current session when off or when the model is unavailable.
+- `SUMMARY_PROVIDER=claude-cli`: summaries and voice-agent plans can use the
+  `claude` CLI already logged in on the machine (`claude -p --model haiku`,
+  run from a temp dir), so no API key is needed. `auto` picks it when no API
+  key or URL is configured and the CLI is installed.
 - Turns the voice agent starts in another session announce their approvals
   and their result on the session you are on (`narration` kind `background`).
 - **Mobile app** speaks what the bridge sends for voice-mode sessions:
