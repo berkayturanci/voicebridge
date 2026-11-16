@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'settings.dart';
 import 'theme.dart';
@@ -19,7 +19,7 @@ class VoiceBridgeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: VbThemeController.isDark,
-      builder: (_, dark, __) {
+      builder: (_, dark, _) {
         VbColors.setPalette(dark ? VbPalette.dark : VbPalette.light);
         return MaterialApp(
           title: 'VoiceBridge',

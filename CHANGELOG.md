@@ -34,10 +34,23 @@ All notable changes to voicebridge are documented here. This project adheres to
   current session when off or when the model is unavailable.
 - Turns the voice agent starts in another session announce their approvals
   and their result on the session you are on (`narration` kind `background`).
+- **Mobile app** speaks what the bridge sends for voice-mode sessions:
+  filtered `speech`, final summaries, and progress / approval /
+  background-session notices (queued so they never overlap). Older bridges
+  keep the app's own read-the-lead behaviour.
 
 ### Fixed
 - `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer
   throws (missing `sanitizeSessionId` import).
+
+### Changed
+- **App**: migrated from `package:flutter/material.dart` (deprecated in
+  Flutter 3.50) to `package:material_ui`. The app now needs Flutter 3.47+ /
+  Dart 3.13+, and CI builds it on current stable again instead of a pinned
+  3.47.6.
+- **App (Android)**: Gradle wrapper 9.1.0 → 9.5.0, Android Gradle Plugin
+  9.0.1 → 9.3.1 and Kotlin 2.3.20 → 2.4.20, the versions Flutter 3.50's
+  template uses (it rejects Gradle < 9.3.1 and AGP < 9.1.1).
 
 ## [0.8.2] - 2026-08-16
 

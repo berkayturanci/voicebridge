@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
 import '../qr_pairing.dart';
@@ -260,7 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _themeToggle() {
     return ValueListenableBuilder<String>(
       valueListenable: VbThemeController.mode,
-      builder: (_, mode, __) => Container(
+      builder: (_, mode, _) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: VbColors.surface,
