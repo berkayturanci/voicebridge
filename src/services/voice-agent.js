@@ -84,6 +84,9 @@ const T = {
     listOne: "One session: {names}.",
     which: "Which session? {names}.",
     noFull: "{session} has no answer to read yet.",
+    bgDone: "{session} finished: {text}",
+    bgDoneEmpty: "{session} finished.",
+    bgFailed: "{session} stopped with an error.",
     min: "{n} minutes", min1: "a minute", lessMin: "less than a minute",
   },
   tr: {
@@ -101,6 +104,9 @@ const T = {
     listOne: "Bir oturum var: {names}.",
     which: "Hangi oturum? {names}.",
     noFull: "{session} için okunacak bir cevap yok.",
+    bgDone: "{session} bitti: {text}",
+    bgDoneEmpty: "{session} bitti.",
+    bgFailed: "{session} hatayla durdu.",
     min: "{n} dakika", min1: "bir dakika", lessMin: "bir dakikadan az",
   },
 };
@@ -275,7 +281,7 @@ async function handle({ text, active, res, deps, env = process.env }) {
       else sayLine(t("noFull", { session: target.name }, env));
     } else if (a.tool === "send_to_session") {
       if (target.id === active.id && !proxy) { proxy = { target, text: a.text }; continue; }
-      deps.streamAsk(target, a.text, deps.createSink());
+      deps.streamAsk(target, a.text, deps.createSink(backgroundRelay(target, active, deps, env)));
       if (!say) sayLine(t("sentBackground", { session: target.name }, env));
     }
   }
@@ -298,6 +304,33 @@ async function handle({ text, active, res, deps, env = process.env }) {
     log(`[voice-agent] ${getPending() ? "awaiting confirmation" : "reply"} +${Date.now() - t0}ms`);
     return true;
   }
+}
+
+// A turn sent to another session runs out of sight; tell the user (on the
+// session they are looking at) when it needs approval and when it finishes.
+function backgroundRelay(target, active, deps, env) {
+  const spoken = [];
+  let summary = null;
+  const relay = (text) => {
+    if (!text || !deps.broadcast) return;
+    deps.broadcast(active.id, { type: "narration", kind: "background", fromSessionId: target.id, text });
+  };
+  return (ev) => {
+    if (!ev || !ev.type) return;
+    if (ev.type === "speech" && ev.text) spoken.push(ev.text);
+    else if (ev.type === "narration" && ev.kind === "final") summary = ev.text;
+    else if (ev.type === "narration" && ev.kind === "approval") relay(ev.text);
+    else if (ev.type === "error") relay(t("bgFailed", { session: target.name }, env));
+    else if (ev.type === "done" && !ev.stopped) {
+      let text = summary || firstSentences(spoken.join(" "), 2);
+      if (!text && target.lastReply) text = firstSentences(toSpeakable(target.lastReply.text), 2);
+      relay(text ? t("bgDone", { session: target.name, text }, env) : t("bgDoneEmpty", { session: target.name }, env));
+    }
+  };
+}
+function firstSentences(s, n) {
+  const parts = String(s || "").match(/[^.!?…]+[.!?…]+|\S[^.!?…]*$/g) || [];
+  return parts.slice(0, n).map((x) => x.trim()).join(" ").slice(0, 400);
 }
 
 function publicAction(a) {

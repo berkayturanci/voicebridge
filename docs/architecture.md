@@ -77,7 +77,7 @@ The WebSocket Session Hub (`src/services/hub.js`) provides full-duplex live stat
   - `turn_start`: `{ type: "turn_start", sessionId, prompt }`
   - `delta`: `{ type: "delta", sessionId, text }`
   - `router`: `{ type: "router", sessionId, actions: [{ tool, sessionId?, text? }], confirmed?, pending? }` — the voice agent's plan for this utterance
-  - `narration`: `{ type: "narration", sessionId, kind: "progress"|"final"|"approval", text, ms? }` — spoken summaries from the narrator
+  - `narration`: `{ type: "narration", sessionId, kind: "progress"|"final"|"approval"|"background", text, ms?, fromSessionId? }` — spoken summaries from the narrator; `background` relays another session's approval/result to the session you are on
   - `tool_result`: `{ type: "tool_result", sessionId, id?, error }` — a Claude tool call finished (used by the narrator)
   - `speech`: `{ type: "speech", sessionId, text }` — speakable form of the reply (code/markdown/links stripped, sentence-cut); see [configuration](configuration.md#speech-filter)
   - `activity`: `{ type: "activity", sessionId, tool, text }`

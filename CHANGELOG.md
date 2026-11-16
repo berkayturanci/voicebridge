@@ -32,6 +32,8 @@ All notable changes to voicebridge are documented here. This project adheres to
   sessions are addressed by name (asks when ambiguous); commit/push/delete
   instructions need a spoken yes. Falls back to sending the utterance to the
   current session when off or when the model is unavailable.
+- Turns the voice agent starts in another session announce their approvals
+  and their result on the session you are on (`narration` kind `background`).
 
 ### Fixed
 - `POST /api/sessions/:id` with `claudeSessionId` / `agentSessionId` no longer

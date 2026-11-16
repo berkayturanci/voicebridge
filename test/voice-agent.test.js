@@ -94,16 +94,22 @@ function fakeDeps(plan, extra = {}) {
     { id: "s1", name: "api", projectDir: "/w/api", agent: "claude", voice: true },
     { id: "s2", name: "web", projectDir: "/w/web", agent: "claude", voice: true },
   ];
-  const calls = { stop: [], send: [], model: [] };
+  const calls = { stop: [], send: [], model: [], broadcast: [] };
   const deps = {
     listSessions: () => sessions,
     getSession: (id) => sessions.find((s) => s.id === id) || null,
     complete: async (a) => { calls.model.push(a); return plan == null ? null : { text: typeof plan === "string" ? plan : JSON.stringify(plan), ms: 3 }; },
-    streamAsk: (s, text, res) => { calls.send.push({ id: s.id, text, proxied: !!res.lines }); if (res.lines) { res.write(JSON.stringify({ type: "delta", text: "agent:" + text })); res.write(JSON.stringify({ type: "done" })); res.end(); } else res.end(); },
+    streamAsk: (s, text, res) => {
+      calls.send.push({ id: s.id, text, proxied: !!res.lines });
+      if (res.lines) { res.write(JSON.stringify({ type: "delta", text: "agent:" + text })); res.write(JSON.stringify({ type: "done" })); return res.end(); }
+      for (const ev of (extra.backgroundEvents || [])) res.write(JSON.stringify(ev) + "\n");
+      res.end();
+    },
+    broadcast: (id, ev) => calls.broadcast.push({ id, ev }),
     stopTurn: async (id) => { calls.stop.push(id); return true; },
     isBusy: (id) => (extra.busy || []).includes(id),
     turnInfo: () => null,
-    createSink: () => turns.createSink(),
+    createSink: (onEvent) => turns.createSink(onEvent),
     streamHeaders: () => ({}),
     rawEmitter: (s, res) => (o) => res.write(JSON.stringify(o)),
     emitFullAnswer: (s, emit) => emit({ type: "speech", text: "FULL:" + s.lastReply.text }),
@@ -186,6 +192,33 @@ test("handle: other sessions run in the background; ambiguous names get a questi
   const r3 = fakeRes();
   await va.handle({ text: "testleri çalıştır", active: ask.sessions[0], res: r3, deps: ask.deps, env: {} });
   assert.strictEqual(speechOf(r3), "Hangi oturumda?");
+});
+
+test("handle: background turns relay their approval and result to the session you are on", async () => {
+  va.clearPending();
+  const { deps, calls, sessions } = fakeDeps({ actions: [{ tool: "send_to_session", session: "web", text: "build it" }] }, {
+    backgroundEvents: [
+      { type: "narration", kind: "approval", text: "web is waiting for your approval: npm publish." },
+      { type: "speech", text: "Build finished without errors." },
+      { type: "speech", text: "Bundle is 120 kB. Extra detail." },
+      { type: "done" },
+    ],
+  });
+  await va.handle({ text: "web'de build al", active: sessions[0], res: fakeRes(), deps, env: { NARRATOR_LANG: "tr" } });
+  assert.deepStrictEqual(calls.broadcast.map((b) => [b.id, b.ev.kind, b.ev.fromSessionId, b.ev.text]), [
+    ["s1", "background", "s2", "web is waiting for your approval: npm publish."],
+    ["s1", "background", "s2", "web bitti: Build finished without errors. Bundle is 120 kB."],
+  ]);
+
+  const sum = fakeDeps({ actions: [{ tool: "send_to_session", session: "web", text: "x" }] }, {
+    backgroundEvents: [{ type: "narration", kind: "final", text: "All good." }, { type: "done" }],
+  });
+  await va.handle({ text: "x", active: sum.sessions[0], res: fakeRes(), deps: sum.deps, env: {} });
+  assert.strictEqual(sum.calls.broadcast[0].ev.text, "web finished: All good.");
+
+  const stopped = fakeDeps({ actions: [{ tool: "send_to_session", session: "web", text: "x" }] }, { backgroundEvents: [{ type: "done", stopped: true }] });
+  await va.handle({ text: "x", active: stopped.sessions[0], res: fakeRes(), deps: stopped.deps, env: {} });
+  assert.strictEqual(stopped.calls.broadcast.length, 0); // a stop the user asked for isn't announced again
 });
 
 test("handle: status, list and read_full_answer", async () => {
@@ -297,7 +330,10 @@ test("e2e: voice agent off or summarizer down → plain Stage 1–2 turn", async
 });
 
 test("turns.createSink behaves like a response for background turns", async () => {
-  const sink = turns.createSink();
+  const seen = [];
+  const sink = turns.createSink((ev) => seen.push(ev.type));
+  sink.write(JSON.stringify({ type: "delta" }) + "\n" + JSON.stringify({ type: "done" }) + "\nnot json\n");
+  assert.deepStrictEqual(seen, ["delta", "done"]);
   let closed = false;
   sink.on("close", () => { closed = true; });
   sink.writeHead(200, {});
