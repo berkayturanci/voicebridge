@@ -233,10 +233,10 @@ class Api {
       _u('/api/sessions/$id'),
       headers: _headers({'Content-Type': 'application/json'}),
       body: jsonEncode({
-        if (name != null) 'name': name,
-        if (mode != null) 'mode': mode,
-        if (voice != null) 'voice': voice,
-        if (claudeSessionId != null) 'claudeSessionId': claudeSessionId,
+        'name': ?name,
+        'mode': ?mode,
+        'voice': ?voice,
+        'claudeSessionId': ?claudeSessionId,
       }),
     );
     if (r.statusCode != 200) {
