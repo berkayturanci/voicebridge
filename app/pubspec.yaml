@@ -20,7 +20,7 @@ dependencies:
   wakelock_plus: ^1.8.0   # keep the screen awake during talking mode (so the connection doesn't drop)
   url_launcher: ^6.3.0    # open privacy, support, and docs links from settings
   mobile_scanner: ^7.4.2  # scan the bridge's startup QR (README-promised pairing flow, #212)
-  material_ui: ^1.11.0
+  material_ui: ^1.11.1
 
 dev_dependencies:
   flutter_test:
